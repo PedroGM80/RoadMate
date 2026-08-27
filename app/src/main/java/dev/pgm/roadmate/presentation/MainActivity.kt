@@ -8,13 +8,19 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
+import dev.pgm.roadmate.domain.repository.OnboardingRepository
 import dev.pgm.roadmate.presentation.screen.HomeScreen
+import dev.pgm.roadmate.presentation.screen.OnboardingScreen
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 import dev.pgm.roadmate.service.SilenceDetectionForegroundService
 import dev.pgm.roadmate.ui.theme.RoadMateTheme
 import dev.pgm.roadmate.utils.PermissionManager
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -25,16 +31,29 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var permissionManager: PermissionManager
 
+    @Inject
+    lateinit var onboardingRepository: OnboardingRepository
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             RoadMateTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    HomeScreen(
-                        viewModel = viewModel,
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    val isOnboardingCompleted by onboardingRepository.isOnboardingCompleted
+                        .collectAsState(initial = null)
+
+                    when (isOnboardingCompleted) {
+                        null -> Unit // still reading DataStore — render nothing rather than flash a screen
+                        false -> OnboardingScreen(
+                            onContinue = { lifecycleScope.launch { onboardingRepository.setOnboardingCompleted() } },
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                        true -> HomeScreen(
+                            viewModel = viewModel,
+                            modifier = Modifier.padding(innerPadding)
+                        )
+                    }
                 }
             }
         }
