@@ -13,6 +13,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +50,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -83,6 +87,7 @@ fun HomeScreen(
     LaunchedEffect(permissionsState.allPermissionsGranted) {
         if (permissionsState.allPermissionsGranted) {
             viewModel.startSilenceMonitoring()
+            viewModel.refreshLocation()
             if (notificationPermissionState?.status?.isGranted == false) {
                 notificationPermissionState.launchPermissionRequest()
             }
@@ -104,6 +109,8 @@ fun HomeScreen(
 
         LocationChip(
             location = uiState.location,
+            unavailable = uiState.locationUnavailable,
+            onRetry = viewModel::refreshLocation,
             modifier = Modifier.padding(top = 8.dp)
         )
 
@@ -126,11 +133,24 @@ fun HomeScreen(
 }
 
 @Composable
-private fun LocationChip(location: Pair<Double, Double>?, modifier: Modifier = Modifier) {
+private fun LocationChip(
+    location: Pair<Double, Double>?,
+    unavailable: Boolean,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val label = when {
+        location != null -> "%.4f, %.4f".format(location.first, location.second)
+        unavailable -> "Ubicación no disponible · toca para reintentar"
+        else -> "Buscando ubicación..."
+    }
+
     Row(
         modifier = modifier
             .background(MaterialTheme.colorScheme.surfaceVariant, shape = CircleShape)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .let { if (unavailable) it.clickable(onClick = onRetry) else it }
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -140,9 +160,7 @@ private fun LocationChip(location: Pair<Double, Double>?, modifier: Modifier = M
             modifier = Modifier.size(16.dp)
         )
         Text(
-            text = location
-                ?.let { "%.4f, %.4f".format(it.first, it.second) }
-                ?: "Buscando ubicación...",
+            text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp)
@@ -173,7 +191,13 @@ private fun GrantedContent(
                 .fillMaxWidth()
                 .padding(bottom = 40.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    // Announce to TalkBack when the answer arrives — the driver
+                    // may be looking at the road, not the screen, when it does.
+                    .semantics { liveRegion = LiveRegionMode.Polite }
+            ) {
                 if (uiState.lastRecognizedInput.isNotBlank()) {
                     Text(
                         text = "Tú: “${uiState.lastRecognizedInput}”",

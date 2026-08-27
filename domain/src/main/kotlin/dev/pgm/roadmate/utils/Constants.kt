@@ -24,6 +24,9 @@ object Constants {
 
     const val GEMINI_TIMEOUT_MS = 5_000L
 
+    /** How long to wait for a GPS fix before showing "location unavailable" instead of spinning forever. */
+    const val LOCATION_TIMEOUT_MS = 10_000L
+
     const val GEMINI_SYSTEM_PROMPT =
         "Eres el copiloto de viaje local de RoadMate. Respondes de forma breve, " +
             "clara y útil a un conductor, usando su ubicación y contexto de viaje. " +

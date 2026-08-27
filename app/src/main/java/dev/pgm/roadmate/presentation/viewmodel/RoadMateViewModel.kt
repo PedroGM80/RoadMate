@@ -9,6 +9,7 @@ import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.DetectSilenceUseCase
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
+import dev.pgm.roadmate.utils.Constants
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Calendar
 import javax.inject.Inject
 
@@ -27,6 +29,7 @@ data class RoadMateUiState(
     val lastRecognizedInput: String = "",
     val currentResponse: String = "",
     val location: Pair<Double, Double>? = null,
+    val locationUnavailable: Boolean = false,
     val isListening: Boolean = false
 )
 
@@ -48,7 +51,30 @@ class RoadMateViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             locationRepository.location.collect { location ->
-                _uiState.value = _uiState.value.copy(location = location)
+                _uiState.value = _uiState.value.copy(
+                    location = location,
+                    locationUnavailable = if (location != null) false else _uiState.value.locationUnavailable
+                )
+            }
+        }
+    }
+
+    /**
+     * Proactively fetches a GPS fix instead of waiting for the first voice
+     * question to trigger one (buildTravelContext() would otherwise be the
+     * only thing that ever called this, leaving the location chip stuck on
+     * "buscando ubicación..." indefinitely until the user asked something).
+     * Gives up after LOCATION_TIMEOUT_MS and surfaces that as
+     * locationUnavailable rather than spinning forever.
+     */
+    fun refreshLocation() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(locationUnavailable = false)
+            val location = withTimeoutOrNull(Constants.LOCATION_TIMEOUT_MS) {
+                locationRepository.getCurrentCoordinates()
+            }
+            if (location == null) {
+                _uiState.value = _uiState.value.copy(locationUnavailable = true)
             }
         }
     }
