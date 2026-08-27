@@ -3,6 +3,7 @@ package dev.pgm.roadmate.domain.usecase
 import dev.pgm.roadmate.domain.fake.FakeGeminiRepository
 import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
 import dev.pgm.roadmate.domain.model.TravelContext
+import dev.pgm.roadmate.utils.JokeProvider
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -31,5 +32,21 @@ class GenerateResponseUseCaseTest {
         assertEquals(1, geminiRepository.responseCount)
         assertTrue(geminiRepository.lastPrompt!!.contains("¿dónde paro?"))
         assertEquals("para en la próxima área", speechSynthesisRepository.lastSpoken)
+    }
+
+    @Test
+    fun `joke requests are answered locally, bypassing Gemini entirely`() = runTest {
+        val geminiRepository = FakeGeminiRepository(response = "no debería usarse")
+        val speechSynthesisRepository = FakeSpeechSynthesisRepository()
+        val useCase = GenerateResponseUseCase(geminiRepository, speechSynthesisRepository)
+
+        val context = TravelContext(currentLocation = null, hour = 12, date = Date(), userInput = "cuéntame un chiste")
+
+        val emitted = useCase(context, context.userInput).toList()
+
+        assertEquals(0, geminiRepository.responseCount)
+        assertTrue(JokeProvider.matchesJokeIntent(context.userInput))
+        assertEquals(1, emitted.size)
+        assertEquals(emitted.first(), speechSynthesisRepository.lastSpoken)
     }
 }
