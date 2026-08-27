@@ -5,6 +5,7 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dev.pgm.roadmate.data.repository.GeminiRepositoryImpl
+import dev.pgm.roadmate.data.repository.GreetingRepositoryImpl
 import dev.pgm.roadmate.data.repository.LocationRepositoryImpl
 import dev.pgm.roadmate.data.repository.MapSearchRepositoryImpl
 import dev.pgm.roadmate.data.repository.OnboardingRepositoryImpl
@@ -14,6 +15,7 @@ import dev.pgm.roadmate.data.repository.SpeechRecognitionRepositoryImpl
 import dev.pgm.roadmate.data.repository.SpeechSynthesisRepositoryImpl
 import dev.pgm.roadmate.data.repository.WeatherRepositoryImpl
 import dev.pgm.roadmate.domain.repository.GeminiRepository
+import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchRepository
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
@@ -57,4 +59,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindMapSearchRepository(impl: MapSearchRepositoryImpl): MapSearchRepository
+
+    @Binds
+    abstract fun bindGreetingRepository(impl: GreetingRepositoryImpl): GreetingRepository
 }

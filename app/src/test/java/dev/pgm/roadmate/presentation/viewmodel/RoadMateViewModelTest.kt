@@ -4,6 +4,7 @@ import dev.pgm.roadmate.domain.usecase.DetectSilenceUseCase
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeGeminiRepository
+import dev.pgm.roadmate.presentation.viewmodel.fake.FakeGreetingRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeLocationRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMapSearchRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakePhoneCallRepository
@@ -30,7 +31,9 @@ class RoadMateViewModelTest {
         recognizedSpeech: String = "hola roadmate",
         geminiResponse: String = "respuesta de prueba",
         location: Pair<Double, Double>? = 36.46 to -6.19,
-        locationFetchDelayMs: Long = 0L
+        locationFetchDelayMs: Long = 0L,
+        greetingRepository: FakeGreetingRepository = FakeGreetingRepository(),
+        greetingSpeechSynthesisRepository: FakeSpeechSynthesisRepository = FakeSpeechSynthesisRepository()
     ): RoadMateViewModel {
         val geminiRepository = FakeGeminiRepository(geminiResponse)
         val speechSynthesisRepository = FakeSpeechSynthesisRepository()
@@ -50,7 +53,9 @@ class RoadMateViewModelTest {
             detectSilenceUseCase = detectSilenceUseCase,
             locationRepository = locationRepository,
             weatherRepository = FakeWeatherRepository(),
-            geminiRepository = geminiRepository
+            geminiRepository = geminiRepository,
+            speechSynthesisRepository = greetingSpeechSynthesisRepository,
+            greetingRepository = greetingRepository
         )
     }
 
@@ -120,4 +125,30 @@ class RoadMateViewModelTest {
             assertTrue(state.locationUnavailable)
             assertEquals(null, state.location)
         }
+
+    @Test
+    fun `greetIfNeeded speaks and marks greeted when not greeted today`() = runTest(mainDispatcherRule.testDispatcher) {
+        val greetingRepository = FakeGreetingRepository(shouldGreet = true)
+        val greetingSpeech = FakeSpeechSynthesisRepository()
+        val viewModel = buildViewModel(greetingRepository = greetingRepository, greetingSpeechSynthesisRepository = greetingSpeech)
+
+        viewModel.greetIfNeeded()
+        advanceUntilIdle()
+
+        assertEquals(1, greetingRepository.markedGreetedCount)
+        assertTrue(greetingSpeech.spoken.isNotEmpty())
+    }
+
+    @Test
+    fun `greetIfNeeded stays silent when already greeted today`() = runTest(mainDispatcherRule.testDispatcher) {
+        val greetingRepository = FakeGreetingRepository(shouldGreet = false)
+        val greetingSpeech = FakeSpeechSynthesisRepository()
+        val viewModel = buildViewModel(greetingRepository = greetingRepository, greetingSpeechSynthesisRepository = greetingSpeech)
+
+        viewModel.greetIfNeeded()
+        advanceUntilIdle()
+
+        assertEquals(0, greetingRepository.markedGreetedCount)
+        assertTrue(greetingSpeech.spoken.isEmpty())
+    }
 }

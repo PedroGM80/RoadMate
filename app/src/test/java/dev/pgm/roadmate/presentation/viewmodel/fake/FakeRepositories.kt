@@ -3,6 +3,7 @@ package dev.pgm.roadmate.presentation.viewmodel.fake
 import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.SilenceEvent
 import dev.pgm.roadmate.domain.repository.GeminiRepository
+import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
@@ -90,5 +91,14 @@ class FakeMapSearchRepository : MapSearchRepository {
     var lastQuery: String? = null
     override fun searchNearby(query: String, location: Pair<Double, Double>?) {
         lastQuery = query
+    }
+}
+
+class FakeGreetingRepository(private val shouldGreet: Boolean = false) : GreetingRepository {
+    var markedGreetedCount = 0
+        private set
+    override suspend fun shouldGreetToday(): Boolean = shouldGreet
+    override suspend fun markGreetedToday() {
+        markedGreetedCount++
     }
 }

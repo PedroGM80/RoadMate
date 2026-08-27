@@ -5,7 +5,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.repository.GeminiRepository
+import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
+import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.DetectSilenceUseCase
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
@@ -43,7 +45,9 @@ class RoadMateViewModel @Inject constructor(
     private val detectSilenceUseCase: DetectSilenceUseCase,
     private val locationRepository: LocationRepository,
     private val weatherRepository: WeatherRepository,
-    private val geminiRepository: GeminiRepository
+    private val geminiRepository: GeminiRepository,
+    private val speechSynthesisRepository: SpeechSynthesisRepository,
+    private val greetingRepository: GreetingRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RoadMateUiState())
@@ -87,6 +91,23 @@ class RoadMateViewModel @Inject constructor(
             }
             if (location == null) {
                 _uiState.value = _uiState.value.copy(locationUnavailable = true)
+            }
+        }
+    }
+
+    /**
+     * Speaks a time-of-day greeting the first time the app is opened with
+     * core permissions granted on a given calendar day — called from the
+     * same permission-gated place as [refreshLocation], not from init{},
+     * so it never speaks before the user can actually hear a purposeful
+     * answer (i.e. before mic/location permissions exist).
+     */
+    fun greetIfNeeded() {
+        viewModelScope.launch {
+            if (greetingRepository.shouldGreetToday()) {
+                greetingRepository.markGreetedToday()
+                val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                speechSynthesisRepository.speak(Constants.greetingForHour(hour))
             }
         }
     }

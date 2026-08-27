@@ -36,4 +36,11 @@ object Constants {
         "¿Necesitas descansar?",
         "Cuéntame datos curiosos del sitio en el que estoy."
     )
+
+    /** Spoken once per calendar day, the first time the app is opened with core permissions granted. */
+    fun greetingForHour(hour: Int): String = when (hour) {
+        in 6..12 -> "Buenos días. Soy RoadMate, listo para la carretera."
+        in 13..19 -> "Buenas tardes. Soy RoadMate, ¿rodamos?"
+        else -> "Buenas noches. Soy RoadMate, conduce con cuidado."
+    }
 }

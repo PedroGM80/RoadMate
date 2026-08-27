@@ -100,6 +100,7 @@ fun HomeScreen(
         if (permissionsState.allPermissionsGranted) {
             viewModel.startSilenceMonitoring()
             viewModel.refreshLocation()
+            viewModel.greetIfNeeded()
             // Android only allows one permission dialog in flight at a time
             // ("Can request only one set of permissions at a time") — firing
             // both here would silently drop the second request. So: ask for
