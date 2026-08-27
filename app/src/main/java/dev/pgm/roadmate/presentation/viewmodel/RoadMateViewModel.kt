@@ -24,6 +24,7 @@ enum class RoadMateStatus { IDLE, LISTENING, PROCESSING, SPEAKING }
 
 data class RoadMateUiState(
     val status: RoadMateStatus = RoadMateStatus.IDLE,
+    val lastRecognizedInput: String = "",
     val currentResponse: String = "",
     val location: Pair<Double, Double>? = null,
     val isListening: Boolean = false
@@ -88,7 +89,10 @@ class RoadMateViewModel @Inject constructor(
                 return@launch
             }
 
-            _uiState.value = _uiState.value.copy(status = RoadMateStatus.PROCESSING)
+            _uiState.value = _uiState.value.copy(
+                status = RoadMateStatus.PROCESSING,
+                lastRecognizedInput = userInput
+            )
             respondTo(userInput)
         }
     }

@@ -2,12 +2,20 @@ package dev.pgm.roadmate.presentation.screen
 
 import android.Manifest
 import android.os.Build
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,7 +25,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
@@ -33,8 +43,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -161,16 +173,26 @@ private fun GrantedContent(
                 .fillMaxWidth()
                 .padding(bottom = 40.dp)
         ) {
-            Text(
-                text = uiState.currentResponse.ifBlank { "Pulsa el micrófono y haz tu pregunta." },
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (uiState.currentResponse.isBlank()) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.tertiary
-                },
-                modifier = Modifier.padding(20.dp)
-            )
+            Column(modifier = Modifier.padding(20.dp)) {
+                if (uiState.lastRecognizedInput.isNotBlank()) {
+                    Text(
+                        text = "Tú: “${uiState.lastRecognizedInput}”",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
+                Text(
+                    text = uiState.currentResponse.ifBlank { "Pulsa el micrófono y haz tu pregunta." },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (uiState.currentResponse.isBlank()) {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    } else {
+                        MaterialTheme.colorScheme.tertiary
+                    }
+                )
+            }
         }
 
         MicButton(isListening = uiState.isListening, onClick = onMicClick)
@@ -179,6 +201,19 @@ private fun GrantedContent(
 
 @Composable
 private fun MicButton(isListening: Boolean, onClick: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    // M3 Expressive-style tactile press: a bouncy spring instead of a linear
+    // scale, so the button feels squeezed rather than just resized.
+    val pressScale by animateFloatAsState(
+        targetValue = if (isPressed) 0.86f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "mic-press-scale"
+    )
+
     val infiniteTransition = rememberInfiniteTransition(label = "mic-pulse")
     val pulseScale by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -190,39 +225,86 @@ private fun MicButton(isListening: Boolean, onClick: () -> Unit) {
         label = "mic-pulse-scale"
     )
 
-    Box(contentAlignment = Alignment.Center) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
         if (isListening) {
-            Box(
-                modifier = Modifier
-                    .size(96.dp)
-                    .scale(pulseScale)
-                    .background(
-                        MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f),
-                        shape = CircleShape
-                    )
-            )
+            VoiceWaveform(modifier = Modifier.padding(bottom = 20.dp))
         }
 
-        Button(
-            onClick = onClick,
-            shape = CircleShape,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (isListening) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.secondary
-                },
-                contentColor = Color.White
-            ),
-            modifier = Modifier.size(80.dp)
-        ) {
-            Icon(
-                imageVector = if (isListening) Icons.Filled.Stop else Icons.Filled.Mic,
-                contentDescription = if (isListening) "Detener" else "Escuchar",
-                modifier = Modifier.size(32.dp)
-            )
+        Box(contentAlignment = Alignment.Center) {
+            if (isListening) {
+                Box(
+                    modifier = Modifier
+                        .size(96.dp)
+                        .scale(pulseScale)
+                        .background(
+                            MaterialTheme.colorScheme.secondary.copy(alpha = 0.25f),
+                            shape = CircleShape
+                        )
+                )
+            }
+
+            Button(
+                onClick = onClick,
+                shape = CircleShape,
+                interactionSource = interactionSource,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isListening) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.secondary
+                    },
+                    contentColor = Color.White
+                ),
+                modifier = Modifier.size(80.dp).scale(pressScale)
+            ) {
+                Icon(
+                    imageVector = if (isListening) Icons.Filled.Stop else Icons.Filled.Mic,
+                    contentDescription = if (isListening) "Detener" else "Escuchar",
+                    modifier = Modifier.size(32.dp)
+                )
+            }
         }
     }
+}
+
+/**
+ * Animated bars suggesting sound while listening — visual flourish, not a
+ * real amplitude readout. SpeechRecognitionManager's onRmsChanged callback
+ * (currently unused) could drive real mic-reactive bar heights later if
+ * that's worth the plumbing through SpeechRecognitionRepository.
+ */
+@Composable
+private fun VoiceWaveform(modifier: Modifier = Modifier, barCount: Int = 5) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(barCount) { index -> WaveformBar(index = index) }
+    }
+}
+
+@Composable
+private fun WaveformBar(index: Int) {
+    val infiniteTransition = rememberInfiniteTransition(label = "wave-$index")
+    val heightFraction by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 380 + index * 70, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+            initialStartOffset = StartOffset(index * 90)
+        ),
+        label = "wave-bar-$index"
+    )
+
+    Box(
+        modifier = Modifier
+            .width(5.dp)
+            .height(28.dp * heightFraction)
+            .clip(RoundedCornerShape(50))
+            .background(MaterialTheme.colorScheme.secondary)
+    )
 }
 
 @Composable

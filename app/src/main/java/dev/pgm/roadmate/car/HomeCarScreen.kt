@@ -42,6 +42,7 @@ class HomeCarScreen(
 ) : Screen(carContext) {
 
     private var statusText = "Pulsa Escuchar y haz tu pregunta."
+    private var lastRecognizedInput: String? = null
     private var isBusy = false
 
     private val header = Header.Builder()
@@ -78,6 +79,7 @@ class HomeCarScreen(
                     Row.Builder()
                         .setImage(micIcon)
                         .setTitle(statusText)
+                        .apply { lastRecognizedInput?.let { addText("Tú: “$it”") } }
                         .build()
                 )
                 .addAction(
@@ -108,6 +110,7 @@ class HomeCarScreen(
                 invalidate()
                 return@launch
             }
+            lastRecognizedInput = userInput
 
             val location = locationRepository.getCurrentCoordinates()
             val calendar = Calendar.getInstance()
