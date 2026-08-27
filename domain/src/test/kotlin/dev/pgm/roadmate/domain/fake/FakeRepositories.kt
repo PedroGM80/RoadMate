@@ -4,6 +4,7 @@ import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.SilenceEvent
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
+import dev.pgm.roadmate.domain.repository.MapSearchRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
@@ -90,5 +91,15 @@ class FakePhoneCallRepository(
 
     override fun placeCall(phoneNumber: String) {
         placedCallTo = phoneNumber
+    }
+}
+
+class FakeMapSearchRepository : MapSearchRepository {
+    var lastQuery: String? = null
+    var lastLocation: Pair<Double, Double>? = null
+
+    override fun searchNearby(query: String, location: Pair<Double, Double>?) {
+        lastQuery = query
+        lastLocation = location
     }
 }

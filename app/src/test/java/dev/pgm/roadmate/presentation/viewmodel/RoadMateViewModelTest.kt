@@ -5,6 +5,7 @@ import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeGeminiRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeLocationRepository
+import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMapSearchRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeSilenceDetectionRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeSpeechRecognitionRepository
@@ -33,8 +34,12 @@ class RoadMateViewModelTest {
     ): RoadMateViewModel {
         val geminiRepository = FakeGeminiRepository(geminiResponse)
         val speechSynthesisRepository = FakeSpeechSynthesisRepository()
-        val generateResponseUseCase =
-            GenerateResponseUseCase(geminiRepository, speechSynthesisRepository, FakePhoneCallRepository())
+        val generateResponseUseCase = GenerateResponseUseCase(
+            geminiRepository,
+            speechSynthesisRepository,
+            FakePhoneCallRepository(),
+            FakeMapSearchRepository()
+        )
         val recordAudioUseCase = RecordAudioUseCase(FakeSpeechRecognitionRepository(recognizedSpeech))
         val detectSilenceUseCase = DetectSilenceUseCase(FakeSilenceDetectionRepository(), generateResponseUseCase)
         val locationRepository = FakeLocationRepository(fetchDelayMs = locationFetchDelayMs, fetchResult = location)
