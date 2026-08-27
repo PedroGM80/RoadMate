@@ -14,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "dev.pgm.roadmate"
-        minSdk = 24
+        minSdk = 31 // com.google.ai.edge.aicore requires 31+; on-device Gemini Nano is unavailable below it anyway
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
