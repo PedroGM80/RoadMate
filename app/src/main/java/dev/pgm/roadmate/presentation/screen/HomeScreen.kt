@@ -12,6 +12,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -50,6 +51,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -220,6 +223,25 @@ private fun GrantedContent(
     uiState: RoadMateUiState,
     onMicClick: () -> Unit
 ) {
+    val haptics = LocalHapticFeedback.current
+    // A small "pop" plus a confirm tick when the answer actually lands — the
+    // driver may not be looking at the screen, so the arrival needs to be
+    // felt, not just read.
+    val cardScale = remember { Animatable(1f) }
+    LaunchedEffect(uiState.status) {
+        if (uiState.status == RoadMateStatus.SPEAKING) {
+            haptics.performHapticFeedback(HapticFeedbackType.Confirm)
+            cardScale.snapTo(0.96f)
+            cardScale.animateTo(
+                1f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMedium
+                )
+            )
+        }
+    }
+
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         if (uiState.status != RoadMateStatus.IDLE) {
             Text(
@@ -237,6 +259,7 @@ private fun GrantedContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 40.dp)
+                .scale(cardScale.value)
         ) {
             Column(
                 modifier = Modifier
@@ -272,6 +295,7 @@ private fun GrantedContent(
 
 @Composable
 private fun MicButton(isListening: Boolean, onClick: () -> Unit) {
+    val haptics = LocalHapticFeedback.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     // M3 Expressive-style tactile press: a bouncy spring instead of a linear
@@ -315,7 +339,12 @@ private fun MicButton(isListening: Boolean, onClick: () -> Unit) {
             }
 
             Button(
-                onClick = onClick,
+                onClick = {
+                    haptics.performHapticFeedback(
+                        if (isListening) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn
+                    )
+                    onClick()
+                },
                 shape = CircleShape,
                 interactionSource = interactionSource,
                 colors = ButtonDefaults.buttonColors(
