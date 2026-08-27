@@ -1,6 +1,8 @@
 package dev.pgm.roadmate.presentation.screen
 
 import android.Manifest
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.os.Build
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -42,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -296,6 +299,16 @@ private fun GrantedContent(
 @Composable
 private fun MicButton(isListening: Boolean, onClick: () -> Unit) {
     val haptics = LocalHapticFeedback.current
+    // Short built-in tones instead of a bundled audio asset — no extra
+    // resource to ship, and TONE_PROP_BEEP/BEEP2 are designed for exactly
+    // this kind of "start/stop" UI cue. STREAM_NOTIFICATION so it honors
+    // the device's notification volume/silent mode automatically.
+    val toneGenerator = remember {
+        runCatching { ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70) }.getOrNull()
+    }
+    DisposableEffect(Unit) {
+        onDispose { toneGenerator?.release() }
+    }
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     // M3 Expressive-style tactile press: a bouncy spring instead of a linear
@@ -342,6 +355,10 @@ private fun MicButton(isListening: Boolean, onClick: () -> Unit) {
                 onClick = {
                     haptics.performHapticFeedback(
                         if (isListening) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn
+                    )
+                    toneGenerator?.startTone(
+                        if (isListening) ToneGenerator.TONE_PROP_BEEP2 else ToneGenerator.TONE_PROP_BEEP,
+                        120
                     )
                     onClick()
                 },
