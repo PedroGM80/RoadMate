@@ -24,3 +24,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "RoadMate"
 include(":app")
+include(":domain")
+include(":data")
