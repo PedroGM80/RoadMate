@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.repository.LocationRepository
+import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.DetectSilenceUseCase
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
@@ -33,7 +34,8 @@ class RoadMateViewModel @Inject constructor(
     private val recordAudioUseCase: RecordAudioUseCase,
     private val generateResponseUseCase: GenerateResponseUseCase,
     private val detectSilenceUseCase: DetectSilenceUseCase,
-    private val locationRepository: LocationRepository
+    private val locationRepository: LocationRepository,
+    private val weatherRepository: WeatherRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RoadMateUiState())
@@ -118,6 +120,9 @@ class RoadMateViewModel @Inject constructor(
 
     private suspend fun buildTravelContext(userInput: String): TravelContext {
         val location = locationRepository.getCurrentCoordinates()
+        val weatherDescription = location?.let { (lat, lon) ->
+            weatherRepository.getCurrentWeatherDescription(lat, lon)
+        }
         val calendar = Calendar.getInstance()
         return TravelContext(
             currentLocation = location,
@@ -125,7 +130,8 @@ class RoadMateViewModel @Inject constructor(
             hour = calendar.get(Calendar.HOUR_OF_DAY),
             date = calendar.time,
             userInput = userInput,
-            lastResponses = listOfNotNull(_uiState.value.currentResponse.takeIf { it.isNotBlank() })
+            lastResponses = listOfNotNull(_uiState.value.currentResponse.takeIf { it.isNotBlank() }),
+            weatherDescription = weatherDescription
         )
     }
 

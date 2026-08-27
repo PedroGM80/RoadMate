@@ -24,6 +24,10 @@ object PromptBuilder {
                     "Pregunta: [$userInput]. Responde en 1-2 frases."
             )
 
+            if (!context.weatherDescription.isNullOrBlank()) {
+                appendLine("Clima actual: ${context.weatherDescription}")
+            }
+
             if (context.lastResponses.isNotEmpty()) {
                 appendLine("Respuestas anteriores en este viaje (para continuidad):")
                 context.lastResponses.takeLast(MAX_LAST_RESPONSES).forEach { appendLine("- $it") }

@@ -11,5 +11,6 @@ data class TravelContext(
     val hour: Int,
     val date: Date,
     val userInput: String,
-    val lastResponses: List<String> = emptyList()
+    val lastResponses: List<String> = emptyList(),
+    val weatherDescription: String? = null
 )

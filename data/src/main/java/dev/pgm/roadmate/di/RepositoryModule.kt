@@ -9,11 +9,13 @@ import dev.pgm.roadmate.data.repository.LocationRepositoryImpl
 import dev.pgm.roadmate.data.repository.SilenceDetectionRepositoryImpl
 import dev.pgm.roadmate.data.repository.SpeechRecognitionRepositoryImpl
 import dev.pgm.roadmate.data.repository.SpeechSynthesisRepositoryImpl
+import dev.pgm.roadmate.data.repository.WeatherRepositoryImpl
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
+import dev.pgm.roadmate.domain.repository.WeatherRepository
 
 /**
  * Binds each domain/repository contract to its data-layer implementation —
@@ -37,4 +39,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindSilenceDetectionRepository(impl: SilenceDetectionRepositoryImpl): SilenceDetectionRepository
+
+    @Binds
+    abstract fun bindWeatherRepository(impl: WeatherRepositoryImpl): WeatherRepository
 }
