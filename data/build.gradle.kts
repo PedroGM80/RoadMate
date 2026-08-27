@@ -12,6 +12,7 @@ android {
 
     defaultConfig {
         minSdk = 31 // com.google.ai.edge.aicore requires 31+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -44,4 +45,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.runner)
+    androidTestImplementation(libs.androidx.core)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
 }
