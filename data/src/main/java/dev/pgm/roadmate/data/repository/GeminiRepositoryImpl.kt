@@ -26,4 +26,6 @@ class GeminiRepositoryImpl @Inject constructor(
     override fun clearCache() {
         responseCache.clear()
     }
+
+    override suspend fun isLocalAiAvailable(): Boolean = geminiNanoManager.checkAvailability()
 }

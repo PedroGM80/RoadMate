@@ -107,6 +107,8 @@ fun HomeScreen(
             color = MaterialTheme.colorScheme.primary
         )
 
+        LocalAiStatusLabel(isAvailable = uiState.isLocalAiAvailable)
+
         LocationChip(
             location = uiState.location,
             unavailable = uiState.locationUnavailable,
@@ -130,6 +132,29 @@ fun HomeScreen(
             }
         }
     }
+}
+
+/**
+ * Honesty over silence: AICore/Gemini Nano is only present on a handful of
+ * devices today (confirmed missing on a plain emulator — "AiCoreService: not
+ * found"). Rather than let a user's first sign of that be a generic fallback
+ * answer with no explanation, say upfront whether this device has real
+ * on-device AI or is running in "modo básico". Either way, nothing about a
+ * question ever leaves the phone except weather — that part's unconditional.
+ */
+@Composable
+private fun LocalAiStatusLabel(isAvailable: Boolean?) {
+    val (text, color) = when (isAvailable) {
+        true -> "IA local activa" to MaterialTheme.colorScheme.tertiary
+        false -> "Modo básico · sin IA local en este dispositivo" to MaterialTheme.colorScheme.onSurfaceVariant
+        null -> "Comprobando IA local..." to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = color,
+        modifier = Modifier.padding(top = 2.dp)
+    )
 }
 
 @Composable

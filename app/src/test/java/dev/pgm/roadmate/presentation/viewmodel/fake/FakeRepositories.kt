@@ -43,9 +43,13 @@ class FakeWeatherRepository(private val description: String? = null) : WeatherRe
     override suspend fun getCurrentWeatherDescription(lat: Double, lon: Double): String? = description
 }
 
-class FakeGeminiRepository(private val response: String = "respuesta") : GeminiRepository {
+class FakeGeminiRepository(
+    private val response: String = "respuesta",
+    private val localAiAvailable: Boolean = true
+) : GeminiRepository {
     override suspend fun getResponse(prompt: String): String = response
     override fun clearCache() = Unit
+    override suspend fun isLocalAiAvailable(): Boolean = localAiAvailable
 }
 
 class FakeSpeechSynthesisRepository : SpeechSynthesisRepository {

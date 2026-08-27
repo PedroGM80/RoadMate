@@ -42,7 +42,8 @@ class RoadMateViewModelTest {
             generateResponseUseCase = generateResponseUseCase,
             detectSilenceUseCase = detectSilenceUseCase,
             locationRepository = locationRepository,
-            weatherRepository = FakeWeatherRepository()
+            weatherRepository = FakeWeatherRepository(),
+            geminiRepository = geminiRepository
         )
     }
 

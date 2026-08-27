@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.pgm.roadmate.domain.model.TravelContext
+import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.DetectSilenceUseCase
@@ -30,7 +31,9 @@ data class RoadMateUiState(
     val currentResponse: String = "",
     val location: Pair<Double, Double>? = null,
     val locationUnavailable: Boolean = false,
-    val isListening: Boolean = false
+    val isListening: Boolean = false,
+    /** null while checking, then whether on-device Gemini Nano actually works on this hardware. */
+    val isLocalAiAvailable: Boolean? = null
 )
 
 @HiltViewModel
@@ -39,7 +42,8 @@ class RoadMateViewModel @Inject constructor(
     private val generateResponseUseCase: GenerateResponseUseCase,
     private val detectSilenceUseCase: DetectSilenceUseCase,
     private val locationRepository: LocationRepository,
-    private val weatherRepository: WeatherRepository
+    private val weatherRepository: WeatherRepository,
+    private val geminiRepository: GeminiRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RoadMateUiState())
@@ -56,6 +60,14 @@ class RoadMateViewModel @Inject constructor(
                     locationUnavailable = if (location != null) false else _uiState.value.locationUnavailable
                 )
             }
+        }
+
+        // Checked once at startup rather than discovered per-answer, so the UI
+        // can be upfront about "modo básico" instead of the user only finding
+        // out by getting generic fallback text on their first real question.
+        viewModelScope.launch {
+            val available = geminiRepository.isLocalAiAvailable()
+            _uiState.value = _uiState.value.copy(isLocalAiAvailable = available)
         }
     }
 

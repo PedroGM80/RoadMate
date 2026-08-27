@@ -51,7 +51,13 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
-                <category android:name="androidx.car.app.category.IOT" />
+                <!-- POI fits what RoadMate actually does (location-aware Q&A,
+                     trip context) better than IoT (device control, which this
+                     isn't). Still an imperfect fit — no category exists for a
+                     general voice assistant. Talk to Google's Android for
+                     Cars team before submitting for review; a mismatched
+                     category risks rejection or later removal. -->
+                <category android:name="androidx.car.app.category.POI" />
             </intent-filter>
         </service>
     </application>

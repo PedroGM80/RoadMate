@@ -27,6 +27,8 @@ class FakeGeminiRepository(private val response: String = "respuesta de prueba")
     override fun clearCache() {
         cacheClearedCount++
     }
+
+    override suspend fun isLocalAiAvailable(): Boolean = true
 }
 
 class FakeSpeechSynthesisRepository : SpeechSynthesisRepository {

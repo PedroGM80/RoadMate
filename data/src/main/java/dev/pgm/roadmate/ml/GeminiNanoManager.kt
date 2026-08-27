@@ -32,11 +32,31 @@ class GeminiNanoManager @Inject constructor(@ApplicationContext context: Context
         )
     }
 
+    @Volatile
+    private var lastKnownAvailable: Boolean? = null
+
     suspend fun generateResponse(prompt: String): String {
         val response = withTimeoutOrNull(Constants.GEMINI_TIMEOUT_MS) {
             runCatching { model.generateContent(prompt).text }.getOrNull()
         }
+        lastKnownAvailable = response != null
         return response?.takeIf { it.isNotBlank() } ?: FALLBACK_RESPONSE
+    }
+
+    /**
+     * Whether on-device Gemini Nano actually works on this hardware, cached
+     * after the first attempt (real question or this probe). Meant to be
+     * called once at startup so the UI can be upfront about running in
+     * "modo básico" instead of silently returning FALLBACK_RESPONSE on every
+     * question with no explanation — AICore is only on a handful of devices
+     * today (confirmed missing on a plain emulator: "AiCoreService: not found").
+     */
+    suspend fun checkAvailability(): Boolean {
+        lastKnownAvailable?.let { return it }
+        val probe = withTimeoutOrNull(Constants.GEMINI_TIMEOUT_MS) {
+            runCatching { model.generateContent("ok").text }.getOrNull()
+        }
+        return (probe != null).also { lastKnownAvailable = it }
     }
 
     private companion object {
