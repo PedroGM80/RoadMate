@@ -1,6 +1,5 @@
 package dev.pgm.roadmate.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -12,32 +11,42 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = RoadBlue80,
+    onPrimary = RoadBlueOnLight,
+    secondary = SignalAmber80,
+    onSecondary = SignalAmberOnLight,
+    tertiary = ReplyGreen80,
+    onTertiary = ReplyGreenOnLight,
+    background = NeutralBackgroundDark,
+    onBackground = NeutralOnSurfaceDark,
+    surface = NeutralSurfaceDark,
+    onSurface = NeutralOnSurfaceDark,
+    surfaceVariant = NeutralSurfaceVariantDark,
+    onSurfaceVariant = NeutralOnSurfaceDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = RoadBlue40,
+    onPrimary = NeutralSurfaceLight,
+    secondary = SignalAmber40,
+    onSecondary = NeutralSurfaceLight,
+    tertiary = ReplyGreen40,
+    onTertiary = NeutralSurfaceLight,
+    background = NeutralBackgroundLight,
+    onBackground = NeutralOnSurfaceLight,
+    surface = NeutralSurfaceLight,
+    onSurface = NeutralOnSurfaceLight,
+    surfaceVariant = NeutralSurfaceVariantLight,
+    onSurfaceVariant = NeutralOnSurfaceLight
 )
 
 @Composable
 fun RoadMateTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Off by default: a deliberate brand palette (tuned for night-driving
+    // glare and a legible mic-CTA accent) beats inheriting whatever colors
+    // happen to come from the user's wallpaper. Still available to flip on.
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
