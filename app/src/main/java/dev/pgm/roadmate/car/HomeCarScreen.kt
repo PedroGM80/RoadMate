@@ -3,11 +3,13 @@ package dev.pgm.roadmate.car
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
+import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Header
 import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.lifecycleScope
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.repository.LocationRepository
@@ -18,13 +20,18 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 
 /**
- * Single-screen voice Q&A UI for the car display: a status line and one
+ * Single-screen voice Q&A UI for the car display: a status row and one
  * "Escuchar" action, matching the same golden path as HomeScreen on the phone
  * (record -> transcribe -> ask Gemini -> speak), but through PaneTemplate
  * instead of Compose, since Android Auto only renders host-controlled
  * templates. Rest-reminder silence detection isn't surfaced here — it still
  * runs via SilenceDetectionForegroundService/RoadMateViewModel when this
  * screen isn't the one in front.
+ *
+ * Listening/processing collapses into the host's native loading spinner
+ * (Pane.setLoading) rather than juggling separate "Escuchando.../
+ * Procesando..." row text — one generic busy state reads faster at a glance,
+ * which matters more here than on the phone.
  */
 class HomeCarScreen(
     carContext: CarContext,
@@ -37,7 +44,14 @@ class HomeCarScreen(
     private var statusText = "Pulsa Escuchar y haz tu pregunta."
     private var isBusy = false
 
-    private val header = Header.Builder().setStartHeaderAction(Action.APP_ICON).build()
+    private val header = Header.Builder()
+        .setTitle("RoadMate")
+        .setStartHeaderAction(Action.APP_ICON)
+        .build()
+
+    private val micIcon = CarIcon.Builder(
+        IconCompat.createWithResource(carContext, android.R.drawable.ic_btn_speak_now)
+    ).build()
 
     override fun onGetTemplate(): Template {
         if (!permissionManager.hasRecordAudioPermission()) {
@@ -45,6 +59,7 @@ class HomeCarScreen(
                 Pane.Builder()
                     .addRow(
                         Row.Builder()
+                            .setImage(micIcon)
                             .setTitle("Permisos pendientes")
                             .addText("Abre RoadMate en tu teléfono una vez para conceder micrófono y ubicación.")
                             .build()
@@ -55,16 +70,25 @@ class HomeCarScreen(
                 .build()
         }
 
-        val pane = Pane.Builder()
-            .addRow(Row.Builder().setTitle(statusText).build())
-            .addAction(
-                Action.Builder()
-                    .setTitle(if (isBusy) statusText else "Escuchar")
-                    .setEnabled(!isBusy)
-                    .setOnClickListener(::startListening)
-                    .build()
-            )
-            .build()
+        val pane = if (isBusy) {
+            Pane.Builder().setLoading(true).build()
+        } else {
+            Pane.Builder()
+                .addRow(
+                    Row.Builder()
+                        .setImage(micIcon)
+                        .setTitle(statusText)
+                        .build()
+                )
+                .addAction(
+                    Action.Builder()
+                        .setTitle("Escuchar")
+                        .setIcon(micIcon)
+                        .setOnClickListener(::startListening)
+                        .build()
+                )
+                .build()
+        }
 
         return PaneTemplate.Builder(pane)
             .setHeader(header)
@@ -74,7 +98,6 @@ class HomeCarScreen(
     private fun startListening() {
         if (isBusy) return
         isBusy = true
-        statusText = "Escuchando..."
         invalidate()
 
         lifecycleScope.launch {
@@ -85,9 +108,6 @@ class HomeCarScreen(
                 invalidate()
                 return@launch
             }
-
-            statusText = "Procesando..."
-            invalidate()
 
             val location = locationRepository.getCurrentCoordinates()
             val calendar = Calendar.getInstance()
