@@ -59,7 +59,7 @@ class HomeCarScreen(
             .addRow(Row.Builder().setTitle(statusText).build())
             .addAction(
                 Action.Builder()
-                    .setTitle(if (isBusy) "Procesando..." else "Escuchar")
+                    .setTitle(if (isBusy) statusText else "Escuchar")
                     .setEnabled(!isBusy)
                     .setOnClickListener(::startListening)
                     .build()
