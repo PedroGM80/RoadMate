@@ -40,18 +40,30 @@ class RoadMateViewModel @Inject constructor(
     val uiState: StateFlow<RoadMateUiState> = _uiState.asStateFlow()
 
     private var listeningJob: Job? = null
+    private var silenceMonitoringJob: Job? = null
 
     init {
-        detectSilenceUseCase.observeSilence()
-            .onEach { handleRestReminder() }
-            .catch { /* transient audio read errors shouldn't kill the monitor */ }
-            .launchIn(viewModelScope)
-
         viewModelScope.launch {
             locationRepository.location.collect { location ->
                 _uiState.value = _uiState.value.copy(location = location)
             }
         }
+    }
+
+    /**
+     * Starts the rest-reminder silence monitor. Must be called only after RECORD_AUDIO
+     * has actually been granted — AudioRecord initialization fails silently otherwise,
+     * and unlike startListening() there's no user action to retry it from, so calling
+     * this too early (e.g. unconditionally from init{}) would leave the monitor dead
+     * for the rest of the ViewModel's lifetime. HomeScreen calls this once its
+     * permission state flips to granted.
+     */
+    fun startSilenceMonitoring() {
+        if (silenceMonitoringJob?.isActive == true) return
+        silenceMonitoringJob = detectSilenceUseCase.observeSilence()
+            .onEach { handleRestReminder() }
+            .catch { /* transient audio read errors shouldn't kill the monitor */ }
+            .launchIn(viewModelScope)
     }
 
     fun startListening() {
