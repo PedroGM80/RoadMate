@@ -1,5 +1,6 @@
 package dev.pgm.roadmate.presentation.screen
 
+import android.Manifest
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,15 +21,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateStatus
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun HomeScreen(
     viewModel: RoadMateViewModel,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val permissionsState = rememberMultiplePermissionsState(
+        listOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.ACCESS_FINE_LOCATION)
+    )
 
     Column(
         modifier = modifier
@@ -60,20 +68,35 @@ fun HomeScreen(
             modifier = Modifier.padding(bottom = 32.dp)
         )
 
-        Button(
-            onClick = {
-                if (uiState.isListening) viewModel.cancelListening() else viewModel.startListening()
-            },
-            modifier = Modifier.size(width = 200.dp, height = 64.dp)
-        ) {
-            Icon(
-                imageVector = if (uiState.isListening) Icons.Filled.Stop else Icons.Filled.Mic,
-                contentDescription = null
-            )
-            Text(
-                text = if (uiState.isListening) "Hablar" else "Escuchar",
-                modifier = Modifier.padding(start = 8.dp)
-            )
+        if (permissionsState.allPermissionsGranted) {
+            Button(
+                onClick = {
+                    if (uiState.isListening) viewModel.cancelListening() else viewModel.startListening()
+                },
+                modifier = Modifier.size(width = 200.dp, height = 64.dp)
+            ) {
+                Icon(
+                    imageVector = if (uiState.isListening) Icons.Filled.Stop else Icons.Filled.Mic,
+                    contentDescription = null
+                )
+                Text(
+                    text = if (uiState.isListening) "Hablar" else "Escuchar",
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+        } else {
+            val rationale = if (permissionsState.shouldShowRationale) {
+                "RoadMate necesita el micrófono y la ubicación para responder tus preguntas."
+            } else {
+                "Concede permisos de micrófono y ubicación para empezar."
+            }
+            Text(text = rationale, style = MaterialTheme.typography.bodyMedium)
+            Button(
+                onClick = { permissionsState.launchMultiplePermissionRequest() },
+                modifier = Modifier.padding(top = 16.dp)
+            ) {
+                Text("Conceder permisos")
+            }
         }
     }
 }
