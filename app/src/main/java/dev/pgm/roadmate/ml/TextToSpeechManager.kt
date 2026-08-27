@@ -27,10 +27,8 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
     private var isReady = false
     private val pendingUtterances = mutableListOf<Pair<String, () -> Unit>>()
     private val doneCallbacks = mutableMapOf<String, () -> Unit>()
-    private lateinit var engine: TextToSpeech
 
-    init {
-        engine = TextToSpeech(context) { status ->
+    private val engine: TextToSpeech = TextToSpeech(context) { status ->
             isReady = status == TextToSpeech.SUCCESS
             if (isReady) {
                 engine.language = Locale.getDefault()
@@ -62,7 +60,6 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
                 queued.forEach { (text, onDone) -> enqueue(text, onDone) }
             }
         }
-    }
 
     fun speak(text: String, onDone: () -> Unit = {}) {
         if (text.isBlank()) {
