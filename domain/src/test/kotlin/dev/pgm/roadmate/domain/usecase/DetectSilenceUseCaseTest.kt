@@ -1,6 +1,7 @@
 package dev.pgm.roadmate.domain.usecase
 
 import dev.pgm.roadmate.domain.fake.FakeGeminiRepository
+import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.domain.fake.FakeSilenceDetectionRepository
 import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
 import dev.pgm.roadmate.domain.model.TravelContext
@@ -17,7 +18,8 @@ class DetectSilenceUseCaseTest {
     @Test
     fun `observeSilence uses the rest-reminder threshold and duration`() {
         val silenceDetectionRepository = FakeSilenceDetectionRepository()
-        val generateResponseUseCase = GenerateResponseUseCase(FakeGeminiRepository(), FakeSpeechSynthesisRepository())
+        val generateResponseUseCase =
+            GenerateResponseUseCase(FakeGeminiRepository(), FakeSpeechSynthesisRepository(), FakePhoneCallRepository())
         val useCase = DetectSilenceUseCase(silenceDetectionRepository, generateResponseUseCase)
 
         useCase.observeSilence()
@@ -29,7 +31,8 @@ class DetectSilenceUseCaseTest {
     @Test
     fun `triggerRestPrompt picks one of the predefined prompts and generates a response`() = runTest {
         val geminiRepository = FakeGeminiRepository(response = "haz una pausa")
-        val generateResponseUseCase = GenerateResponseUseCase(geminiRepository, FakeSpeechSynthesisRepository())
+        val generateResponseUseCase =
+            GenerateResponseUseCase(geminiRepository, FakeSpeechSynthesisRepository(), FakePhoneCallRepository())
         val useCase = DetectSilenceUseCase(FakeSilenceDetectionRepository(), generateResponseUseCase)
 
         val context = TravelContext(null, null, 0, Date(), userInput = "")

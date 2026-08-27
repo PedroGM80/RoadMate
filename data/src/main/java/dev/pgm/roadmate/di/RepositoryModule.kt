@@ -7,6 +7,7 @@ import dagger.hilt.components.SingletonComponent
 import dev.pgm.roadmate.data.repository.GeminiRepositoryImpl
 import dev.pgm.roadmate.data.repository.LocationRepositoryImpl
 import dev.pgm.roadmate.data.repository.OnboardingRepositoryImpl
+import dev.pgm.roadmate.data.repository.PhoneCallRepositoryImpl
 import dev.pgm.roadmate.data.repository.SilenceDetectionRepositoryImpl
 import dev.pgm.roadmate.data.repository.SpeechRecognitionRepositoryImpl
 import dev.pgm.roadmate.data.repository.SpeechSynthesisRepositoryImpl
@@ -14,6 +15,7 @@ import dev.pgm.roadmate.data.repository.WeatherRepositoryImpl
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
+import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
@@ -47,4 +49,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindOnboardingRepository(impl: OnboardingRepositoryImpl): OnboardingRepository
+
+    @Binds
+    abstract fun bindPhoneCallRepository(impl: PhoneCallRepositoryImpl): PhoneCallRepository
 }

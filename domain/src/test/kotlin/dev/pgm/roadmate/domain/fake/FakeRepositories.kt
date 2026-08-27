@@ -1,8 +1,10 @@
 package dev.pgm.roadmate.domain.fake
 
+import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.SilenceEvent
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
+import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
@@ -74,4 +76,19 @@ class FakeLocationRepository(
     override val location: StateFlow<Pair<Double, Double>?> = _location
 
     override suspend fun getCurrentCoordinates(forceRefresh: Boolean): Pair<Double, Double>? = _location.value
+}
+
+class FakePhoneCallRepository(
+    private val hasPermission: Boolean = true,
+    private val lookupResult: ContactLookupResult = ContactLookupResult.NotFound
+) : PhoneCallRepository {
+    var placedCallTo: String? = null
+
+    override fun hasCallPermission(): Boolean = hasPermission
+
+    override suspend fun findContactByName(name: String): ContactLookupResult = lookupResult
+
+    override fun placeCall(phoneNumber: String) {
+        placedCallTo = phoneNumber
+    }
 }
