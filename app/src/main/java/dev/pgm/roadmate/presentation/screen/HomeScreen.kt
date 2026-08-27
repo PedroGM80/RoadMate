@@ -83,13 +83,35 @@ fun HomeScreen(
     } else {
         null
     }
+    // Also secondary and non-blocking: without it, "llama a X" just falls
+    // back to GenerateResponseUseCase's "no tengo permiso" spoken response
+    // instead of silently failing — the core voice Q&A flow never depends on it.
+    val callPermissionsState = rememberMultiplePermissionsState(
+        listOf(Manifest.permission.CALL_PHONE, Manifest.permission.READ_CONTACTS)
+    )
 
     LaunchedEffect(permissionsState.allPermissionsGranted) {
         if (permissionsState.allPermissionsGranted) {
             viewModel.startSilenceMonitoring()
             viewModel.refreshLocation()
+            // Android only allows one permission dialog in flight at a time
+            // ("Can request only one set of permissions at a time") — firing
+            // both here would silently drop the second request. So: ask for
+            // notifications first if needed, otherwise go straight to
+            // call/contacts; the effect below picks up call/contacts once
+            // the notification dialog has been resolved.
             if (notificationPermissionState?.status?.isGranted == false) {
                 notificationPermissionState.launchPermissionRequest()
+            } else if (!callPermissionsState.allPermissionsGranted) {
+                callPermissionsState.launchMultiplePermissionRequest()
+            }
+        }
+    }
+
+    if (notificationPermissionState != null) {
+        LaunchedEffect(notificationPermissionState.status) {
+            if (permissionsState.allPermissionsGranted && !callPermissionsState.allPermissionsGranted) {
+                callPermissionsState.launchMultiplePermissionRequest()
             }
         }
     }
