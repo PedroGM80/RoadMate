@@ -129,32 +129,37 @@ class RoadMateViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(status = RoadMateStatus.IDLE, isListening = false)
     }
 
+    // These previously used .onEach{}.launchIn(viewModelScope) — a detached,
+    // unawaited child coroutine. Since both are already suspend functions
+    // called from inside a viewModelScope.launch{} started by the caller,
+    // there's no reason not to just collect directly: same production
+    // behavior, but now genuinely finishes before the calling coroutine does
+    // instead of racing it (caught by a ViewModel unit test asserting state
+    // right after startListening() returned).
     private suspend fun respondTo(userInput: String) {
         val travelContext = buildTravelContext(userInput)
         generateResponseUseCase(travelContext, userInput)
-            .onEach { response ->
+            .catch {
+                _uiState.value = _uiState.value.copy(status = RoadMateStatus.IDLE, isListening = false)
+            }
+            .collect { response ->
                 _uiState.value = _uiState.value.copy(
                     status = RoadMateStatus.SPEAKING,
                     currentResponse = response,
                     isListening = false
                 )
             }
-            .catch {
-                _uiState.value = _uiState.value.copy(status = RoadMateStatus.IDLE, isListening = false)
-            }
-            .launchIn(viewModelScope)
     }
 
     private suspend fun handleRestReminder() {
         val travelContext = buildTravelContext(userInput = "")
         detectSilenceUseCase.triggerRestPrompt(travelContext)
-            .onEach { response ->
+            .collect { response ->
                 _uiState.value = _uiState.value.copy(
                     status = RoadMateStatus.SPEAKING,
                     currentResponse = response
                 )
             }
-            .launchIn(viewModelScope)
     }
 
     private suspend fun buildTravelContext(userInput: String): TravelContext {
