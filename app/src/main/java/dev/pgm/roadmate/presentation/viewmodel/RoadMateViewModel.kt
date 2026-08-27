@@ -59,6 +59,10 @@ class RoadMateViewModel @Inject constructor(
      * this too early (e.g. unconditionally from init{}) would leave the monitor dead
      * for the rest of the ViewModel's lifetime. HomeScreen calls this once its
      * permission state flips to granted.
+     *
+     * Only one thing should hold the mic for silence detection at a time: MainActivity
+     * stops this in onPause() (handing off to SilenceDetectionForegroundService while
+     * backgrounded) and restarts it in onResume().
      */
     fun startSilenceMonitoring() {
         if (silenceMonitoringJob?.isActive == true) return
@@ -66,6 +70,11 @@ class RoadMateViewModel @Inject constructor(
             .onEach { handleRestReminder() }
             .catch { /* transient audio read errors shouldn't kill the monitor */ }
             .launchIn(viewModelScope)
+    }
+
+    fun stopSilenceMonitoring() {
+        silenceMonitoringJob?.cancel()
+        silenceMonitoringJob = null
     }
 
     fun startListening() {

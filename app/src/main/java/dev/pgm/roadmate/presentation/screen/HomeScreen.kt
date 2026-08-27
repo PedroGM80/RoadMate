@@ -1,6 +1,7 @@
 package dev.pgm.roadmate.presentation.screen
 
 import android.Manifest
+import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,7 +24,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.google.accompanist.permissions.rememberPermissionState
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateStatus
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 
@@ -37,10 +40,22 @@ fun HomeScreen(
     val permissionsState = rememberMultiplePermissionsState(
         listOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.ACCESS_FINE_LOCATION)
     )
+    // Notifications are requested separately and never gate the mic button —
+    // denying them just means the background silence-detection notification
+    // (see SilenceDetectionForegroundService) won't be visible, which doesn't
+    // affect the core voice Q&A flow.
+    val notificationPermissionState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS)
+    } else {
+        null
+    }
 
     LaunchedEffect(permissionsState.allPermissionsGranted) {
         if (permissionsState.allPermissionsGranted) {
             viewModel.startSilenceMonitoring()
+            if (notificationPermissionState?.status?.isGranted == false) {
+                notificationPermissionState.launchPermissionRequest()
+            }
         }
     }
 

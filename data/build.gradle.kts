@@ -45,7 +45,6 @@ dependencies {
 
     implementation(libs.aicore)
     implementation(libs.play.services.location)
-    implementation(libs.androidx.work.runtime)
 
     implementation(libs.retrofit)
     implementation(libs.converter.moshi)

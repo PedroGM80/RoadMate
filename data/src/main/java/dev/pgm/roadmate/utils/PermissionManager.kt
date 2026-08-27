@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
 
 /**
  * Checks runtime/manifest permission grants for the app's core capabilities:
@@ -16,7 +18,7 @@ import androidx.core.content.ContextCompat
  * the asynchronous result as observable state, which a request method on
  * this class couldn't do without duplicating that machinery.
  */
-class PermissionManager(private val context: Context) {
+class PermissionManager @Inject constructor(@ApplicationContext private val context: Context) {
 
     fun hasRecordAudioPermission(): Boolean =
         hasPermission(Manifest.permission.RECORD_AUDIO)
