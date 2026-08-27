@@ -1,46 +1,35 @@
 package dev.pgm.roadmate.utils
 
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import dev.pgm.roadmate.domain.model.TravelContext
 
 /**
- * Assembles the text prompt sent to Gemini Nano from the current trip context.
+ * Assembles the text prompt sent to Gemini Nano from the current [TravelContext].
+ * Pure Kotlin, no Android dependency — safe to unit test directly.
  */
 object PromptBuilder {
 
-    fun build(
-        currentLocation: Pair<Double, Double>?,
-        destination: String?,
-        userInput: String,
-        tripContext: String? = null,
-        timestamp: Date = Date()
-    ): String {
-        val formattedDateTime = DATE_FORMAT.format(timestamp)
+    private const val MAX_LAST_RESPONSES = 3
 
-        return buildString {
-            appendLine("Eres el asistente de conducción de RoadMate.")
-            appendLine("Fecha y hora actual: $formattedDateTime")
+    fun buildPrompt(context: TravelContext, userInput: String): String {
+        val location = context.currentLocation
+            ?.let { "${it.first}, ${it.second}" }
+            ?: "desconocida"
+        val destination = context.destination ?: "sin destino definido"
+        val hour = "%02d:00".format(context.hour)
 
-            if (currentLocation != null) {
-                appendLine("Ubicación actual (lat, lon): ${currentLocation.first}, ${currentLocation.second}")
-            } else {
-                appendLine("Ubicación actual: no disponible")
+        val prompt = buildString {
+            appendLine(Constants.GEMINI_SYSTEM_PROMPT)
+            appendLine(
+                "Usuario está en [$location], va a [$destination], son las [$hour]. " +
+                    "Pregunta: [$userInput]. Responde en 1-2 frases."
+            )
+
+            if (context.lastResponses.isNotEmpty()) {
+                appendLine("Respuestas anteriores en este viaje (para continuidad):")
+                context.lastResponses.takeLast(MAX_LAST_RESPONSES).forEach { appendLine("- $it") }
             }
+        }.trim()
 
-            if (!destination.isNullOrBlank()) {
-                appendLine("Destino del viaje: $destination")
-            }
-
-            if (!tripContext.isNullOrBlank()) {
-                appendLine("Contexto del viaje: $tripContext")
-            }
-
-            appendLine()
-            appendLine("Petición del usuario:")
-            append(userInput.trim())
-        }
+        return prompt.take(Constants.MAX_CONTEXT_LENGTH)
     }
-
-    private val DATE_FORMAT = SimpleDateFormat("EEEE d MMMM yyyy, HH:mm", Locale.getDefault())
 }
