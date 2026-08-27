@@ -5,6 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.annotation.RequiresPermission
+import dev.pgm.roadmate.utils.Constants
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,27 +18,37 @@ import kotlin.math.sqrt
 /**
  * Monitors the microphone input level in real time and reports sustained silence.
  *
- * All audio reading happens on [Dispatchers.Default] via coroutines, so it never
- * blocks the UI thread. Callbacks ([onLevelChanged], [onSilenceDetected]) are invoked
- * from that background context — hop back to the main dispatcher in the caller if
- * touching UI state directly.
+ * All audio reading happens on [Dispatchers.IO] via coroutines (AudioRecord.read is a
+ * blocking hardware call), so it never blocks the UI thread. Callbacks ([onLevelChanged],
+ * [onSilenceDetected]) are invoked from that background context — hop back to the main
+ * dispatcher in the caller if touching UI state directly.
+ *
+ * Not a shared/injected singleton: callers construct a fresh instance per use with the
+ * threshold/duration that fits their purpose (e.g. a short gap to end a recording vs a
+ * long one to suggest a rest break).
  */
 class AudioLevelDetector(
-    private val silenceThresholdDb: Double = -50.0,
-    private val silenceDurationMs: Long = 30_000L,
+    private val silenceThresholdDb: Double = Constants.SILENCE_THRESHOLD_DB,
+    private val silenceDurationMs: Long = Constants.REST_REMINDER_SILENCE_MS,
     private val onLevelChanged: (dB: Double) -> Unit = {},
-    private val onSilenceDetected: () -> Unit = {}
+    private val onSilenceDetected: (duration: Long) -> Unit = {}
 ) {
 
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     private var silenceStartedAtMs: Long? = null
     private var silenceAlreadyReported = false
 
     val isRunning: Boolean
         get() = recordingJob?.isActive == true
+
+    /** Milliseconds of continuous silence so far, or 0 if not currently silent. */
+    fun getSilenceDuration(): Long {
+        val startedAt = silenceStartedAtMs ?: return 0L
+        return System.currentTimeMillis() - startedAt
+    }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     fun start() {
@@ -113,9 +124,10 @@ class AudioLevelDetector(
 
         if (currentDb < silenceThresholdDb) {
             val startedAt = silenceStartedAtMs ?: now.also { silenceStartedAtMs = it }
-            if (!silenceAlreadyReported && now - startedAt >= silenceDurationMs) {
+            val elapsed = now - startedAt
+            if (!silenceAlreadyReported && elapsed >= silenceDurationMs) {
                 silenceAlreadyReported = true
-                onSilenceDetected()
+                onSilenceDetected(elapsed)
             }
         } else {
             silenceStartedAtMs = null

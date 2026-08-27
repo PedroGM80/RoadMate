@@ -20,7 +20,8 @@ import java.util.Locale
 class SpeechRecognitionManager(
     private val context: Context,
     private val onResult: (String) -> Unit = {},
-    private val onError: (Int) -> Unit = {}
+    private val onError: (Int) -> Unit = {},
+    private val onPartialResult: (String) -> Unit = {}
 ) {
 
     private var speechRecognizer: SpeechRecognizer? = null
@@ -45,6 +46,7 @@ class SpeechRecognitionManager(
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         }
         recognizer.startListening(intent)
     }
@@ -77,7 +79,14 @@ class SpeechRecognitionManager(
             onResult(transcript)
         }
 
-        override fun onPartialResults(partialResults: Bundle?) = Unit
+        override fun onPartialResults(partialResults: Bundle?) {
+            val partialTranscript = partialResults
+                ?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                ?.firstOrNull()
+            if (!partialTranscript.isNullOrBlank()) {
+                onPartialResult(partialTranscript)
+            }
+        }
         override fun onEvent(eventType: Int, params: Bundle?) = Unit
     }
 }

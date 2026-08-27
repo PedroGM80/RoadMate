@@ -3,26 +3,28 @@ package dev.pgm.roadmate.ml
 import android.content.Context
 import com.google.ai.edge.aicore.GenerativeModel
 import com.google.ai.edge.aicore.generationConfig
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.pgm.roadmate.utils.Constants
+import kotlinx.coroutines.withTimeoutOrNull
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
- * Sends prompts to the on-device Gemini Nano model via Android AICore and
- * returns the generated text.
+ * Sends prompts to the on-device Gemini Nano model via Android AICore and returns
+ * the generated text, or a canned offline fallback if AICore times out or fails
+ * (model not downloaded yet, device unsupported, inference error).
  *
- * IMPORTANT: this depends on `com.google.ai.edge.aicore:aicore`, which is not
- * yet declared in gradle/libs.versions.toml — add it before this file will
- * compile. ML Kit's GenAI APIs (Summarization/Rewriting/Proofreading) do not
- * expose free-form prompting, so this targets the AICore SDK instead, which
- * is the actual on-device Gemini Nano entry point. That SDK is still
- * evolving — verify the package/class names below against the AICore
- * version you add, and confirm target devices support AICore before relying
- * on this in production.
+ * Requires `com.google.ai.edge.aicore:aicore` (declared in the version catalog).
+ * The SDK is an early-access preview — verify class/package names against the
+ * AICore release in use before shipping.
  */
-class GeminiNanoManager(context: Context) {
+@Singleton
+class GeminiNanoManager @Inject constructor(@ApplicationContext context: Context) {
 
     private val model: GenerativeModel by lazy {
         GenerativeModel(
             generationConfig = generationConfig {
-                this.context = context.applicationContext
+                this.context = context
                 temperature = 0.2f
                 topK = 16
                 maxOutputTokens = 256
@@ -30,8 +32,15 @@ class GeminiNanoManager(context: Context) {
         )
     }
 
-    suspend fun generateResponse(prompt: String): Result<String> = runCatching {
-        val response = model.generateContent(prompt)
-        response.text ?: throw IllegalStateException("Gemini Nano returned an empty response")
+    suspend fun generateResponse(prompt: String): String {
+        val response = withTimeoutOrNull(Constants.GEMINI_TIMEOUT_MS) {
+            runCatching { model.generateContent(prompt).text }.getOrNull()
+        }
+        return response?.takeIf { it.isNotBlank() } ?: FALLBACK_RESPONSE
+    }
+
+    private companion object {
+        const val FALLBACK_RESPONSE =
+            "No he podido generar una respuesta ahora mismo. Puedes repetir la pregunta más adelante."
     }
 }
