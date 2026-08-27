@@ -57,6 +57,13 @@ without reading the full git log.
   launcher icon, M3-Expressive-style mic button (spring press + pulse +
   waveform), live-region announcements for TalkBack, location chip with
   retry-on-failure state.
+- **Interaction polish**: haptic tick (`ToggleOn`/`ToggleOff`) plus a short
+  `ToneGenerator` earcon on mic start/stop, a haptic "confirm" + spring
+  "pop" on the response card when an answer lands, and a spoken time-of-day
+  greeting once per calendar day (tracked via a single DataStore date
+  string, gated behind core permissions being granted). All verified live
+  on the emulator, including a fresh-install run confirming the greeting's
+  `last_greeted_date` lands correctly in the DataStore file with no crash.
 - **Test suite**: `:domain:test` and `:app:testDebugUnitTest`, hand-rolled
   fakes (no mocking library). Caught one real bug this way — a detached
   `.onEach{}.launchIn()` coroutine in `RoadMateViewModel` that let
