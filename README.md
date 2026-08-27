@@ -92,4 +92,5 @@ Unit could not be driven from this environment. Verify on a real head unit
 or DHU before relying on it.
 
 See [`PROGRESS.md`](PROGRESS.md) for what's built, what's been verified,
-and what's still open.
+and what's still open, and [`FUTURE.md`](FUTURE.md) for ideas and known
+gaps for the next round of work.
