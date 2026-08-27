@@ -3,6 +3,7 @@ package dev.pgm.roadmate.data.repository
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
+import dev.pgm.roadmate.ml.CarMicrophonePreference
 import dev.pgm.roadmate.ml.SpeechRecognitionManager
 import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.inject.Inject
@@ -17,20 +18,29 @@ class SpeechRecognitionRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context
 ) : SpeechRecognitionRepository {
 
+    private val carMicrophonePreference = CarMicrophonePreference(context)
+
     override suspend fun recognizeSpeech(): String = suspendCancellableCoroutine { continuation ->
+        carMicrophonePreference.preferCarMicrophoneIfAvailable()
+
         lateinit var manager: SpeechRecognitionManager
         manager = SpeechRecognitionManager(
             context = context,
             onResult = { text ->
+                carMicrophonePreference.clearPreference()
                 manager.destroy()
                 if (continuation.isActive) continuation.resume(text)
             },
             onError = {
+                carMicrophonePreference.clearPreference()
                 manager.destroy()
                 if (continuation.isActive) continuation.resume("")
             }
         )
-        continuation.invokeOnCancellation { manager.destroy() }
+        continuation.invokeOnCancellation {
+            carMicrophonePreference.clearPreference()
+            manager.destroy()
+        }
         manager.startListening()
     }
 }
