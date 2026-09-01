@@ -78,6 +78,36 @@ things out loud.
   wrong and need fixing against the real style JSON.
 - Tap a pin → Google Maps turn-by-turn launches.
 
+### Then build: voice search → offline map, not the `geo:` intent
+
+Right now "busca gasolineras" always fires a `geo:` intent (external Maps).
+It should prefer the in-app offline map for the categories that map has.
+**Only start this once the filter chips above are confirmed to actually
+drop pins** — otherwise this routes the user to an empty map.
+
+Design (hybrid, with fallback):
+
+1. New `:domain` enum `PlaceCategory { FUEL, HOTEL, FOOD }` + a
+   `PlaceCategoryParser` mapping query text → category
+   ("gasolinera(s)", "combustible", "repostar" → FUEL; "hotel(es)",
+   "alojamiento", "dónde dormir" → HOTEL; "restaurante", "comer",
+   "bar", "cafetería" → FOOD). `PoiKind` in `:app` keeps its
+   tile-`class` sets; add a `PoiKind.from(PlaceCategory)` bridge.
+2. In `GenerateResponseUseCase.handleMapSearch`: if
+   `PlaceCategoryParser` matches → don't call `mapSearchRepository`;
+   instead emit a signal (a `MutableSharedFlow<PlaceCategory>` on a new
+   `MapSearchCoordinator` interface, impl in `:app` / a shared VM) and
+   speak "Te lo enseño en el mapa".
+3. `RootScreen` observes it → switch to the Mapa tab; `MapViewModel`
+   observes it → `_poiFilter.value = PoiKind.from(category)` and recenter
+   on the user's location.
+4. Fallback: if the map has no downloaded region OR
+   `queryRenderedFeatures` returns nothing for that category within ~1 s,
+   fall back to the current `geo:` intent and say "No tengo esa zona
+   descargada, lo abro en Maps".
+5. Non-category queries ("hotel Perico", an address) keep going straight
+   to `geo:` — the offline map has no geocoder.
+
 ## Phase 4 — Model download + inference (Wi-Fi, ~547 MB, slow)
 
 - Fetch completes; kill the app mid-download → relaunch → it resumes.

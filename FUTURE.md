@@ -13,6 +13,13 @@ commitment, just a starting point for the next session. See
   more proximity filler ("por aquí", "en la zona", bare "cercana"), and the
   fact-lookup guard covers "quién/cuánto/cuándo/qué significa". Still
   hand-written regex — revisit against real spoken phrasing on a device.
+- **Voice search → in-app offline map for known categories.** "busca
+  gasolineras" currently always fires a `geo:` intent (external Maps). For
+  the categories the offline map can pin (fuel / hotel / food) it should
+  switch to the Mapa tab and apply that filter instead, falling back to
+  `geo:` for everything else or when no region is downloaded. Blocked on
+  verifying the offline POI layer query on hardware first — full design in
+  `NEXT_SESSION.md`.
 - **Contact follow-up: label-aware — done.** `ContactMatch` now carries a
   `PhoneLabel` (mobile / work / home / main / other) read from
   `Phone.TYPE`. One contact with two labelled numbers is treated as
