@@ -18,6 +18,7 @@ import dev.pgm.roadmate.utils.JokeProvider
 import dev.pgm.roadmate.utils.MapSearchIntentParser
 import dev.pgm.roadmate.utils.MediaIntentParser
 import dev.pgm.roadmate.utils.MemoryCommandParser
+import dev.pgm.roadmate.utils.PlaceName
 import dev.pgm.roadmate.utils.PromptBuilder
 import dev.pgm.roadmate.utils.StylePreferenceParser
 import kotlinx.coroutines.flow.Flow
@@ -172,7 +173,7 @@ class GenerateResponseUseCase @Inject constructor(
 
     private suspend fun handleMapSearch(query: String, location: Pair<Double, Double>?): String =
         if (mapSearchRepository.searchNearby(query, location)) {
-            memoryRepository.rememberPlace(query)
+            memoryRepository.rememberPlace(PlaceName.normalize(query))
             "Busco $query en el mapa."
         } else {
             "No hay ninguna app de mapas para buscar $query."

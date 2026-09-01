@@ -163,6 +163,7 @@ fun MapScreen(
             PoiSheet(
                 name = name.ifBlank { "Sitio" },
                 onNavigate = {
+                    viewModel.recordVisit(name)
                     launchNavigation(context, name, latLng)
                     selectedPoi = null
                 },
