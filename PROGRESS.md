@@ -45,6 +45,16 @@ without reading the full git log.
   (`OfflineMapStatusTest`, `MapViewModelTest`). **Not** run on a GL device —
   map rendering, offline download, and POI extraction are unverified on
   hardware.
+- **"Abre Spotify / YouTube Music"** (build- & unit-verified): fourth local
+  shortcut in `GenerateResponseUseCase`, ahead of Gemini. `MediaIntentParser`
+  needs a launch verb *and* a known app name. `MediaRepositoryImpl` only
+  fires the package's launcher intent — no playback control — and the reply
+  says "Abriendo", not "reproduciendo"; missing app is handled. Manifest
+  `<queries>` lists both packages. 6 new tests.
+- **Adaptive `RootScreen`** (build-verified): `NavigationSuiteScaffold` — bar
+  on a phone, rail when wider; past ~840dp both Voz and Mapa render side by
+  side and the nav items drop. Phone behaviour unchanged (two tabs, one
+  saved int). Not checked on a real tablet/foldable.
 - **Location + weather context**: `LocationRepository` (FusedLocationProvider)
   feeds `TravelContext`; weather is the one optional network call, disclosed
   on first run. `refreshLocation()` times out via

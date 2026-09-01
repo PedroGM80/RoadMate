@@ -25,6 +25,9 @@ query data).
   API itself.
 - **"Cuéntame un chiste"** — answered from a small local bank of original
   road-themed jokes, no network, no AI call.
+- **"Abre Spotify" / "pon música en YouTube Music"** — brings the music app
+  to the foreground. Just opens it (no playback control) and says so; an
+  app that isn't installed gets a spoken explanation.
 - **In-app map ("Mapa" tab).** A real vector map (MapLibre + OpenFreeMap,
   OpenStreetMap data, no API key) showing your position. **"Descargar esta
   zona"** saves the visible area so the map keeps working with no
@@ -74,7 +77,8 @@ inward:
   `SilenceDetectionForegroundService`. `GeminiRepositoryImpl` routes a
   prompt AICore → downloaded model → canned fallback.
 - **`:app`** is presentation-only: `RoadMateViewModel`, `HomeScreen`,
-  `OnboardingScreen`, the two-tab `RootScreen`, the Car App Library screens
+  `OnboardingScreen`, `RootScreen` (Voz/Mapa — tabs on a phone, both panes
+  side by side past ~840dp), the Car App Library screens
   under `car/`, and the in-app map under `presentation/map/`
   (`MapScreen`, `MapViewModel`, `OfflineMapManager` — MapLibre lives here,
   not in `:data`, to keep GL/UI types out of the clean-arch core).
