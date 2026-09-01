@@ -13,6 +13,13 @@
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 
+    <!-- Car App Library: declares the app targets the templates host (Android
+         Auto / Automotive OS). required=false so phones without it still
+         install. Part of the standard Car App Library manifest setup. -->
+    <uses-feature
+        android:name="android.software.car.templates_host"
+        android:required="false" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />

@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Car App Library apps MUST declare `androidx.car.app` here. `template` is the
+  older media/messaging-style value and makes Android Auto ignore the app
+  entirely — it won't show in the car launcher. See "Get started with the
+  Android for Cars App Library".
+-->
 <automotiveApp>
-    <uses name="template" />
+    <uses name="androidx.car.app" />
 </automotiveApp>
