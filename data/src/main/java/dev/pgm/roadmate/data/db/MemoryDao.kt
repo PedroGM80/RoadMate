@@ -18,6 +18,10 @@ interface MemoryDao {
     @Query("DELETE FROM trip_exchange WHERE at < :before")
     suspend fun pruneExchangesBefore(before: Long)
 
+    /** Newest first, no time cutoff — for keyword search over recent history. */
+    @Query("SELECT * FROM trip_exchange ORDER BY at DESC LIMIT :limit")
+    suspend fun latestExchanges(limit: Int): List<TripExchangeEntity>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertFact(fact: UserFactEntity): Long
 

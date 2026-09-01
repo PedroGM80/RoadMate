@@ -330,4 +330,28 @@ class GenerateResponseUseCaseTest {
         assertEquals(null, phone.placedCallTo)
         assertTrue(emitted.first().contains("No sé quién es tu hermano"))
     }
+
+    @Test
+    fun `que te dije sobre X searches past conversation, bypassing Gemini`() = runTest {
+        val gemini = FakeGeminiRepository(response = "no debería usarse")
+        val memory = FakeMemoryRepository(
+            initial = listOf(Exchange("¿hay hotel en Ronda?", "sí, el Parador está bien")),
+        )
+
+        val emitted = useCase(gemini, memoryRepository = memory)(
+            context, "¿qué te dije sobre el hotel de Ronda?",
+        ).toList()
+
+        assertEquals(0, gemini.responseCount)
+        assertTrue(emitted.first().contains("el Parador está bien"))
+    }
+
+    @Test
+    fun `a search with nothing on record says so`() = runTest {
+        val emitted = useCase(memoryRepository = FakeMemoryRepository())(
+            context, "¿qué te dije sobre el hotel de Ronda?",
+        ).toList()
+
+        assertTrue(emitted.first().contains("No encuentro"))
+    }
 }

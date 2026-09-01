@@ -106,6 +106,12 @@ class GenerateResponseUseCase @Inject constructor(
             else "Recuerdo esto: " + prefs.joinToString("; ") { it.value } + "."
         }
 
+        is MemoryCommandParser.Command.Search -> {
+            val hit = memoryRepository.searchExchanges(command.term).firstOrNull()
+            if (hit == null) "No encuentro que hayamos hablado de eso."
+            else "Me preguntaste \"${hit.question}\" y te dije: ${hit.answer}"
+        }
+
         MemoryCommandParser.Command.SetHome -> saveNamedLocation(FactType.HOME, "casa", context)
         MemoryCommandParser.Command.SetWork -> saveNamedLocation(FactType.WORK, "trabajo", context)
 

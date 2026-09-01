@@ -144,6 +144,10 @@ class FakeMemoryRepository : MemoryRepository {
         recorded += Exchange(question, answer)
     }
     override suspend fun recentExchanges(limit: Int): List<Exchange> = recorded.takeLast(limit)
+    override suspend fun searchExchanges(term: String, limit: Int): List<Exchange> {
+        val tokens = term.lowercase().split(Regex("\\W+")).filter { it.length >= 4 }
+        return recorded.filter { e -> tokens.any { (e.question + " " + e.answer).lowercase().contains(it) } }.take(limit)
+    }
     private val places = mutableListOf<String>()
     override suspend fun remember(fact: UserFact) {
         if (fact.key != null) facts.removeAll { it.type == fact.type && it.key == fact.key }

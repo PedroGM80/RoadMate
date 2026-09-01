@@ -40,6 +40,20 @@ class MemoryCommandParserTest {
     }
 
     @Test
+    fun `recognizes a search over past conversation`() {
+        assertEquals(
+            Command.Search("el hotel de Ronda"),
+            MemoryCommandParser.parse("¿qué te dije sobre el hotel de Ronda?"),
+        )
+        assertEquals(
+            Command.Search("gasolineras"),
+            MemoryCommandParser.parse("qué dijiste de gasolineras"),
+        )
+        // "de mí" recall must not be swallowed by search
+        assertTrue(MemoryCommandParser.parse("¿qué sabes de mí?") is Command.Recall)
+    }
+
+    @Test
     fun `does not fire on ordinary sentences containing the verb`() {
         assertNull(MemoryCommandParser.parse("¿esto te recuerda a algo?"))
         assertNull(MemoryCommandParser.parse("cuéntame algo de este pueblo"))

@@ -26,6 +26,20 @@ class MemoryRepositoryImpl @Inject constructor(
             .map { Exchange(question = it.question, answer = it.answer) }
     }
 
+    override suspend fun searchExchanges(term: String, limit: Int): List<Exchange> {
+        val tokens = term.lowercase().split(Regex("\\W+")).filter { it.length >= 4 }
+        if (tokens.isEmpty()) return emptyList()
+        return dao.latestExchanges(SEARCH_SCAN)
+            .map { row ->
+                val hay = (row.question + " " + row.answer).lowercase()
+                row to tokens.count { hay.contains(it) }
+            }
+            .filter { it.second > 0 }
+            .sortedWith(compareByDescending<Pair<TripExchangeEntity, Int>> { it.second }.thenByDescending { it.first.at })
+            .take(limit)
+            .map { Exchange(question = it.first.question, answer = it.first.answer) }
+    }
+
     override suspend fun remember(fact: UserFact) {
         // Keyed facts (e.g. a relationship) are single-valued: replace any
         // existing one for that key. Keyless facts just dedupe by value.
@@ -72,5 +86,8 @@ class MemoryRepositoryImpl @Inject constructor(
 
         /** Older rows are dropped — the history is for continuity, not a log. */
         const val RETENTION_MS = 7 * 24 * 60 * 60 * 1000L
+
+        /** How many recent rows a keyword search scans (weekly prune keeps this small). */
+        const val SEARCH_SCAN = 200
     }
 }

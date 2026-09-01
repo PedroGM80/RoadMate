@@ -15,8 +15,11 @@ object MemoryCommandParser {
         /** Drop preferences matching [match] (or all, if blank). */
         data class Forget(val match: String) : Command
 
-        /** Say back what's remembered. */
+        /** Say back what's remembered (preferences). */
         data object Recall : Command
+
+        /** Look up what was said earlier about [term]. */
+        data class Search(val term: String) : Command
 
         /** Save the current location as home / work. */
         data object SetHome : Command
@@ -61,13 +64,21 @@ object MemoryCommandParser {
         RegexOption.IGNORE_CASE,
     )
     private val RECALL = Regex(
-        """\bqu[eé]\s+(?:sabes|recuerdas|has\s+aprendido|tienes\s+apuntado)\s+(?:de\s+m[ií]|sobre\s+m[ií])?""",
+        """\bqu[eé]\s+(?:sabes|recuerdas|has\s+aprendido|tienes\s+apuntado)\s+(?:de\s+m[ií]|sobre\s+m[ií])?\s*$""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val SEARCH = Regex(
+        """\b(?:qu[eé]\s+(?:te\s+dije|dijiste|dijimos|hablamos|comentamos|coment[eé])|de\s+qu[eé]\s+hablamos)\s+(?:sobre|de|acerca\s+de|del|de\s+la|de\s+lo\s+de)\s+(.+)""",
         RegexOption.IGNORE_CASE,
     )
 
     fun parse(userInput: String): Command? {
         val text = userInput.trim().trimEnd('.', '?', '!', ' ')
 
+        SEARCH.find(text)?.let { m ->
+            val term = m.groupValues[1].trim()
+            if (term.isNotBlank()) return Command.Search(term)
+        }
         RECALL.find(text)?.let { return Command.Recall }
         if (SET_HOME.containsMatchIn(text)) return Command.SetHome
         if (SET_WORK.containsMatchIn(text)) return Command.SetWork

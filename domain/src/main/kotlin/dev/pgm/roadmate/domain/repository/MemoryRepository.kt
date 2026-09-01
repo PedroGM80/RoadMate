@@ -21,6 +21,13 @@ interface MemoryRepository {
      */
     suspend fun recentExchanges(limit: Int = 3): List<Exchange>
 
+    /**
+     * Past exchanges whose question or answer mentions [term], newest first —
+     * for "¿qué te dije sobre…?". Plain substring match; the history table is
+     * small (weekly prune) so it needs no full-text index.
+     */
+    suspend fun searchExchanges(term: String, limit: Int = 3): List<Exchange>
+
     /** Adds a fact, or updates the existing one with the same type + key/value. */
     suspend fun remember(fact: UserFact)
 

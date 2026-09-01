@@ -163,6 +163,14 @@ class FakeMemoryRepository(
     override suspend fun recentExchanges(limit: Int): List<Exchange> =
         recorded.takeLast(limit)
 
+    override suspend fun searchExchanges(term: String, limit: Int): List<Exchange> {
+        val tokens = term.lowercase().split(Regex("\\W+")).filter { it.length >= 4 }
+        if (tokens.isEmpty()) return emptyList()
+        return recorded.asReversed()
+            .filter { e -> tokens.any { (e.question + " " + e.answer).lowercase().contains(it) } }
+            .take(limit)
+    }
+
     private val placeHits = linkedMapOf<String, Int>()
 
     override suspend fun remember(fact: UserFact) {
