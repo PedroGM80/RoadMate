@@ -89,6 +89,14 @@ things out loud.
 - Greeting: fresh install, first open of the day → one spoken time-of-day
   greeting, not on every open.
 
+## Phase 5b — Android Auto discovery
+
+`automotive_app_desc.xml` was fixed (`androidx.car.app`, was `template`) so
+the app can be recognised at all. To actually see it on a sideloaded build:
+Android Auto → tap the version 10× to unlock **Developer settings** → enable
+**Unknown sources**, then RoadMate shows in the car launcher (POI category).
+If it still doesn't: check `adb logcat -s CAR.APP` while connecting.
+
 ## Phase 6 — AICore device (only if you have one)
 
 - On a Pixel 8+ / Galaxy S24+: "IA local activa" should show **immediately**
