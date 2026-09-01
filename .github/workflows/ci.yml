@@ -14,20 +14,20 @@ jobs:
   unit-tests:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
 
       # The :app build's preBuild task downloads the ~39 MB Vosk model into
       # assets (onlyIf it's missing). Cache it so CI doesn't re-fetch from
       # alphacephei.com every run and doesn't go red if that host is down.
       - name: Cache Vosk model
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: app/src/main/assets/vosk-model-small-es-0.42.zip
           key: vosk-model-small-es-0.42
@@ -37,7 +37,7 @@ jobs:
 
       - name: Upload test reports
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-reports
           path: |
