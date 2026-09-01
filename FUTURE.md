@@ -49,6 +49,30 @@ commitment, just a starting point for the next session. See
 
 ## Larger initiatives
 
+- **Vosk STT: verify on hardware + trim size.** The switch from Android
+  `SpeechRecognizer` to Vosk (`VoskSpeechRecognizer`, `vosk-model-small-es-0.42`
+  bundled in assets) compiles, packages, and is unit-tested, but hasn't run
+  on a device — needs a real mic pass (partials, end-pointing, the
+  no-speech timeout, the mic-permission error path).
+
+- **In-app map: verify on a GL device + polish.** `MapScreen` / MapLibre /
+  `OfflineMapManager` compile and unit-test, but nothing map-side has run on
+  hardware: needs a real GL surface to confirm the OpenFreeMap style renders,
+  the blue-dot location component activates (MapLibre's default location
+  engine — may need `play-services-location` wired as the engine), the
+  "Descargar esta zona" flow completes and survives airplane mode, and that
+  `queryRenderedFeatures(... "class")` actually matches the OpenFreeMap
+  "liberty" POI layers (the schema/layer names are assumed, not checked).
+  Also: the `google.navigation:` intent needs an `ActivityNotFoundException`
+  guard tested; consider a "borrar mapas descargados" action; Android Auto
+  still has no map surface.
+
+- **APK size / ABI splits.** The all-ABI debug APK is now ~250 MB (MediaPipe
+  + Vosk + MapLibre native libs + the 39 MB Vosk model). A release build
+  needs per-ABI splits / an app bundle; consider moving the Vosk model to a
+  runtime download and swapping `vosk-model-small` for something smaller to
+  shrink the base install.
+
 - **Verify on a real Android Auto head unit or working DHU.** Still the
   single biggest unverified risk — everything car-side is only checked by
   compiling against the real `androidx.car.app` API, never actually driven.
@@ -57,6 +81,21 @@ commitment, just a starting point for the next session. See
   emulator (expected) but never confirmed *present and working* on a real
   AICore-capable device — the "IA local activa" path is unverified end to
   end.
+- **Verify the local-model download + inference on a real device.** The
+  fallback (`LocalAiModelManager` HTTPS download → `LocalLlmManager`
+  MediaPipe) compiles, the unit tests cover the auto-trigger, and the
+  default model URL is confirmed reachable with no auth (HTTP 206, range
+  supported, `x-linked-size` matches the built-in integrity check). But it
+  has not been run on hardware: needs a non-AICore device (e.g. the Xiaomi)
+  to confirm the ~547 MB fetch, resume-after-kill, the metered→Wi-Fi wait,
+  and that `Qwen2.5-0.5B` actually loads and answers usefully through
+  MediaPipe 0.10.27. Open sub-items: try a larger model (Qwen2.5-1.5B q8,
+  ~1.6 GB) for answer quality where the device can take it; GPU backend
+  instead of CPU in `LocalLlmManager`; run the download in a `WorkManager`
+  job / foreground service so it survives the app being swiped away;
+  `LlmInference` close/reload on `onTrimMemory`; R8 keep rules for
+  `com.google.mediapipe.**` once release minification is on; ABI splits to
+  trim the ~50–100 MB of `tasks-genai` native libs from the base APK.
 - **CI pipeline.** No automated build/test run exists outside manually
   invoking Gradle locally. Even a minimal `./gradlew test` on push would
   catch the kind of constructor-signature breakage this session ran into

@@ -6,9 +6,14 @@ without reading the full git log.
 
 ## Done and verified live (emulator or real API)
 
-- **Core voice loop**: mic → `SpeechRecognizer` (on-device) → `GenerateResponseUseCase`
-  → Gemini Nano or local fast path → `TextToSpeech` (on-device). Verified on
-  a Medium_Phone (API 37) AVD end to end.
+- **Core voice loop**: mic → Vosk (on-device, model bundled) →
+  `GenerateResponseUseCase` → Gemini Nano / downloaded model / local fast
+  path → `TextToSpeech` (on-device). The STT half was rebuilt on Vosk
+  (`VoskSpeechRecognizer`) after Android's `SpeechRecognizer` +
+  `EXTRA_PREFER_OFFLINE` proved unreliable on devices without a Google
+  speech pack (e.g. many Xiaomi/MIUI). Now streams live partial results to
+  the UI and speaks a clear error instead of silently resetting. Build- and
+  unit-test-verified; **not** yet run on hardware.
 - **Clean Architecture split**: `:domain` / `:data` / `:app` Gradle modules,
   Hilt DI throughout.
 - **On-device AI availability**: `GeminiNanoManager.checkAvailability()` and
@@ -16,6 +21,30 @@ without reading the full git log.
   real instrumented test that AICore is genuinely unavailable on the
   emulator ("AiCoreService: not found") and the 5s timeout+fallback path
   works (14ms completion, no hang).
+- **Universal local-AI fallback (build-verified, download URL verified)**:
+  for devices without AICore, `GeminiRepositoryImpl` routes AICore →
+  downloaded model (MediaPipe `LocalLlmManager`) → canned "modo básico".
+  `LocalAiModelManager` downloads `Qwen2.5-0.5B-Instruct` q8 (~547 MB,
+  Apache-2.0) over plain HTTPS from Hugging Face's public CDN — **no
+  account, no token** — resumable, Wi-Fi-only, with a size-integrity check;
+  `RoadMateViewModel` auto-starts it the moment it sees no local backend,
+  and `HomeScreen` renders the full `LocalAiStatus` machine (preparing /
+  downloading % / waiting-for-Wi-Fi / failed+retry / ready). Verified: the
+  default model URL returns HTTP 206 with range support and
+  `x-linked-size == 546660344` (matches the built-in check);
+  `:app:assembleDebug` + `:app:bundleDebug` pass; `:domain:test` and
+  `:app:testDebugUnitTest` pass (20 + 11, incl. 3 new `RoadMateViewModelTest`
+  cases for auto-download). **Not** yet run on hardware — see FUTURE.md.
+- **In-app offline map (build- & unit-verified)**: new "Mapa" tab
+  (`RootScreen` bottom nav) with a MapLibre vector map on OpenFreeMap tiles
+  (no API key). `OfflineMapManager` wraps MapLibre `OfflineManager` for a
+  "Descargar esta zona" region download with a progress chip; POI pins
+  (gasolineras / hoteles / comida) come from `queryRenderedFeatures` on the
+  rendered tiles (fully offline, no places API), tap → Google Maps
+  navigation intent. `:app:assembleDebug` passes; 8 new unit tests
+  (`OfflineMapStatusTest`, `MapViewModelTest`). **Not** run on a GL device —
+  map rendering, offline download, and POI extraction are unverified on
+  hardware.
 - **Location + weather context**: `LocationRepository` (FusedLocationProvider)
   feeds `TravelContext`; weather is the one optional network call, disclosed
   on first run. `refreshLocation()` times out via
@@ -94,10 +123,14 @@ without reading the full git log.
 
 ## Deliberate constraints (not gaps)
 
-- **No cloud STT/TTS, ever.** Voice capture and interpretation are offline
-  by hard requirement, restated explicitly after an earlier proposal
-  (Cloud Speech-to-Text for car-mic capture) was rejected. Weather is the
-  only network call anywhere in the app, and it's optional and disclosed.
+- **No cloud STT/TTS, ever. No inference off-device.** Voice capture,
+  interpretation and answer generation are all on-device by hard
+  requirement, restated explicitly after an earlier proposal (Cloud
+  Speech-to-Text for car-mic capture) was rejected. The app makes exactly
+  two kinds of network call, both benign: the optional, disclosed weather
+  lookup, and the one-time model-file download (a plain GET of a public
+  openly-licensed file — no query data, no account). No prompt or
+  transcript is ever sent anywhere.
 - **No mocking library.** Test doubles are hand-rolled fakes, duplicated
   separately in `:domain/src/test` and `:app/src/test` (module test sources
   aren't cross-visible without a testFixtures setup, judged not worth the
