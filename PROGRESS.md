@@ -71,6 +71,18 @@ without reading the full git log.
   of past exchanges ("¿qué te dije sobre…?"), PLACE capture from the map's
   nav button too (with name normalisation), and an instrumented `MemoryDao`
   test. Replaces the vestigial `TravelContext.lastResponses`.
+- **Design pass** (build-verified): completed theme (full brand
+  `ColorScheme` + containers/outline, a real `Typography` scale, `Shapes`,
+  a named `Spacing` grid); every UI literal in `strings.xml`, every fixed
+  spoken line in one `SpokenText` object; `HomeScreen` split into
+  single-purpose components under `presentation/components/` (shared
+  `InfoPill` replaces two near-identical pills). Audit fixes: errors render
+  in the error colour not reply-green, 48dp touch targets, a spinner during
+  "Procesando…", sentence-case status, mic "stop" no longer the alarming
+  red, decorative loops honour reduce-motion, `MapScreen` controls inset
+  past the system bars with a real `ModalBottomSheet`, Voz/Mapa crossfade.
+  Still open: a `TopAppBar` + settings surface (theme toggle, "borrar
+  memoria").
 - **Location + weather context**: `LocationRepository` (FusedLocationProvider)
   feeds `TravelContext`; weather is the one optional network call, disclosed
   on first run. `refreshLocation()` times out via

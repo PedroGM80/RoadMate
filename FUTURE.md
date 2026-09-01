@@ -55,9 +55,20 @@ commitment, just a starting point for the next session. See
   `Constants`, `JokeProvider`, `CallIntentParser`/`MapSearchIntentParser`'s
   regexes, and every Compose string reworked for locale awareness.
 - **Accessibility audit beyond the current pass.** TalkBack live regions
-  and merged semantics exist on the core screens, but there's been no
-  dedicated Switch Access or contrast-ratio pass, and Android Auto's own
-  accessibility surface hasn't been touched at all.
+  and merged semantics exist on the core screens, and the design pass added
+  reduce-motion handling + 48dp targets, but there's been no dedicated
+  Switch Access or measured contrast-ratio pass, no font-scale check, and
+  Android Auto's own accessibility surface hasn't been touched.
+- **Settings surface.** The design pass left `RootScreen` without a
+  `TopAppBar`; there's nowhere for a theme toggle (light / dark / follow
+  system, useful at night regardless of the phone setting — the app has
+  location + time and could even flip at dusk) or a "borrar memoria"
+  action. Needs a small settings screen or overflow menu + a persisted
+  `ThemePreference` (DataStore) plumbed into `RoadMateTheme`, and a
+  `MemoryRepository.clearAll()`.
+- **Real mic-reactive waveform.** `MicButton`'s bars still animate on a
+  timer. A separate `AudioRecord` amplitude tap would make it honest, or
+  drop it for a single breathing dot.
 
 ## Larger initiatives
 
