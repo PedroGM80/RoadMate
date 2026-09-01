@@ -27,6 +27,12 @@ interface MemoryDao {
     @Query("SELECT * FROM user_fact WHERE type = :type ORDER BY updatedAt DESC")
     suspend fun factsByType(type: String): List<UserFactEntity>
 
+    @Query("SELECT * FROM user_fact WHERE type = :type ORDER BY hits DESC, updatedAt DESC LIMIT :limit")
+    suspend fun topFactsByType(type: String, limit: Int): List<UserFactEntity>
+
+    @Query("UPDATE user_fact SET hits = hits + 1, updatedAt = :now WHERE type = :type AND value = :value")
+    suspend fun bumpFact(type: String, value: String, now: Long): Int
+
     @Query("DELETE FROM user_fact WHERE type = :type")
     suspend fun deleteFactsByType(type: String): Int
 

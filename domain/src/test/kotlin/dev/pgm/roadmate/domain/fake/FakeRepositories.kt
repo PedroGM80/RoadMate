@@ -163,9 +163,19 @@ class FakeMemoryRepository(
     override suspend fun recentExchanges(limit: Int): List<Exchange> =
         recorded.takeLast(limit)
 
+    private val placeHits = linkedMapOf<String, Int>()
+
     override suspend fun remember(fact: UserFact) {
         if (storedFacts.none { it.type == fact.type && it.value == fact.value }) storedFacts += fact
     }
+
+    override suspend fun rememberPlace(place: String) {
+        placeHits[place] = (placeHits[place] ?: 0) + 1
+    }
+
+    override suspend fun frequentPlaces(limit: Int): List<UserFact> =
+        placeHits.entries.sortedByDescending { it.value }.take(limit)
+            .map { UserFact(FactType.PLACE, value = it.key) }
 
     override suspend fun facts(type: FactType): List<UserFact> = storedFacts.filter { it.type == type }
 

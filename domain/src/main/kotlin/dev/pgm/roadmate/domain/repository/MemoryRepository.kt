@@ -24,8 +24,14 @@ interface MemoryRepository {
     /** Adds a fact, or updates the existing one with the same type + key/value. */
     suspend fun remember(fact: UserFact)
 
+    /** Notes that the driver headed to [place] — inserts it or bumps its count. */
+    suspend fun rememberPlace(place: String)
+
     /** Every stored fact of [type]. */
     suspend fun facts(type: FactType): List<UserFact>
+
+    /** The [limit] places the driver goes to most, most-visited first. */
+    suspend fun frequentPlaces(limit: Int = 3): List<UserFact>
 
     /**
      * Drops facts of [type] whose value contains [valueContains]

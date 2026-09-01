@@ -20,6 +20,7 @@ object PromptBuilder {
         style: AnswerStyle = AnswerStyle.DEFAULT,
         recentExchanges: List<Exchange> = emptyList(),
         driverPreferences: List<String> = emptyList(),
+        frequentPlaces: List<String> = emptyList(),
     ): String {
         val location = context.currentLocation
             ?.let { "${it.first}, ${it.second}" }
@@ -41,6 +42,10 @@ object PromptBuilder {
             if (driverPreferences.isNotEmpty()) {
                 appendLine("Lo que sabes del conductor (tenlo en cuenta):")
                 driverPreferences.forEach { appendLine("- $it") }
+            }
+
+            if (frequentPlaces.isNotEmpty()) {
+                appendLine("Sitios a los que suele ir: ${frequentPlaces.joinToString(", ")}.")
             }
 
             if (recentExchanges.isNotEmpty()) {

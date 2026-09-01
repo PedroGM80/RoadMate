@@ -38,8 +38,22 @@ class MemoryRepositoryImpl @Inject constructor(
         )
     }
 
+    override suspend fun rememberPlace(place: String) {
+        val now = System.currentTimeMillis()
+        if (dao.bumpFact(FactType.PLACE.name, place, now) == 0) {
+            dao.insertFact(
+                UserFactEntity(type = FactType.PLACE.name, value = place, updatedAt = now, hits = 1)
+            )
+        }
+    }
+
     override suspend fun facts(type: FactType): List<UserFact> =
-        dao.factsByType(type.name).map { UserFact(FactType.valueOf(it.type), it.factKey, it.value) }
+        dao.factsByType(type.name).map { it.toDomain() }
+
+    override suspend fun frequentPlaces(limit: Int): List<UserFact> =
+        dao.topFactsByType(FactType.PLACE.name, limit).map { it.toDomain() }
+
+    private fun UserFactEntity.toDomain() = UserFact(FactType.valueOf(type), factKey, value)
 
     override suspend fun forget(type: FactType, valueContains: String?): Int =
         if (valueContains.isNullOrBlank()) dao.deleteFactsByType(type.name)

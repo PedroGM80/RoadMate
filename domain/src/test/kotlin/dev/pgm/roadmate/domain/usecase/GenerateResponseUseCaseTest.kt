@@ -269,4 +269,16 @@ class GenerateResponseUseCaseTest {
 
         assertTrue(emitted.first().contains("prefiere las nacionales"))
     }
+
+    @Test
+    fun `a map search records the place and later feeds it into the prompt`() = runTest {
+        val memory = FakeMemoryRepository()
+        val gemini = FakeGeminiRepository(response = "vale")
+
+        useCase(gemini, memoryRepository = memory)(context, "busca gasolineras").toList()
+        useCase(gemini, memoryRepository = memory)(context, "¿por dónde sigo?").toList()
+
+        assertEquals(listOf("gasolineras"), memory.frequentPlaces().map { it.value })
+        assertTrue(gemini.lastPrompt!!.contains("gasolineras"))
+    }
 }

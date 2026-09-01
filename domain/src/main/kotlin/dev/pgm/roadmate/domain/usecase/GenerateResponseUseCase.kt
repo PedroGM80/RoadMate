@@ -109,6 +109,7 @@ class GenerateResponseUseCase @Inject constructor(
             style = assistantPreferencesRepository.answerStyle.first(),
             recentExchanges = memoryRepository.recentExchanges(),
             driverPreferences = memoryRepository.facts(FactType.PREFERENCE).map { it.value },
+            frequentPlaces = memoryRepository.frequentPlaces().map { it.value },
         )
         val answer = geminiRepository.getResponse(prompt)
         memoryRepository.recordExchange(userInput, answer)
@@ -136,8 +137,9 @@ class GenerateResponseUseCase @Inject constructor(
         }
     }
 
-    private fun handleMapSearch(query: String, location: Pair<Double, Double>?): String =
+    private suspend fun handleMapSearch(query: String, location: Pair<Double, Double>?): String =
         if (mapSearchRepository.searchNearby(query, location)) {
+            memoryRepository.rememberPlace(query)
             "Busco $query en el mapa."
         } else {
             "No hay ninguna app de mapas para buscar $query."
