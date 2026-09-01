@@ -66,9 +66,11 @@ commitment, just a starting point for the next session. See
   fixed 20:00–07:00 window when there's no fix yet. Open: the theme is
   computed at composition time, so it won't switch mid-session exactly at
   dusk without a recomposition.
-- **Real mic-reactive waveform.** `MicButton`'s bars still animate on a
-  timer. A separate `AudioRecord` amplitude tap would make it honest, or
-  drop it for a single breathing dot.
+- **Real mic-reactive waveform — resolved by removal.** The timer-driven
+  5-bar waveform was dishonest (nothing tapped the mic amplitude), so
+  `MicButton` now shows a single breathing dot while listening. A genuine
+  amplitude tap is still possible later, but it needs an `AudioRecord`
+  path that doesn't fight Vosk for the mic — a device job, not done here.
 
 ## Larger initiatives
 

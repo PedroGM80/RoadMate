@@ -3,7 +3,6 @@ package dev.pgm.roadmate.presentation.components
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.StartOffset
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
@@ -13,16 +12,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -48,8 +42,9 @@ import dev.pgm.roadmate.ui.theme.Spacing
  * The one control the app is really about. Tap to start/stop; a short earcon
  * and a toggle haptic confirm it. Idle = amber (the CTA); listening = the
  * "active" secondary-container tone with a stop glyph — deliberately not the
- * red error colour, which would read as danger. The breathing pulse and the
- * waveform are decorative and hold still under reduce-motion.
+ * red error colour, which would read as danger. A single breathing dot marks
+ * "listening" — no fake waveform, since nothing here actually taps the mic
+ * amplitude. The pulse and the dot hold still under reduce-motion.
  */
 @Composable
 fun MicButton(
@@ -78,7 +73,9 @@ fun MicButton(
     )
 
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        if (isListening) VoiceWaveform(reduceMotion, Modifier.padding(bottom = Spacing.lg - Spacing.xs))
+        if (isListening) {
+            ListeningDot(reduceMotion, Modifier.padding(bottom = Spacing.lg - Spacing.xs))
+        }
 
         Box(contentAlignment = Alignment.Center) {
             if (isListening && !reduceMotion) {
@@ -132,34 +129,22 @@ fun MicButton(
 }
 
 @Composable
-private fun VoiceWaveform(reduceMotion: Boolean, modifier: Modifier = Modifier, barCount: Int = 5) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.xs + 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        repeat(barCount) { index -> WaveformBar(index, reduceMotion) }
-    }
-}
-
-@Composable
-private fun WaveformBar(index: Int, reduceMotion: Boolean) {
-    val transition = rememberInfiniteTransition(label = "wave-$index")
-    val fraction by transition.animateFloat(
-        initialValue = if (reduceMotion) 0.6f else 0.3f,
-        targetValue = if (reduceMotion) 0.6f else 1f,
+private fun ListeningDot(reduceMotion: Boolean, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "listening-dot")
+    val scale by transition.animateFloat(
+        initialValue = if (reduceMotion) 1f else 0.7f,
+        targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            tween(380 + index * 70, easing = FastOutSlowInEasing),
+            tween(900, easing = FastOutSlowInEasing),
             RepeatMode.Reverse,
-            StartOffset(index * 90),
         ),
-        label = "wave-bar-$index",
+        label = "listening-dot-scale",
     )
     Box(
-        modifier = Modifier
-            .width(5.dp)
-            .height(28.dp * fraction)
-            .clip(RoundedCornerShape(50))
+        modifier = modifier
+            .size(10.dp)
+            .scale(scale)
+            .clip(CircleShape)
             .background(MaterialTheme.colorScheme.secondary),
     )
 }
