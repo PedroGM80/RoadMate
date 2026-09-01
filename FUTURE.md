@@ -11,11 +11,9 @@ commitment, just a starting point for the next session. See
   `ToneGenerator`'s built-in `TONE_PROP_BEEP`/`BEEP2` — free, no asset, but
   generic. Swapping in a short custom two-note sound (via `SoundPool`) would
   read as more "designed" for not much more work.
-- **Wider `MapSearchIntentParser` coverage.** It's a simple regex on
-  "busca/encuentra X" and "dónde hay X", untested against varied real
-  phrasing. Likely false positive: "busca información sobre..." would
-  currently also get sent to Maps. Worth a pass once real usage surfaces
-  actual phrasing patterns, rather than guessing more regexes upfront.
+- **Wider `MapSearchIntentParser` coverage.** The obvious false positive
+  ("busca información sobre…" → Maps) is now guarded and there's a test
+  file, but it's still hand-written regex; revisit against real phrasing.
 - **Contact call follow-ups.** Ambiguous matches currently just say "sé más
   específico" and stop. A natural next step — without adding a full
   multi-turn dialogue system — is accepting a same-session disambiguating
@@ -59,11 +57,11 @@ commitment, just a starting point for the next session. See
   reduce-motion handling + 48dp targets, but there's been no dedicated
   Switch Access or measured contrast-ratio pass, no font-scale check, and
   Android Auto's own accessibility surface hasn't been touched.
-- **Settings surface — extend it.** The `TopAppBar` overflow now has a
-  theme toggle (system / light / dark, persisted) and "borrar lo
-  aprendido". Could grow: auto dark at dusk (the app has location + time),
-  an answer-length control that mirrors the "respuestas cortas" voice
-  command, a "borrar mapas descargados" action.
+- **Settings surface — extend it.** The `TopAppBar` overflow now covers
+  theme (system / light / dark / auto-night), answer length, "borrar mapas
+  descargados" and "borrar lo aprendido". If it grows further it wants a
+  real settings screen. `AUTO` uses a fixed 20:00–07:00 window — a real
+  sunset/sunrise calc from the known location would be nicer.
 - **Real mic-reactive waveform.** `MicButton`'s bars still animate on a
   timer. A separate `AudioRecord` amplitude tap would make it honest, or
   drop it for a single breathing dot.
