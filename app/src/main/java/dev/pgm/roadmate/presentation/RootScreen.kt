@@ -2,9 +2,6 @@ package dev.pgm.roadmate.presentation
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -16,6 +13,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import dev.pgm.roadmate.R
 import dev.pgm.roadmate.presentation.map.MapScreen
 import dev.pgm.roadmate.presentation.map.MapViewModel
 import dev.pgm.roadmate.presentation.screen.HomeScreen
@@ -41,13 +40,13 @@ fun RootScreen(
                 NavigationBarItem(
                     selected = tab == 0,
                     onClick = { tab = 0 },
-                    icon = { Icon(Icons.Filled.Mic, contentDescription = null) },
+                    icon = { Icon(painterResource(R.drawable.lucide_ic_mic), contentDescription = null) },
                     label = { Text("Voz") },
                 )
                 NavigationBarItem(
                     selected = tab == 1,
                     onClick = { tab = 1 },
-                    icon = { Icon(Icons.Filled.Map, contentDescription = null) },
+                    icon = { Icon(painterResource(R.drawable.lucide_ic_map), contentDescription = null) },
                     label = { Text("Mapa") },
                 )
             }

@@ -32,10 +32,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -58,6 +54,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -68,6 +65,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.rememberPermissionState
+import dev.pgm.roadmate.R
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateStatus
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateUiState
@@ -256,7 +254,7 @@ private fun LocationChip(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
-            imageVector = Icons.Filled.LocationOn,
+            painter = painterResource(R.drawable.lucide_ic_map_pin),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(16.dp)
@@ -435,7 +433,9 @@ private fun MicButton(isListening: Boolean, onClick: () -> Unit) {
                 modifier = Modifier.size(80.dp).scale(pressScale)
             ) {
                 Icon(
-                    imageVector = if (isListening) Icons.Filled.Stop else Icons.Filled.Mic,
+                    painter = painterResource(
+                        if (isListening) R.drawable.lucide_ic_square else R.drawable.lucide_ic_mic
+                    ),
                     contentDescription = if (isListening) "Detener" else "Escuchar",
                     modifier = Modifier.size(32.dp)
                 )
@@ -487,7 +487,7 @@ private fun WaveformBar(index: Int) {
 private fun PermissionRequest(shouldShowRationale: Boolean, onRequestClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(
-            imageVector = Icons.Filled.Mic,
+            painter = painterResource(R.drawable.lucide_ic_mic),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
             modifier = Modifier.size(48.dp)

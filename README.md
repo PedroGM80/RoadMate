@@ -96,6 +96,9 @@ Dependency injection is Hilt end to end (`@HiltAndroidApp`, `@AndroidEntryPoint`
   downloadable offline regions, no API key (`MAP_STYLE_URL` overridable in
   `local.properties`)
 - Android `TextToSpeech` — on-device TTS
+- [Lucide](https://lucide.dev) icons (ISC) — the handful the UI uses are
+  vendored as `<vector>` drawables (`app/.../res/drawable/lucide_ic_*`, see
+  `third_party/lucide/`) instead of a dependency; no Material Icons artifact
 - Retrofit/Moshi/OkHttp — the one optional network call, for weather
 - DataStore Preferences — onboarding persistence
 - `androidx.car.app` — Android Auto integration

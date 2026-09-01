@@ -9,11 +9,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.NightsStay
-import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -21,9 +18,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.pgm.roadmate.R
 
 /**
  * First-run screen: the "100% offline y privado" value prop (the chosen
@@ -54,11 +52,11 @@ fun OnboardingScreen(onContinue: () -> Unit, modifier: Modifier = Modifier) {
         )
 
         ValuePropRow(
-            icon = Icons.Filled.CloudOff,
+            iconRes = R.drawable.lucide_ic_cloud_off,
             text = "Tu voz y tus preguntas nunca salen del móvil. Solo el tiempo necesita internet, y es opcional."
         )
         ValuePropRow(
-            icon = Icons.Filled.NightsStay,
+            iconRes = R.drawable.lucide_ic_moon_star,
             text = "Vigila los silencios largos y te sugiere parar a descansar, sin que se lo pidas."
         )
 
@@ -75,7 +73,7 @@ fun OnboardingScreen(onContinue: () -> Unit, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.Top
         ) {
             Icon(
-                imageVector = Icons.Filled.WarningAmber,
+                painter = painterResource(R.drawable.lucide_ic_triangle_alert),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onErrorContainer
             )
@@ -96,7 +94,7 @@ fun OnboardingScreen(onContinue: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun ValuePropRow(icon: ImageVector, text: String) {
+private fun ValuePropRow(@DrawableRes iconRes: Int, text: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -104,7 +102,7 @@ private fun ValuePropRow(icon: ImageVector, text: String) {
         verticalAlignment = Alignment.Top
     ) {
         Icon(
-            imageVector = icon,
+            painter = painterResource(iconRes),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.tertiary
         )

@@ -3,6 +3,7 @@ package dev.pgm.roadmate.car
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
+import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Header
 import androidx.car.app.model.Pane
@@ -11,6 +12,7 @@ import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.lifecycleScope
+import dev.pgm.roadmate.R
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
@@ -51,8 +53,8 @@ class HomeCarScreen(
         .build()
 
     private val micIcon = CarIcon.Builder(
-        IconCompat.createWithResource(carContext, android.R.drawable.ic_btn_speak_now)
-    ).build()
+        IconCompat.createWithResource(carContext, R.drawable.lucide_ic_mic)
+    ).setTint(CarColor.DEFAULT).build()
 
     override fun onGetTemplate(): Template {
         if (!permissionManager.hasRecordAudioPermission()) {
