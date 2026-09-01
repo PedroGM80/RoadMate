@@ -34,6 +34,8 @@ data class RoadMateUiState(
     val status: RoadMateStatus = RoadMateStatus.IDLE,
     val lastRecognizedInput: String = "",
     val currentResponse: String = "",
+    /** True when [currentResponse] is an error/nudge, not a real answer. */
+    val isError: Boolean = false,
     val location: Pair<Double, Double>? = null,
     val locationUnavailable: Boolean = false,
     val isListening: Boolean = false,
@@ -164,7 +166,8 @@ class RoadMateViewModel @Inject constructor(
                 status = RoadMateStatus.LISTENING,
                 isListening = true,
                 lastRecognizedInput = "",
-                currentResponse = ""
+                currentResponse = "",
+                isError = false
             )
 
             var finalText = ""
@@ -187,7 +190,8 @@ class RoadMateViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     status = RoadMateStatus.IDLE,
                     isListening = false,
-                    currentResponse = message
+                    currentResponse = message,
+                    isError = true
                 )
                 speechSynthesisRepository.speak(message)
                 return@launch
@@ -233,7 +237,8 @@ class RoadMateViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     status = RoadMateStatus.SPEAKING,
                     currentResponse = response,
-                    isListening = false
+                    isListening = false,
+                    isError = false
                 )
             }
     }
