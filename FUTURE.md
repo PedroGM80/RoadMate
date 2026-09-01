@@ -34,11 +34,8 @@ commitment, just a starting point for the next session. See
   the table — AICore is frozen, MediaPipe LLM Inference is inference-only,
   and anything server-side breaks the "nothing leaves the phone" stance.
   Shipped so far: `RoadMateDatabase` (Room), conversation-history continuity,
-  `PREFERENCE` facts ("recuerda que…"), and `PLACE` facts from map searches —
-  all folded into the prompt. Still open:
-  - *HOME / WORK / RELATIONSHIP facts.* "esta es mi casa" (store current
-    location), "el trabajo es aquí", "X es mi hermano" → then "llama a mi
-    hermano" resolves through memory before hitting contacts by literal name.
+  `PREFERENCE` / `PLACE` / `HOME` / `WORK` / `RELATIONSHIP` facts (the last
+  wired into call resolution) — all folded into the prompt. Still open:
   - *FTS recall.* Room FTS4/5 over `trip_exchange` + `user_fact` so "¿qué te
     dije sobre el hotel de Ronda?" works. No embeddings/vector DB needed at
     this data scale — a phrase match covers it.

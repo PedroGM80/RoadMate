@@ -37,8 +37,10 @@ builds without a `google-services.json` have no crash reporting.
   **"Recuerda que no me gustan las autovías"**, **"prefiero las
   nacionales"** → stored on-device and fed into every future answer;
   **"olvida lo de…"** drops it, **"¿qué sabes de mí?"** reads it back.
-  Places you search for build up as context too. All of it in a local
-  database, nothing sent anywhere.
+  **"Esta es mi casa"** / **"aquí es mi trabajo"** save the spot;
+  **"Juan es mi hermano"** then makes **"llama a mi hermano"** work. Places
+  you search for build up as context too. All of it in a local database,
+  nothing sent anywhere.
 - **In-app map ("Mapa" tab).** A real vector map (MapLibre + OpenFreeMap,
   OpenStreetMap data, no API key) showing your position. **"Descargar esta
   zona"** saves the visible area so the map keeps working with no

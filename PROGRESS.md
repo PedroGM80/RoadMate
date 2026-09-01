@@ -63,11 +63,13 @@ without reading the full git log.
   it was unused). `GenerateResponseUseCase` now (a) gives real questions the
   last few Q&A exchanges for continuity and records the new pair, (b) takes
   "recuerda que… / prefiero… / olvida lo de… / ¿qué sabes de mí?" as
-  PREFERENCE facts, (c) bumps a PLACE fact on every "busca X". Preferences
-  and frequent places are folded into every Gemini prompt. Replaces the
-  vestigial `TravelContext.lastResponses`. Still to do: HOME/WORK/
-  RELATIONSHIP facts, FTS free-text recall, capture from the map's own nav
-  button, an instrumented DAO test.
+  PREFERENCE facts, (c) bumps a PLACE fact on every "busca X", (d) takes
+  "esta es mi casa / aquí es mi trabajo" (HOME/WORK from the current
+  location) and "X es mi hermano" (RELATIONSHIP) — after which "llama a mi
+  hermano" resolves through memory. Preferences, frequent places and
+  home/work coords are folded into every Gemini prompt. Replaces the
+  vestigial `TravelContext.lastResponses`. Still to do: FTS free-text
+  recall, capture from the map's own nav button, an instrumented DAO test.
 - **Location + weather context**: `LocationRepository` (FusedLocationProvider)
   feeds `TravelContext`; weather is the one optional network call, disclosed
   on first run. `refreshLocation()` times out via
