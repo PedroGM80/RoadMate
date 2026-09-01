@@ -83,4 +83,16 @@ class MemoryDaoTest {
         assertEquals(listOf("Luis"), dao.factsByType("RELATIONSHIP").map { it.value })
         assertNull(dao.findFact("RELATIONSHIP", "Ana"))
     }
+
+    @Test
+    fun clear_wipesBothTables() = runTest {
+        dao.insertExchange(TripExchangeEntity(question = "q", answer = "a", at = 1))
+        dao.insertFact(UserFactEntity(type = "PREFERENCE", value = "x", updatedAt = 1))
+
+        dao.clearExchanges()
+        dao.clearFacts()
+
+        assertEquals(emptyList<TripExchangeEntity>(), dao.recentExchanges(since = 0, limit = 10))
+        assertEquals(emptyList<UserFactEntity>(), dao.factsByType("PREFERENCE"))
+    }
 }

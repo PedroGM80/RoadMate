@@ -80,9 +80,9 @@ without reading the full git log.
   in the error colour not reply-green, 48dp touch targets, a spinner during
   "Procesando…", sentence-case status, mic "stop" no longer the alarming
   red, decorative loops honour reduce-motion, `MapScreen` controls inset
-  past the system bars with a real `ModalBottomSheet`, Voz/Mapa crossfade.
-  Still open: a `TopAppBar` + settings surface (theme toggle, "borrar
-  memoria").
+  past the system bars with a real `ModalBottomSheet`, Voz/Mapa crossfade,
+  and a `TopAppBar` with an overflow menu: theme (system / light / dark,
+  persisted) and "borrar lo aprendido" (confirm → `MemoryRepository.clearAll`).
 - **Location + weather context**: `LocationRepository` (FusedLocationProvider)
   feeds `TravelContext`; weather is the one optional network call, disclosed
   on first run. `refreshLocation()` times out via
