@@ -64,6 +64,6 @@ class GeminiNanoManager @Inject constructor(@ApplicationContext context: Context
          *  as the last-resort "modo básico" answer when no local backend
          *  (AICore or the downloaded model) can respond. */
         internal const val FALLBACK_RESPONSE =
-            "No he podido generar una respuesta ahora mismo. Puedes repetir la pregunta más adelante."
+            "Ahora no puedo responder a eso. Pregúntamelo otra vez en un rato."
     }
 }

@@ -134,7 +134,7 @@ class GenerateResponseUseCaseTest {
         val emitted = useCase(mapSearchRepository = mapSearchRepository)(context, "busca una gasolinera")
             .toList()
 
-        assertTrue(emitted.first().contains("No tengo una app de mapas"))
+        assertTrue(emitted.first().contains("ninguna app de mapas"))
     }
 
     @Test
@@ -149,7 +149,7 @@ class GenerateResponseUseCaseTest {
 
         assertEquals(0, geminiRepository.responseCount)
         assertEquals(MediaApp.SPOTIFY, mediaRepository.lastLaunchedApp)
-        assertEquals(listOf("Abriendo Spotify"), emitted)
+        assertEquals(listOf("Abro Spotify."), emitted)
     }
 
     @Test
@@ -159,6 +159,6 @@ class GenerateResponseUseCaseTest {
         val emitted = useCase(mediaRepository = mediaRepository)(context, "abre YouTube Music").toList()
 
         assertEquals(MediaApp.YOUTUBE_MUSIC, mediaRepository.lastLaunchedApp)
-        assertTrue(emitted.first().contains("No he podido abrir"))
+        assertTrue(emitted.first().contains("No puedo abrir"))
     }
 }

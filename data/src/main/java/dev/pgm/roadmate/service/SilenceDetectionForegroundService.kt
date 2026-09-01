@@ -94,7 +94,7 @@ class SilenceDetectionForegroundService : Service() {
 
     private suspend fun onSilenceDetected() {
         val manager = getSystemService(NotificationManager::class.java)
-        manager?.notify(NOTIFICATION_ID, buildNotification("Llevas un rato en silencio. ¿Necesitas descansar?"))
+        manager?.notify(NOTIFICATION_ID, buildNotification("Llevas un buen rato al volante. ¿Paramos a descansar?"))
 
         val travelContext = buildTravelContext()
         detectSilenceUseCase.triggerRestPrompt(travelContext).collect { response ->
@@ -116,7 +116,7 @@ class SilenceDetectionForegroundService : Service() {
         )
     }
 
-    private fun buildNotification(text: String = "Escuchando en segundo plano por si necesitas un descanso."): Notification {
+    private fun buildNotification(text: String = "Atento por si necesitas un descanso."): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("RoadMate")
             .setContentText(text)

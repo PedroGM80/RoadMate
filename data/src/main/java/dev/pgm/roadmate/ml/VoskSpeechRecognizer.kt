@@ -55,7 +55,7 @@ class VoskSpeechRecognizer @Inject constructor(
     fun recognize(): Flow<SpeechRecognitionEvent> = callbackFlow {
         val loadedModel = runCatching { loadModel() }.getOrNull()
         if (loadedModel == null) {
-            trySend(SpeechRecognitionEvent.Failed("El reconocimiento de voz aún no está listo. Inténtalo de nuevo en unos segundos."))
+            trySend(SpeechRecognitionEvent.Failed("La voz aún se está preparando. Prueba en unos segundos."))
             close()
             return@callbackFlow
         }
@@ -81,7 +81,7 @@ class VoskSpeechRecognizer @Inject constructor(
 
             override fun onError(exception: Exception?) {
                 Log.w(TAG, "recognition error", exception)
-                trySend(SpeechRecognitionEvent.Failed("No he podido escucharte. Inténtalo otra vez."))
+                trySend(SpeechRecognitionEvent.Failed("No te he oído. Prueba otra vez."))
                 close()
             }
 
@@ -95,7 +95,7 @@ class VoskSpeechRecognizer @Inject constructor(
             SpeechService(recognizer, SAMPLE_RATE)
         } catch (e: IOException) {
             Log.w(TAG, "could not open microphone", e)
-            trySend(SpeechRecognitionEvent.Failed("No puedo acceder al micrófono. Revisa el permiso."))
+            trySend(SpeechRecognitionEvent.Failed("No tengo acceso al micrófono. Revisa el permiso."))
             recognizer.close()
             carMicrophonePreference.clearPreference()
             close()

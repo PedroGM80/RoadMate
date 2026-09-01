@@ -60,7 +60,7 @@ class GenerateResponseUseCase @Inject constructor(
 
     private suspend fun handleCallRequest(contactName: String): String {
         if (!phoneCallRepository.hasCallPermission()) {
-            return "No tengo permiso para llamar. Concede el permiso de contactos y teléfono en los ajustes de RoadMate."
+            return "No puedo llamar sin permiso. Actívalo en ajustes: contactos y teléfono."
         }
         return when (val result = phoneCallRepository.findContactByName(contactName)) {
             is ContactLookupResult.Found -> {
@@ -68,23 +68,23 @@ class GenerateResponseUseCase @Inject constructor(
                 "Llamando a ${result.contact.name}"
             }
             is ContactLookupResult.Ambiguous ->
-                "Hay varios contactos llamados $contactName. Sé más específico."
+                "Tienes varios contactos con ese nombre. Dime cuál."
             ContactLookupResult.NotFound ->
-                "No encuentro ningún contacto llamado $contactName."
+                "No encuentro a $contactName en tus contactos."
         }
     }
 
     private fun handleMapSearch(query: String, location: Pair<Double, Double>?): String =
         if (mapSearchRepository.searchNearby(query, location)) {
-            "Buscando $query en el mapa"
+            "Busco $query en el mapa."
         } else {
-            "No tengo una app de mapas instalada para buscar $query."
+            "No hay ninguna app de mapas para buscar $query."
         }
 
     private fun handleMediaRequest(app: MediaApp): String =
         if (mediaRepository.launchMediaApp(app)) {
-            "Abriendo ${app.displayName}"
+            "Abro ${app.displayName}."
         } else {
-            "No he podido abrir ${app.displayName}. ¿La tienes instalada?"
+            "No puedo abrir ${app.displayName}. ¿La tienes instalada?"
         }
 }

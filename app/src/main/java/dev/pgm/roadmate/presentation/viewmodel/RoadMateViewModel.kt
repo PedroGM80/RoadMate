@@ -169,7 +169,7 @@ class RoadMateViewModel @Inject constructor(
             var finalText = ""
             var failure: String? = null
             recordAudioUseCase()
-                .catch { failure = "No he podido escucharte. Inténtalo otra vez." }
+                .catch { failure = "No te he oído. Prueba otra vez." }
                 .collect { event ->
                     when (event) {
                         // Live transcription so the user sees what's being heard.

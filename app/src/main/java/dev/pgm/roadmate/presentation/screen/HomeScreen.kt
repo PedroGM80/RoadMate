@@ -334,7 +334,7 @@ private fun GrantedContent(
                     uiState.currentResponse.isNotBlank() -> uiState.currentResponse
                     listening && uiState.lastRecognizedInput.isBlank() -> "Escuchando..."
                     listening -> ""
-                    else -> "Pulsa el micrófono y haz tu pregunta."
+                    else -> "Pulsa el micrófono y pregunta."
                 }
                 if (bodyText.isNotEmpty()) {
                     Text(

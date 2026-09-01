@@ -36,19 +36,19 @@ object Constants {
     const val LOCATION_TIMEOUT_MS = 10_000L
 
     const val GEMINI_SYSTEM_PROMPT =
-        "Eres el copiloto de viaje local de RoadMate. Respondes de forma breve, " +
-            "clara y útil a un conductor, usando su ubicación y contexto de viaje. " +
-            "Nunca sugieras acciones que distraigan de la conducción."
+        "Eres el copiloto de RoadMate. Hablas a un conductor: frases cortas y " +
+            "claras, tono tranquilo, nada que distraiga. Ve al grano, sin " +
+            "saludos ni rodeos. Usa su ubicación y el contexto del viaje."
 
     val REST_REMINDER_PROMPTS = listOf(
-        "¿Necesitas descansar?",
-        "Cuéntame datos curiosos del sitio en el que estoy."
+        "¿Debería parar a descansar?",
+        "Llevo mucho rato conduciendo. ¿Qué me recomiendas?"
     )
 
     /** Spoken once per calendar day, the first time the app is opened with core permissions granted. */
     fun greetingForHour(hour: Int): String = when (hour) {
-        in 6..12 -> "Buenos días. Soy RoadMate, listo para la carretera."
-        in 13..19 -> "Buenas tardes. Soy RoadMate, ¿rodamos?"
-        else -> "Buenas noches. Soy RoadMate, conduce con cuidado."
+        in 6..12 -> "Buenos días. RoadMate en marcha."
+        in 13..19 -> "Buenas tardes. Aquí RoadMate, listo."
+        else -> "Buenas noches. RoadMate contigo. Atento a la carretera."
     }
 }

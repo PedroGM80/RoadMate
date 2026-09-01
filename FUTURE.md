@@ -24,12 +24,12 @@ commitment, just a starting point for the next session. See
 
 ## Medium effort
 
-- **Voice personality pass.** Flagged early as the highest-leverage lever
-  for making the app feel distinctive, not yet done: a consistent tone in
-  `Constants.GEMINI_SYSTEM_PROMPT` and the fixed spoken phrases (call/map
-  responses, rest reminders), rather than each being written independently.
-  In a voice-first app used while driving, this is what gets remembered —
-  more than further visual polish.
+- **Voice personality — done, but keep tuning.** One tone now runs through
+  `GEMINI_SYSTEM_PROMPT` and every fixed spoken line (calls, map, media,
+  rest reminders, greeting, errors): "calm co-driver, short sentences, no
+  filler". Worth revisiting once it's heard on a device — TTS cadence can
+  make a written line land differently — and the joke bank still has its
+  own separate voice.
 - **Quick Settings Tile / home screen widget.** A one-tap "ask RoadMate"
   entry point without opening the app first. Real effort (new Android
   surface, its own lifecycle), but a plausible retention lever.

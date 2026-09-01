@@ -43,7 +43,7 @@ class HomeCarScreen(
     private val permissionManager: PermissionManager
 ) : Screen(carContext) {
 
-    private var statusText = "Pulsa Escuchar y haz tu pregunta."
+    private var statusText = "Pulsa Escuchar y pregunta."
     private var lastRecognizedInput: String? = null
     private var isBusy = false
 
@@ -64,7 +64,7 @@ class HomeCarScreen(
                         Row.Builder()
                             .setImage(micIcon)
                             .setTitle("Permisos pendientes")
-                            .addText("Abre RoadMate en tu teléfono una vez para conceder micrófono y ubicación.")
+                            .addText("Abre RoadMate en el móvil una vez para dar permiso de micrófono y ubicación.")
                             .build()
                     )
                     .build()
@@ -107,7 +107,7 @@ class HomeCarScreen(
         lifecycleScope.launch {
             val userInput = recordAudioUseCase.finalText()
             if (userInput.isBlank()) {
-                statusText = "No te he oído. Pulsa Escuchar para volver a intentarlo."
+                statusText = "No te he oído. Pulsa Escuchar y prueba otra vez."
                 isBusy = false
                 invalidate()
                 return@launch
