@@ -103,7 +103,7 @@ class HomeCarScreen(
         invalidate()
 
         lifecycleScope.launch {
-            val userInput = recordAudioUseCase()
+            val userInput = recordAudioUseCase.finalText()
             if (userInput.isBlank()) {
                 statusText = "No te he oído. Pulsa Escuchar para volver a intentarlo."
                 isBusy = false

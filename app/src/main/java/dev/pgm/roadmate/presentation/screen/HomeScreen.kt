@@ -41,8 +41,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -66,6 +68,7 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.rememberPermissionState
+import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateStatus
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateUiState
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
@@ -136,7 +139,10 @@ fun HomeScreen(
             color = MaterialTheme.colorScheme.primary
         )
 
-        LocalAiStatusLabel(isAvailable = uiState.isLocalAiAvailable)
+        LocalAiStatusLabel(
+            status = uiState.localAiStatus,
+            onDownload = viewModel::downloadLocalAiModel
+        )
 
         LocationChip(
             location = uiState.location,
@@ -166,23 +172,65 @@ fun HomeScreen(
 /**
  * Honesty over silence: AICore/Gemini Nano is only present on a handful of
  * devices today (confirmed missing on a plain emulator — "AiCoreService: not
- * found"). Rather than let a user's first sign of that be a generic fallback
- * answer with no explanation, say upfront whether this device has real
- * on-device AI or is running in "modo básico". Either way, nothing about a
- * question ever leaves the phone except weather — that part's unconditional.
+ * found"). Where it's absent, RoadMate downloads a small open model on its
+ * own (Wi-Fi only) and this label shows the progress, so the user isn't left
+ * guessing why answers are generic. Nothing about a question ever leaves the
+ * phone except weather — the model download is a one-time plain HTTPS fetch
+ * of an openly-licensed file, no account, no query data.
  */
 @Composable
-private fun LocalAiStatusLabel(isAvailable: Boolean?) {
-    val (text, color) = when (isAvailable) {
-        true -> "IA local activa" to MaterialTheme.colorScheme.tertiary
-        false -> "Modo básico · sin IA local en este dispositivo" to MaterialTheme.colorScheme.onSurfaceVariant
-        null -> "Comprobando IA local..." to MaterialTheme.colorScheme.onSurfaceVariant
+private fun LocalAiStatusLabel(
+    status: LocalAiStatus,
+    onDownload: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(top = 2.dp)
+    ) {
+        when (status) {
+            LocalAiStatus.ReadyAicore, LocalAiStatus.ReadyLocalModel ->
+                StatusText("IA local activa", scheme.tertiary)
+
+            LocalAiStatus.Checking ->
+                StatusText("Comprobando IA local...", scheme.onSurfaceVariant)
+
+            LocalAiStatus.ModelDownloadable ->
+                StatusText("Modo básico · preparando descarga de IA local...", scheme.onSurfaceVariant)
+
+            is LocalAiStatus.Downloading -> {
+                StatusText(
+                    "Descargando IA local... ${(status.progress * 100).toInt()} %",
+                    scheme.onSurfaceVariant
+                )
+                LinearProgressIndicator(
+                    progress = { status.progress.coerceIn(0f, 1f) },
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .width(220.dp)
+                )
+            }
+
+            LocalAiStatus.WaitingForWifi ->
+                StatusText("IA local · se descargará al conectar a Wi-Fi", scheme.onSurfaceVariant)
+
+            is LocalAiStatus.DownloadFailed -> {
+                StatusText("No se pudo descargar la IA local", scheme.error)
+                TextButton(onClick = onDownload) { Text("Reintentar") }
+            }
+
+            LocalAiStatus.Unavailable ->
+                StatusText("Modo básico · sin IA local en este dispositivo", scheme.onSurfaceVariant)
+        }
     }
+}
+
+@Composable
+private fun StatusText(text: String, color: Color) {
     Text(
         text = text,
         style = MaterialTheme.typography.labelSmall,
-        color = color,
-        modifier = Modifier.padding(top = 2.dp)
+        color = color
     )
 }
 
@@ -272,7 +320,10 @@ private fun GrantedContent(
                     // may be looking at the road, not the screen, when it does.
                     .semantics { liveRegion = LiveRegionMode.Polite }
             ) {
+                val listening = uiState.status == RoadMateStatus.LISTENING
                 if (uiState.lastRecognizedInput.isNotBlank()) {
+                    // Updates live from partial recognition results — the user
+                    // sees the words landing as they speak.
                     Text(
                         text = "Tú: “${uiState.lastRecognizedInput}”",
                         style = MaterialTheme.typography.labelMedium,
@@ -281,15 +332,23 @@ private fun GrantedContent(
                     )
                 }
 
-                Text(
-                    text = uiState.currentResponse.ifBlank { "Pulsa el micrófono y haz tu pregunta." },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (uiState.currentResponse.isBlank()) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.tertiary
-                    }
-                )
+                val bodyText = when {
+                    uiState.currentResponse.isNotBlank() -> uiState.currentResponse
+                    listening && uiState.lastRecognizedInput.isBlank() -> "Escuchando..."
+                    listening -> ""
+                    else -> "Pulsa el micrófono y haz tu pregunta."
+                }
+                if (bodyText.isNotEmpty()) {
+                    Text(
+                        text = bodyText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (uiState.currentResponse.isBlank()) {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        } else {
+                            MaterialTheme.colorScheme.tertiary
+                        }
+                    )
+                }
             }
         }
 
@@ -387,9 +446,8 @@ private fun MicButton(isListening: Boolean, onClick: () -> Unit) {
 
 /**
  * Animated bars suggesting sound while listening — visual flourish, not a
- * real amplitude readout. SpeechRecognitionManager's onRmsChanged callback
- * (currently unused) could drive real mic-reactive bar heights later if
- * that's worth the plumbing through SpeechRecognitionRepository.
+ * real amplitude readout. Vosk exposes no RMS callback, so mic-reactive bar
+ * heights would need a separate AudioRecord tap — not worth it for a flourish.
  */
 @Composable
 private fun VoiceWaveform(modifier: Modifier = Modifier, barCount: Int = 5) {

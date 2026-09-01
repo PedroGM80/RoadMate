@@ -1,7 +1,9 @@
 package dev.pgm.roadmate.presentation.viewmodel.fake
 
 import dev.pgm.roadmate.domain.model.ContactLookupResult
+import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.SilenceEvent
+import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
@@ -15,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.flowOf
 
 /**
@@ -49,11 +52,18 @@ class FakeWeatherRepository(private val description: String? = null) : WeatherRe
 
 class FakeGeminiRepository(
     private val response: String = "respuesta",
-    private val localAiAvailable: Boolean = true
+    initialLocalAiStatus: LocalAiStatus = LocalAiStatus.ReadyAicore
 ) : GeminiRepository {
+    val localAiStatusFlow = MutableStateFlow(initialLocalAiStatus)
+    var downloadRequestedCount = 0
+        private set
+
     override suspend fun getResponse(prompt: String): String = response
     override fun clearCache() = Unit
-    override suspend fun isLocalAiAvailable(): Boolean = localAiAvailable
+    override fun localAiStatus(): Flow<LocalAiStatus> = localAiStatusFlow
+    override suspend fun requestLocalAiModelDownload() {
+        downloadRequestedCount++
+    }
 }
 
 class FakeSpeechSynthesisRepository : SpeechSynthesisRepository {
@@ -65,8 +75,16 @@ class FakeSpeechSynthesisRepository : SpeechSynthesisRepository {
     override fun stop() = Unit
 }
 
-class FakeSpeechRecognitionRepository(private val result: String = "") : SpeechRecognitionRepository {
-    override suspend fun recognizeSpeech(): String = result
+class FakeSpeechRecognitionRepository(
+    private val events: List<SpeechRecognitionEvent> = listOf(SpeechRecognitionEvent.Result("")),
+) : SpeechRecognitionRepository {
+
+    constructor(result: String) : this(
+        if (result.isBlank()) listOf(SpeechRecognitionEvent.Result(""))
+        else listOf(SpeechRecognitionEvent.Partial(result), SpeechRecognitionEvent.Result(result))
+    )
+
+    override fun recognize(): Flow<SpeechRecognitionEvent> = events.asFlow()
 }
 
 class FakeSilenceDetectionRepository(

@@ -1,3 +1,5 @@
+import java.net.URI
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -5,6 +7,33 @@ plugins {
     alias(libs.plugins.jetbrains.kotlin.plugin.serialization)
     alias(libs.plugins.hilt.android)
 }
+
+// The Vosk offline Spanish speech model (~39 MB, Apache-2.0). Fetched into
+// assets at build time so voice recognition works fully offline from the
+// first launch — no Google speech pack, no runtime download, no account.
+// The .zip is gitignored; VoskSpeechRecognizer unpacks it on device.
+val downloadVoskModel = tasks.register("downloadVoskModel") {
+    description = "Downloads the Vosk offline Spanish speech model into assets"
+    // Resolve everything to plain serializable values so the task action is
+    // safe under Gradle's configuration cache (no script/project references).
+    val url = "https://alphacephei.com/vosk/models/vosk-model-small-es-0.42.zip"
+    val target = layout.projectDirectory
+        .file("src/main/assets/vosk-model-small-es-0.42.zip").asFile
+    outputs.file(target)
+    onlyIf { !target.exists() }
+    doLast {
+        target.parentFile.mkdirs()
+        println("Downloading Vosk ES model → $target")
+        URI(url).toURL().openStream().use { input ->
+            target.outputStream().use { output -> input.copyTo(output) }
+        }
+        check(target.length() > 10_000_000L) {
+            "Vosk model download looks truncated (${target.length()} B)"
+        }
+    }
+}
+
+tasks.named("preBuild") { dependsOn(downloadVoskModel) }
 
 android {
     namespace = "dev.pgm.roadmate"

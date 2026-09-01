@@ -1,6 +1,8 @@
 package dev.pgm.roadmate.domain.usecase
 
 import dev.pgm.roadmate.domain.fake.FakeSpeechRecognitionRepository
+import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -8,21 +10,34 @@ import org.junit.Test
 class RecordAudioUseCaseTest {
 
     @Test
-    fun `delegates to the repository and returns its result`() = runTest {
+    fun `streams the repository's partials then the final result`() = runTest {
         val repository = FakeSpeechRecognitionRepository(result = "hola roadmate")
         val useCase = RecordAudioUseCase(repository)
 
-        val result = useCase()
+        val events = useCase().toList()
 
-        assertEquals("hola roadmate", result)
+        assertEquals(
+            listOf(
+                SpeechRecognitionEvent.Partial("hola roadmate"),
+                SpeechRecognitionEvent.Result("hola roadmate"),
+            ),
+            events,
+        )
         assertEquals(1, repository.invocationCount)
     }
 
     @Test
-    fun `returns an empty string when recognition fails or finds nothing`() = runTest {
-        val repository = FakeSpeechRecognitionRepository(result = "")
+    fun `finalText returns the last Result text`() = runTest {
+        val repository = FakeSpeechRecognitionRepository(result = "para en la próxima")
         val useCase = RecordAudioUseCase(repository)
 
-        assertEquals("", useCase())
+        assertEquals("para en la próxima", useCase.finalText())
+    }
+
+    @Test
+    fun `finalText is empty when nothing is recognized`() = runTest {
+        val useCase = RecordAudioUseCase(FakeSpeechRecognitionRepository(result = ""))
+
+        assertEquals("", useCase.finalText())
     }
 }

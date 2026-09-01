@@ -24,6 +24,14 @@ object Constants {
 
     const val GEMINI_TIMEOUT_MS = 5_000L
 
+    /**
+     * Timeout for a single generation on the downloaded model (MediaPipe).
+     * Much longer than [GEMINI_TIMEOUT_MS] — a CPU-backend sub-2B model on
+     * mid-range hardware is far slower than AICore, and this path only runs
+     * when there's no faster option anyway.
+     */
+    const val LOCAL_LLM_TIMEOUT_MS = 20_000L
+
     /** How long to wait for a GPS fix before showing "location unavailable" instead of spinning forever. */
     const val LOCATION_TIMEOUT_MS = 10_000L
 

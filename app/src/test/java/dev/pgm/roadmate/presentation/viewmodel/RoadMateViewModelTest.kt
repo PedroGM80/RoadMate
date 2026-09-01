@@ -1,5 +1,7 @@
 package dev.pgm.roadmate.presentation.viewmodel
 
+import dev.pgm.roadmate.domain.model.LocalAiStatus
+import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
 import dev.pgm.roadmate.domain.usecase.DetectSilenceUseCase
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
@@ -33,9 +35,10 @@ class RoadMateViewModelTest {
         location: Pair<Double, Double>? = 36.46 to -6.19,
         locationFetchDelayMs: Long = 0L,
         greetingRepository: FakeGreetingRepository = FakeGreetingRepository(),
-        greetingSpeechSynthesisRepository: FakeSpeechSynthesisRepository = FakeSpeechSynthesisRepository()
+        greetingSpeechSynthesisRepository: FakeSpeechSynthesisRepository = FakeSpeechSynthesisRepository(),
+        geminiRepository: FakeGeminiRepository = FakeGeminiRepository(geminiResponse),
+        speechEvents: List<SpeechRecognitionEvent>? = null
     ): RoadMateViewModel {
-        val geminiRepository = FakeGeminiRepository(geminiResponse)
         val speechSynthesisRepository = FakeSpeechSynthesisRepository()
         val generateResponseUseCase = GenerateResponseUseCase(
             geminiRepository,
@@ -43,7 +46,12 @@ class RoadMateViewModelTest {
             FakePhoneCallRepository(),
             FakeMapSearchRepository()
         )
-        val recordAudioUseCase = RecordAudioUseCase(FakeSpeechRecognitionRepository(recognizedSpeech))
+        val speechRepo = if (speechEvents != null) {
+            FakeSpeechRecognitionRepository(speechEvents)
+        } else {
+            FakeSpeechRecognitionRepository(recognizedSpeech)
+        }
+        val recordAudioUseCase = RecordAudioUseCase(speechRepo)
         val detectSilenceUseCase = DetectSilenceUseCase(FakeSilenceDetectionRepository(), generateResponseUseCase)
         val locationRepository = FakeLocationRepository(fetchDelayMs = locationFetchDelayMs, fetchResult = location)
 
@@ -85,6 +93,43 @@ class RoadMateViewModelTest {
         assertFalse(state.isListening)
         assertTrue(state.currentResponse.isBlank())
     }
+
+    @Test
+    fun `partial speech results show up live in lastRecognizedInput`() = runTest(mainDispatcherRule.testDispatcher) {
+        val viewModel = buildViewModel(
+            geminiResponse = "vale",
+            speechEvents = listOf(
+                SpeechRecognitionEvent.Partial("cuánto"),
+                SpeechRecognitionEvent.Partial("cuánto queda"),
+                SpeechRecognitionEvent.Result("cuánto queda para llegar"),
+            ),
+        )
+
+        viewModel.startListening()
+        advanceUntilIdle()
+
+        // The final Result wins, but partials drove the field while listening.
+        assertEquals("cuánto queda para llegar", viewModel.uiState.value.lastRecognizedInput)
+    }
+
+    @Test
+    fun `a recognition failure is surfaced and spoken instead of silently resetting`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val spokenErrors = FakeSpeechSynthesisRepository()
+            val viewModel = buildViewModel(
+                greetingSpeechSynthesisRepository = spokenErrors,
+                speechEvents = listOf(SpeechRecognitionEvent.Failed("No puedo acceder al micrófono.")),
+            )
+
+            viewModel.startListening()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(RoadMateStatus.IDLE, state.status)
+            assertFalse(state.isListening)
+            assertEquals("No puedo acceder al micrófono.", state.currentResponse)
+            assertTrue(spokenErrors.spoken.contains("No puedo acceder al micrófono."))
+        }
 
     @Test
     fun `cancelListening resets to IDLE`() = runTest(mainDispatcherRule.testDispatcher) {
@@ -151,4 +196,45 @@ class RoadMateViewModelTest {
         assertEquals(0, greetingRepository.markedGreetedCount)
         assertTrue(greetingSpeech.spoken.isEmpty())
     }
+
+    @Test
+    fun `local AI status is mirrored into uiState and a missing model auto-starts the download`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val geminiRepository = FakeGeminiRepository()
+            geminiRepository.localAiStatusFlow.value = LocalAiStatus.ModelDownloadable
+            val viewModel = buildViewModel(geminiRepository = geminiRepository)
+            advanceUntilIdle()
+
+            assertEquals(LocalAiStatus.ModelDownloadable, viewModel.uiState.value.localAiStatus)
+            // No button tap: ModelDownloadable alone kicks the fetch.
+            assertEquals(1, geminiRepository.downloadRequestedCount)
+
+            geminiRepository.localAiStatusFlow.value = LocalAiStatus.Downloading(0.5f)
+            advanceUntilIdle()
+
+            assertEquals(LocalAiStatus.Downloading(0.5f), viewModel.uiState.value.localAiStatus)
+        }
+
+    @Test
+    fun `a ready local backend never triggers a model download`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val geminiRepository = FakeGeminiRepository() // defaults to ReadyAicore
+            val viewModel = buildViewModel(geminiRepository = geminiRepository)
+            advanceUntilIdle()
+
+            assertEquals(LocalAiStatus.ReadyAicore, viewModel.uiState.value.localAiStatus)
+            assertEquals(0, geminiRepository.downloadRequestedCount)
+        }
+
+    @Test
+    fun `downloadLocalAiModel asks the repository to fetch the model`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val geminiRepository = FakeGeminiRepository()
+            val viewModel = buildViewModel(geminiRepository = geminiRepository)
+
+            viewModel.downloadLocalAiModel()
+            advanceUntilIdle()
+
+            assertEquals(1, geminiRepository.downloadRequestedCount)
+        }
 }

@@ -3,6 +3,8 @@ package dev.pgm.roadmate.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.pgm.roadmate.domain.model.LocalAiStatus
+import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
@@ -34,8 +36,9 @@ data class RoadMateUiState(
     val location: Pair<Double, Double>? = null,
     val locationUnavailable: Boolean = false,
     val isListening: Boolean = false,
-    /** null while checking, then whether on-device Gemini Nano actually works on this hardware. */
-    val isLocalAiAvailable: Boolean? = null
+    /** State of on-device AI: ready (AICore or downloaded model), available
+     *  to download, downloading, or stuck in "modo básico". */
+    val localAiStatus: LocalAiStatus = LocalAiStatus.Checking
 )
 
 @HiltViewModel
@@ -66,13 +69,29 @@ class RoadMateViewModel @Inject constructor(
             }
         }
 
-        // Checked once at startup rather than discovered per-answer, so the UI
-        // can be upfront about "modo básico" instead of the user only finding
-        // out by getting generic fallback text on their first real question.
-        viewModelScope.launch {
-            val available = geminiRepository.isLocalAiAvailable()
-            _uiState.value = _uiState.value.copy(isLocalAiAvailable = available)
-        }
+        // Surfaced from startup rather than discovered per-answer, so the UI
+        // can show progress instead of the user only finding out via generic
+        // fallback text on their first real question. Keeps flowing so
+        // download progress lands in the UI live. When there's no AICore and
+        // the model isn't here yet, the download starts on its own — no tap
+        // needed — and LocalAiModelManager still holds it to Wi-Fi.
+        geminiRepository.localAiStatus()
+            .onEach { status ->
+                _uiState.value = _uiState.value.copy(localAiStatus = status)
+                if (status == LocalAiStatus.ModelDownloadable) downloadLocalAiModel()
+            }
+            .launchIn(viewModelScope)
+    }
+
+    /**
+     * Triggers the one-time (~550 MB, Wi-Fi-only) download of the local model
+     * that powers on-device answers where AICore is absent. Called
+     * automatically when the model is missing, and also wired to a manual
+     * "retry" button. Progress and completion arrive through [uiState]'s
+     * `localAiStatus`.
+     */
+    fun downloadLocalAiModel() {
+        viewModelScope.launch { geminiRepository.requestLocalAiModelDownload() }
     }
 
     /**
@@ -140,19 +159,53 @@ class RoadMateViewModel @Inject constructor(
     fun startListening() {
         if (listeningJob?.isActive == true) return
         listeningJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(status = RoadMateStatus.LISTENING, isListening = true)
+            _uiState.value = _uiState.value.copy(
+                status = RoadMateStatus.LISTENING,
+                isListening = true,
+                lastRecognizedInput = "",
+                currentResponse = ""
+            )
 
-            val userInput = recordAudioUseCase()
-            if (userInput.isBlank()) {
-                _uiState.value = _uiState.value.copy(status = RoadMateStatus.IDLE, isListening = false)
+            var finalText = ""
+            var failure: String? = null
+            recordAudioUseCase()
+                .catch { failure = "No he podido escucharte. Inténtalo otra vez." }
+                .collect { event ->
+                    when (event) {
+                        // Live transcription so the user sees what's being heard.
+                        is SpeechRecognitionEvent.Partial ->
+                            _uiState.value = _uiState.value.copy(lastRecognizedInput = event.text)
+
+                        is SpeechRecognitionEvent.Result -> finalText = event.text
+
+                        is SpeechRecognitionEvent.Failed -> failure = event.message
+                    }
+                }
+
+            failure?.let { message ->
+                _uiState.value = _uiState.value.copy(
+                    status = RoadMateStatus.IDLE,
+                    isListening = false,
+                    currentResponse = message
+                )
+                speechSynthesisRepository.speak(message)
+                return@launch
+            }
+
+            if (finalText.isBlank()) {
+                _uiState.value = _uiState.value.copy(
+                    status = RoadMateStatus.IDLE,
+                    isListening = false,
+                    lastRecognizedInput = ""
+                )
                 return@launch
             }
 
             _uiState.value = _uiState.value.copy(
                 status = RoadMateStatus.PROCESSING,
-                lastRecognizedInput = userInput
+                lastRecognizedInput = finalText
             )
-            respondTo(userInput)
+            respondTo(finalText)
         }
     }
 

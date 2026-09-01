@@ -43,6 +43,8 @@ moshiKotlinCodegen = "1.15.2"
 datastorePreferences = "1.2.1"
 hilt = "2.60.1"
 aicore = "0.0.1-exp02"
+mediapipeTasksGenai = "0.10.27"
+voskAndroid = "0.3.47"
 javaxInject = "1"
 carApp = "1.7.0"
 
@@ -97,6 +99,8 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
 aicore = { group = "com.google.ai.edge.aicore", name = "aicore", version.ref = "aicore" }
+mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeTasksGenai" }
+vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "voskAndroid" }
 javax-inject = { group = "javax.inject", name = "javax.inject", version.ref = "javaxInject" }
 androidx-car-app = { group = "androidx.car.app", name = "app", version.ref = "carApp" }
 

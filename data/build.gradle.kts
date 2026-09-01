@@ -15,6 +15,24 @@ val localProperties = Properties().apply {
 }
 val openWeatherApiKey: String = localProperties.getProperty("OPENWEATHER_API_KEY", "")
 
+// The universal local-AI fallback model. Downloaded at runtime (Wi-Fi only,
+// on explicit opt-in) by LocalAiModelManager and run through MediaPipe.
+// Defaults to Qwen2.5-0.5B-Instruct q8 (~547 MB, Apache-2.0, ungated on
+// Hugging Face) so the feature works out of the box on any device with no
+// setup. Override any of these in local.properties to ship a different
+// model (e.g. a larger Qwen, or a Gemma .task from your own host / with an
+// HF token). A blank URL disables the download path entirely.
+val localAiModelUrl: String = localProperties.getProperty(
+    "LOCAL_AI_MODEL_URL",
+    "https://huggingface.co/litert-community/Qwen2.5-0.5B-Instruct/resolve/main/" +
+        "Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task"
+)
+val localAiModelFilename: String =
+    localProperties.getProperty("LOCAL_AI_MODEL_FILENAME", "qwen2.5-0.5b-instruct-q8.task")
+// Expected byte size for an integrity check after download. 0 = unknown/skip.
+val localAiModelSizeBytes: String =
+    localProperties.getProperty("LOCAL_AI_MODEL_SIZE_BYTES", "546660344")
+
 android {
     namespace = "dev.pgm.roadmate.data"
     compileSdk {
@@ -25,6 +43,9 @@ android {
         minSdk = 31 // com.google.ai.edge.aicore requires 31+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "OPENWEATHER_API_KEY", "\"$openWeatherApiKey\"")
+        buildConfigField("String", "LOCAL_AI_MODEL_URL", "\"$localAiModelUrl\"")
+        buildConfigField("String", "LOCAL_AI_MODEL_FILENAME", "\"$localAiModelFilename\"")
+        buildConfigField("long", "LOCAL_AI_MODEL_SIZE_BYTES", "${localAiModelSizeBytes}L")
     }
 
     buildFeatures {
@@ -44,6 +65,12 @@ dependencies {
     "ksp"(libs.hilt.compiler)
 
     implementation(libs.aicore)
+    // Universal local-AI fallback: a small model downloaded at runtime over
+    // plain HTTPS (no account/token) and run on-device via MediaPipe.
+    implementation(libs.mediapipe.tasks.genai)
+    // Offline Spanish speech-to-text (Kaldi). Works with no Google speech
+    // pack — the model is bundled in :app assets.
+    implementation(libs.vosk.android)
     implementation(libs.play.services.location)
 
     implementation(libs.retrofit)

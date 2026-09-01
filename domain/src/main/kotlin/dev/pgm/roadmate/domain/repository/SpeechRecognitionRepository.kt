@@ -1,14 +1,18 @@
 package dev.pgm.roadmate.domain.repository
 
+import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
+import kotlinx.coroutines.flow.Flow
+
 /**
- * Contract for transcribing a single spoken utterance to text.
+ * Contract for transcribing a single spoken utterance to text, offline.
  *
- * The end of the utterance is detected by the platform recognizer's own
- * end-pointing (it stops listening once the user pauses) — callers don't
- * need to run a separate silence watchdog to know when speech ended.
+ * The end of the utterance is detected by the recognizer's own end-pointing
+ * (it stops once the user pauses) — callers don't need a separate silence
+ * watchdog. The stream emits [SpeechRecognitionEvent.Partial] updates while
+ * the user speaks, then a single terminal [SpeechRecognitionEvent.Result] or
+ * [SpeechRecognitionEvent.Failed].
  */
 interface SpeechRecognitionRepository {
 
-    /** Suspends until a result (or empty string on error/no match) is available. */
-    suspend fun recognizeSpeech(): String
+    fun recognize(): Flow<SpeechRecognitionEvent>
 }

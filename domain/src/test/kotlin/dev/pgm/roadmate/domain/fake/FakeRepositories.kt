@@ -1,7 +1,9 @@
 package dev.pgm.roadmate.domain.fake
 
 import dev.pgm.roadmate.domain.model.ContactLookupResult
+import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.SilenceEvent
+import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchRepository
@@ -12,6 +14,7 @@ import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.flowOf
 
 /** Hand-rolled test doubles — no mocking library is a project dependency. */
@@ -20,6 +23,7 @@ class FakeGeminiRepository(private val response: String = "respuesta de prueba")
     var lastPrompt: String? = null
     var responseCount = 0
     var cacheClearedCount = 0
+    var downloadRequestedCount = 0
 
     override suspend fun getResponse(prompt: String): String {
         lastPrompt = prompt
@@ -31,7 +35,11 @@ class FakeGeminiRepository(private val response: String = "respuesta de prueba")
         cacheClearedCount++
     }
 
-    override suspend fun isLocalAiAvailable(): Boolean = true
+    override fun localAiStatus(): Flow<LocalAiStatus> = flowOf(LocalAiStatus.ReadyAicore)
+
+    override suspend fun requestLocalAiModelDownload() {
+        downloadRequestedCount++
+    }
 }
 
 class FakeSpeechSynthesisRepository : SpeechSynthesisRepository {
@@ -48,12 +56,20 @@ class FakeSpeechSynthesisRepository : SpeechSynthesisRepository {
     }
 }
 
-class FakeSpeechRecognitionRepository(private val result: String = "") : SpeechRecognitionRepository {
+class FakeSpeechRecognitionRepository(
+    private val events: List<SpeechRecognitionEvent> = listOf(SpeechRecognitionEvent.Result("")),
+) : SpeechRecognitionRepository {
     var invocationCount = 0
 
-    override suspend fun recognizeSpeech(): String {
+    /** Convenience: emit some partials then a final Result. */
+    constructor(result: String) : this(
+        if (result.isBlank()) listOf(SpeechRecognitionEvent.Result(""))
+        else listOf(SpeechRecognitionEvent.Partial(result), SpeechRecognitionEvent.Result(result))
+    )
+
+    override fun recognize(): Flow<SpeechRecognitionEvent> {
         invocationCount++
-        return result
+        return events.asFlow()
     }
 }
 

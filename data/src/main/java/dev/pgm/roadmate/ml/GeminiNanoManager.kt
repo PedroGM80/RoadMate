@@ -59,8 +59,11 @@ class GeminiNanoManager @Inject constructor(@ApplicationContext context: Context
         return (probe != null).also { lastKnownAvailable = it }
     }
 
-    private companion object {
-        const val FALLBACK_RESPONSE =
+    companion object {
+        /** Shared with [dev.pgm.roadmate.data.repository.GeminiRepositoryImpl]
+         *  as the last-resort "modo básico" answer when no local backend
+         *  (AICore or the downloaded model) can respond. */
+        internal const val FALLBACK_RESPONSE =
             "No he podido generar una respuesta ahora mismo. Puedes repetir la pregunta más adelante."
     }
 }
