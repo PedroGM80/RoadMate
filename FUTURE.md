@@ -95,10 +95,13 @@ commitment, just a starting point for the next session. See
   invoking Gradle locally. Even a minimal `./gradlew test` on push would
   catch the kind of constructor-signature breakage this session ran into
   by hand each time.
-- **Privacy-respecting crash/error visibility.** Right now a crash on a
-  user's device is invisible to us entirely — no reporting of any kind,
-  consistent with the offline-privacy stance, but it means field issues
-  would only surface as bad reviews, not actionable reports.
+- **Crash reporting — finish it.** Firebase Crashlytics is now wired
+  (opt-in via `app/google-services.json`, diagnostics-only, no Analytics).
+  Still open: it covers JVM crashes but **not native ones** — MediaPipe,
+  Vosk and MapLibre are native libs, so `firebase-crashlytics-ndk` + symbol
+  upload would be needed to see those. Also worth an explicit opt-out
+  toggle, and deciding whether the shipped build should carry a Firebase
+  config at all vs. keeping it dev-only.
 
 ## Blocking real-world launch (not code — decisions/content needed)
 

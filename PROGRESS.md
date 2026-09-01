@@ -137,11 +137,15 @@ without reading the full git log.
 - **No cloud STT/TTS, ever. No inference off-device.** Voice capture,
   interpretation and answer generation are all on-device by hard
   requirement, restated explicitly after an earlier proposal (Cloud
-  Speech-to-Text for car-mic capture) was rejected. The app makes exactly
-  two kinds of network call, both benign: the optional, disclosed weather
-  lookup, and the one-time model-file download (a plain GET of a public
-  openly-licensed file — no query data, no account). No prompt or
-  transcript is ever sent anywhere.
+  Speech-to-Text for car-mic capture) was rejected. No prompt or transcript
+  is ever sent anywhere. The two content-free network calls are the
+  optional, disclosed weather lookup and the one-time model-file download (a
+  plain GET of a public openly-licensed file — no query data, no account).
+- **Crash reporting is opt-in and diagnostics-only.** Firebase Crashlytics
+  is wired but activates only when a build includes `app/google-services.json`
+  (gitignored). When on, it uploads stack trace + device/app state after a
+  crash — never voice, transcripts, answers, location or contacts. No
+  Firebase Analytics. See `PRIVACY.md`.
 - **No mocking library.** Test doubles are hand-rolled fakes, duplicated
   separately in `:domain/src/test` and `:app/src/test` (module test sources
   aren't cross-visible without a testFixtures setup, judged not worth the

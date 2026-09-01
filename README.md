@@ -5,7 +5,9 @@ listens, understands and answers out loud — all of it on-device. RoadMate
 never sends your voice or your questions anywhere. It reaches the network
 for exactly two things: an optional weather lookup, and a one-time download
 of the local-AI model file (a public, openly-licensed file — no account, no
-query data).
+query data). A Firebase-configured build additionally uploads a **crash
+report** if the app crashes (diagnostics only — see [`PRIVACY.md`](PRIVACY.md));
+builds without a `google-services.json` have no crash reporting.
 
 ## What it does
 
@@ -109,6 +111,8 @@ Dependency injection is Hilt end to end (`@HiltAndroidApp`, `@AndroidEntryPoint`
 - Retrofit/Moshi/OkHttp — the one optional network call, for weather
 - DataStore Preferences — onboarding persistence
 - `androidx.car.app` — Android Auto integration
+- Firebase Crashlytics — optional, opt-in via `app/google-services.json`;
+  crash diagnostics only, no Analytics
 - JUnit4 + `kotlinx-coroutines-test` — hand-rolled fakes, no mocking library
 
 ## Requirements
@@ -117,6 +121,10 @@ Dependency injection is Hilt end to end (`@HiltAndroidApp`, `@AndroidEntryPoint`
 - Optional: an `OPENWEATHER_API_KEY` in `local.properties` (gitignored). If
   absent, `WeatherDataSource` treats it as "weather unavailable" and skips
   the network call — nothing else in the app depends on it.
+- Optional: `app/google-services.json` (gitignored) turns on Firebase
+  Crashlytics. Without it the `google-services` / `crashlytics` Gradle
+  plugins aren't applied and the Firebase SDK isn't linked — the build is
+  unaffected. Crash reports are diagnostics only; see `PRIVACY.md`.
 - The local-AI model needs **no setup**. `LocalAiModelManager` downloads
   `Qwen2.5-0.5B-Instruct` q8 (`~547 MB`, Apache-2.0) from Hugging Face's
   public CDN on first run on a non-AICore device. To ship a different model,

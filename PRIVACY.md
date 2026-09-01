@@ -1,6 +1,6 @@
 # RoadMate — Privacy Policy
 
-_Last updated: 1 September 2026_
+_Last updated: 2 September 2026_
 
 RoadMate is a voice copilot for driving. It is built to work **on your
 device**: your voice and your questions are captured, transcribed, and
@@ -16,11 +16,17 @@ device, and the few cases where something leaves it.
 - **Your questions and the assistant's answers never leave the phone.** They
   are generated on-device (Gemini Nano via AICore where available, otherwise
   a small open model run locally through MediaPipe).
-- RoadMate has **no account, no login, no analytics, no crash reporting, no
-  advertising, and no tracking**. Nothing is collected on a server.
-- The app makes network requests for only **two** things, both described
-  below: an optional weather lookup, and a one-time download of the local-AI
-  model file.
+- RoadMate has **no account, no login, no analytics, no advertising, and no
+  tracking**.
+- Some builds enable **crash reporting** (Firebase Crashlytics). When it's
+  on, it uploads a diagnostic report *only if the app crashes* — stack
+  trace, device model and OS version, and app state at the moment of the
+  crash. It **never** sends your voice, your questions, the answers, your
+  location, or your contacts. Builds without a Firebase config file have no
+  crash reporting at all.
+- Beyond crash reports, the app makes network requests for only **two**
+  things, both described below: an optional weather lookup, and a one-time
+  download of the local-AI model file.
 
 ## What stays on your device
 
@@ -32,7 +38,20 @@ device, and the few cases where something leaves it.
 | Contacts | To turn "call Ana" into a phone number | Read locally at the moment you ask. Not uploaded, not stored by RoadMate. |
 | Onboarding state and the date of the last daily greeting | So the intro screen and greeting show once | Stored locally (Android DataStore). Never transmitted. |
 
-## The only two times data leaves your device
+## When data leaves your device
+
+### 0. Crash reports (only in a Firebase-configured build, only after a crash)
+
+If the build has Firebase Crashlytics enabled (it needs a
+`google-services.json` config file that is not part of the source tree), a
+crash report is sent to Google's Firebase servers the next time the app is
+launched with a connection. The report contains: the stack trace, the
+device model and Android version, and app/thread state at the time of the
+crash, plus a random per-install identifier Crashlytics uses to group
+reports. It does **not** contain your voice, transcripts, answers,
+location, contacts, or any prompt content. See Firebase's own privacy and
+data-handling terms for how Google processes it. A build without the config
+file does not include Crashlytics at all.
 
 ### 1. Weather (optional)
 
