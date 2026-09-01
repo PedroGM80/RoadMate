@@ -122,9 +122,10 @@ without reading the full git log.
   assistant" well. Talk to Google's Android for Cars team before
   submitting for review — a mismatched category risks rejection or later
   removal.
-- **Privacy policy contact email**: the published privacy policy still has
-  a placeholder (`[email de contacto pendiente de añadir]`) instead of a
-  real contact address — needs a real value before this can go live.
+- **Privacy policy**: written up in `PRIVACY.md` (contact
+  pedro13087@gmail.com), grounded in what the code actually does. Still
+  needs to be *published* somewhere linkable (GitHub Pages / the Play
+  Console listing) and kept in sync if data flows change.
 - **Map search query parsing**: `MapSearchIntentParser` is a simple
   free-text regex match on "busca/encuentra X" and "dónde hay X". It hasn't
   been checked against a wide range of real phrasing — worth revisiting if

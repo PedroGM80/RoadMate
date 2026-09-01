@@ -16,11 +16,6 @@ commitment, just a starting point for the next session. See
   phrasing. Likely false positive: "busca información sobre..." would
   currently also get sent to Maps. Worth a pass once real usage surfaces
   actual phrasing patterns, rather than guessing more regexes upfront.
-- **Handle no Maps app installed.** `MapSearchRepositoryImpl.searchNearby()`
-  calls `context.startActivity()` on the `geo:` intent with no
-  `ActivityNotFoundException` guard. Every device tested against has Google
-  Maps, but a device without any geo-handling app installed would crash
-  instead of getting a spoken "no tengo una app de mapas instalada."
 - **Contact call follow-ups.** Ambiguous matches currently just say "sé más
   específico" and stop. A natural next step — without adding a full
   multi-turn dialogue system — is accepting a same-session disambiguating
@@ -103,13 +98,14 @@ commitment, just a starting point for the next session. See
 - **Privacy-respecting crash/error visibility.** Right now a crash on a
   user's device is invisible to us entirely — no reporting of any kind,
   consistent with the offline-privacy stance, but it means field issues
-  (like the Maps-not-installed gap above) would only surface as bad
-  reviews, not actionable reports.
+  would only surface as bad reviews, not actionable reports.
 
 ## Blocking real-world launch (not code — decisions/content needed)
 
-- **Privacy policy contact email** — still a placeholder
-  (`[email de contacto pendiente de añadir]`) in the published policy.
+- **Publish the privacy policy.** `PRIVACY.md` now exists (contact
+  pedro13087@gmail.com); it still needs a public URL — GitHub Pages, or
+  pasted into the Play Console listing — and to be kept in sync if the data
+  flows ever change.
 - **Play Store category for the Android Auto service** — `POI` is the best
   available fit, not a good one. Needs a conversation with Google's
   Android for Cars team before submitting for review.

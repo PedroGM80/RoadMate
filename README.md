@@ -51,6 +51,9 @@ on first run. The one-time model download is a plain HTTPS GET of a public,
 openly-licensed file from Hugging Face's CDN — it carries no query data and
 needs no login.
 
+The full data story — what stays on the device, the two times anything
+leaves it, and every permission — is in [`PRIVACY.md`](PRIVACY.md).
+
 ## Architecture
 
 Clean Architecture across three Gradle modules, dependencies pointing
