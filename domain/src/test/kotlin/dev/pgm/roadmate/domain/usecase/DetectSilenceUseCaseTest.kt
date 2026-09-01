@@ -1,5 +1,6 @@
 package dev.pgm.roadmate.domain.usecase
 
+import dev.pgm.roadmate.domain.fake.FakeAssistantPreferencesRepository
 import dev.pgm.roadmate.domain.fake.FakeGeminiRepository
 import dev.pgm.roadmate.domain.fake.FakeMapSearchRepository
 import dev.pgm.roadmate.domain.fake.FakeMediaRepository
@@ -25,7 +26,8 @@ class DetectSilenceUseCaseTest {
             FakeSpeechSynthesisRepository(),
             FakePhoneCallRepository(),
             FakeMapSearchRepository(),
-            FakeMediaRepository()
+            FakeMediaRepository(),
+            FakeAssistantPreferencesRepository()
         )
         val useCase = DetectSilenceUseCase(silenceDetectionRepository, generateResponseUseCase)
 
@@ -43,7 +45,8 @@ class DetectSilenceUseCaseTest {
             FakeSpeechSynthesisRepository(),
             FakePhoneCallRepository(),
             FakeMapSearchRepository(),
-            FakeMediaRepository()
+            FakeMediaRepository(),
+            FakeAssistantPreferencesRepository()
         )
         val useCase = DetectSilenceUseCase(FakeSilenceDetectionRepository(), generateResponseUseCase)
 

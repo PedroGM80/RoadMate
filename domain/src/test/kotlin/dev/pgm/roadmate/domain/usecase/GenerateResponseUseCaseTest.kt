@@ -1,10 +1,12 @@
 package dev.pgm.roadmate.domain.usecase
 
+import dev.pgm.roadmate.domain.fake.FakeAssistantPreferencesRepository
 import dev.pgm.roadmate.domain.fake.FakeGeminiRepository
 import dev.pgm.roadmate.domain.fake.FakeMapSearchRepository
 import dev.pgm.roadmate.domain.fake.FakeMediaRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
+import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.ContactMatch
 import dev.pgm.roadmate.domain.model.MediaApp
@@ -26,13 +28,15 @@ class GenerateResponseUseCaseTest {
         speechSynthesisRepository: FakeSpeechSynthesisRepository = FakeSpeechSynthesisRepository(),
         phoneCallRepository: FakePhoneCallRepository = FakePhoneCallRepository(),
         mapSearchRepository: FakeMapSearchRepository = FakeMapSearchRepository(),
-        mediaRepository: FakeMediaRepository = FakeMediaRepository()
+        mediaRepository: FakeMediaRepository = FakeMediaRepository(),
+        assistantPreferencesRepository: FakeAssistantPreferencesRepository = FakeAssistantPreferencesRepository()
     ) = GenerateResponseUseCase(
         geminiRepository,
         speechSynthesisRepository,
         phoneCallRepository,
         mapSearchRepository,
-        mediaRepository
+        mediaRepository,
+        assistantPreferencesRepository
     )
 
     @Test
@@ -160,5 +164,30 @@ class GenerateResponseUseCaseTest {
 
         assertEquals(MediaApp.YOUTUBE_MUSIC, mediaRepository.lastLaunchedApp)
         assertTrue(emitted.first().contains("No puedo abrir"))
+    }
+
+    @Test
+    fun `an answer-style command persists the preference, acks it, and skips Gemini`() = runTest {
+        val geminiRepository = FakeGeminiRepository(response = "no debería usarse")
+        val prefs = FakeAssistantPreferencesRepository()
+
+        val emitted = useCase(geminiRepository, assistantPreferencesRepository = prefs)(
+            context,
+            "de ahora en adelante respuestas cortas"
+        ).toList()
+
+        assertEquals(0, geminiRepository.responseCount)
+        assertEquals(AnswerStyle.BRIEF, prefs.answerStyle.value)
+        assertEquals(listOf(AnswerStyle.BRIEF.spokenAck), emitted)
+    }
+
+    @Test
+    fun `the stored answer style is folded into the Gemini prompt`() = runTest {
+        val geminiRepository = FakeGeminiRepository(response = "vale")
+        val prefs = FakeAssistantPreferencesRepository(initial = AnswerStyle.BRIEF)
+
+        useCase(geminiRepository, assistantPreferencesRepository = prefs)(context, "¿cuánto queda?").toList()
+
+        assertTrue(geminiRepository.lastPrompt!!.contains(AnswerStyle.BRIEF.promptInstruction))
     }
 }

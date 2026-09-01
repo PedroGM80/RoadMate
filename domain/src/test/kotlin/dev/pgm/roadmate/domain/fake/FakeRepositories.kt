@@ -1,10 +1,12 @@
 package dev.pgm.roadmate.domain.fake
 
+import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.SilenceEvent
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
+import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchRepository
@@ -129,5 +131,16 @@ class FakeMediaRepository(private val canLaunch: Boolean = true) : MediaReposito
     override fun launchMediaApp(app: MediaApp): Boolean {
         lastLaunchedApp = app
         return canLaunch
+    }
+}
+
+class FakeAssistantPreferencesRepository(
+    initial: AnswerStyle = AnswerStyle.DEFAULT
+) : AssistantPreferencesRepository {
+    val styleFlow = MutableStateFlow(initial)
+    override val answerStyle: StateFlow<AnswerStyle> = styleFlow
+
+    override suspend fun setAnswerStyle(style: AnswerStyle) {
+        styleFlow.value = style
     }
 }

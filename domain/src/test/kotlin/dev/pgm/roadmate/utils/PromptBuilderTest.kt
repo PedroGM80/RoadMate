@@ -1,5 +1,6 @@
 package dev.pgm.roadmate.utils
 
+import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.TravelContext
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -7,6 +8,18 @@ import org.junit.Test
 import java.util.Date
 
 class PromptBuilderTest {
+
+    @Test
+    fun `applies the requested answer style, defaulting to normal length`() {
+        val context = TravelContext(null, null, 9, Date(), "hola")
+
+        val normal = PromptBuilder.buildPrompt(context, "hola")
+        val brief = PromptBuilder.buildPrompt(context, "hola", AnswerStyle.BRIEF)
+
+        assertTrue(normal.contains(AnswerStyle.NORMAL.promptInstruction))
+        assertTrue(brief.contains(AnswerStyle.BRIEF.promptInstruction))
+        assertFalse(brief.contains(AnswerStyle.NORMAL.promptInstruction))
+    }
 
     @Test
     fun `includes coordinates when location is known`() {

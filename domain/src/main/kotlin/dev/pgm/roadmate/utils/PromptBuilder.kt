@@ -1,5 +1,6 @@
 package dev.pgm.roadmate.utils
 
+import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.TravelContext
 
 /**
@@ -10,7 +11,11 @@ object PromptBuilder {
 
     private const val MAX_LAST_RESPONSES = 3
 
-    fun buildPrompt(context: TravelContext, userInput: String): String {
+    fun buildPrompt(
+        context: TravelContext,
+        userInput: String,
+        style: AnswerStyle = AnswerStyle.DEFAULT,
+    ): String {
         val location = context.currentLocation
             ?.let { "${it.first}, ${it.second}" }
             ?: "desconocida"
@@ -21,7 +26,7 @@ object PromptBuilder {
             appendLine(Constants.GEMINI_SYSTEM_PROMPT)
             appendLine(
                 "Usuario está en [$location], va a [$destination], son las [$hour]. " +
-                    "Pregunta: [$userInput]. Responde en 1-2 frases."
+                    "Pregunta: [$userInput]. ${style.promptInstruction}"
             )
 
             if (!context.weatherDescription.isNullOrBlank()) {

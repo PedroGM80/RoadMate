@@ -1,8 +1,10 @@
 package dev.pgm.roadmate.domain.usecase
 
+import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.TravelContext
+import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.MapSearchRepository
 import dev.pgm.roadmate.domain.repository.MediaRepository
@@ -13,7 +15,9 @@ import dev.pgm.roadmate.utils.JokeProvider
 import dev.pgm.roadmate.utils.MapSearchIntentParser
 import dev.pgm.roadmate.utils.MediaIntentParser
 import dev.pgm.roadmate.utils.PromptBuilder
+import dev.pgm.roadmate.utils.StylePreferenceParser
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 
@@ -32,7 +36,10 @@ import javax.inject.Inject
  *  3. "abre/pon Spotify|YouTube Music" — launches that music app. Just opens
  *     it (no playback control), and says so.
  *  4. Joke requests — answered from JokeProvider's local bank.
- * All four work identically whether or not this device has on-device AI,
+ *  5. "respuestas cortas / normales / con más detalle" — persists an
+ *     [AssistantPreferencesRepository] setting and acknowledges it; that
+ *     setting then shapes every future Gemini answer's length.
+ * All of these work identically whether or not this device has on-device AI,
  * unlike every other question, which falls back to GeminiNanoManager's
  * generic FALLBACK_RESPONSE in "modo básico".
  */
@@ -41,21 +48,31 @@ class GenerateResponseUseCase @Inject constructor(
     private val speechSynthesisRepository: SpeechSynthesisRepository,
     private val phoneCallRepository: PhoneCallRepository,
     private val mapSearchRepository: MapSearchRepository,
-    private val mediaRepository: MediaRepository
+    private val mediaRepository: MediaRepository,
+    private val assistantPreferencesRepository: AssistantPreferencesRepository
 ) {
     operator fun invoke(context: TravelContext, userInput: String): Flow<String> = flow {
         val contactName = CallIntentParser.extractContactName(userInput)
         val mapQuery = MapSearchIntentParser.extractSearchQuery(userInput)
         val mediaApp = MediaIntentParser.extractMediaApp(userInput)
+        val styleChange = StylePreferenceParser.parse(userInput)
         val response = when {
             contactName != null -> handleCallRequest(contactName)
             mapQuery != null -> handleMapSearch(mapQuery, context.currentLocation)
             mediaApp != null -> handleMediaRequest(mediaApp)
             JokeProvider.matchesJokeIntent(userInput) -> JokeProvider.randomJoke()
-            else -> geminiRepository.getResponse(PromptBuilder.buildPrompt(context, userInput))
+            styleChange != null -> handleStyleChange(styleChange)
+            else -> geminiRepository.getResponse(
+                PromptBuilder.buildPrompt(context, userInput, assistantPreferencesRepository.answerStyle.first())
+            )
         }
         speechSynthesisRepository.speak(response)
         emit(response)
+    }
+
+    private suspend fun handleStyleChange(style: AnswerStyle): String {
+        assistantPreferencesRepository.setAnswerStyle(style)
+        return style.spokenAck
     }
 
     private suspend fun handleCallRequest(contactName: String): String {

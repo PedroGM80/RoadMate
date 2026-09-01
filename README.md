@@ -30,6 +30,10 @@ builds without a `google-services.json` have no crash reporting.
 - **"Abre Spotify" / "pon música en YouTube Music"** — brings the music app
   to the foreground. Just opens it (no playback control) and says so; an
   app that isn't installed gets a spoken explanation.
+- **"Respuestas cortas" / "con más detalle" / "normales"** — RoadMate
+  remembers how long you like answers (across trips) and shapes every
+  Gemini reply to match. The first bit of it adapting to you rather than
+  answering everyone the same.
 - **In-app map ("Mapa" tab).** A real vector map (MapLibre + OpenFreeMap,
   OpenStreetMap data, no API key) showing your position. **"Descargar esta
   zona"** saves the visible area so the map keeps working with no
