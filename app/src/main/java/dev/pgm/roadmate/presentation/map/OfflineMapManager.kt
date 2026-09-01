@@ -25,6 +25,9 @@ interface OfflineMapController {
     val status: StateFlow<OfflineMapStatus>
     fun refresh()
     fun download(styleUrl: String, bounds: LatLngBounds, pixelRatio: Float)
+
+    /** Removes every downloaded region. No-op while a download is running. */
+    fun deleteAll()
 }
 
 /**
@@ -98,6 +101,28 @@ class OfflineMapManager @Inject constructor(
                 }
             },
         )
+    }
+
+    @UiThread
+    override fun deleteAll() {
+        if (_status.value is OfflineMapStatus.Downloading) return
+        offlineManager.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
+            override fun onList(offlineRegions: Array<OfflineRegion>?) {
+                offlineRegions?.forEach { region ->
+                    region.delete(object : OfflineRegion.OfflineRegionDeleteCallback {
+                        override fun onDelete() = Unit
+                        override fun onError(error: String) {
+                            Log.w(TAG, "region delete: $error")
+                        }
+                    })
+                }
+                _status.value = OfflineMapStatus.Idle
+            }
+
+            override fun onError(error: String) {
+                Log.w(TAG, "deleteAll list: $error")
+            }
+        })
     }
 
     private fun regionObserver(region: OfflineRegion) =

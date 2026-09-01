@@ -14,8 +14,10 @@ private class FakeOfflineMap : OfflineMapController {
     var refreshCount = 0
     var downloads = 0
 
+    var deletes = 0
     override fun refresh() { refreshCount++ }
     override fun download(styleUrl: String, bounds: LatLngBounds, pixelRatio: Float) { downloads++ }
+    override fun deleteAll() { deletes++ }
 }
 
 private fun mapViewModel(offlineMap: OfflineMapController) =

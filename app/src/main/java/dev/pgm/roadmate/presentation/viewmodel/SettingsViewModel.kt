@@ -7,6 +7,7 @@ import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
+import dev.pgm.roadmate.presentation.map.OfflineMapController
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -18,6 +19,7 @@ import javax.inject.Inject
 class SettingsViewModel @Inject constructor(
     private val preferences: AssistantPreferencesRepository,
     private val memory: MemoryRepository,
+    private val offlineMap: OfflineMapController,
 ) : ViewModel() {
 
     val theme: StateFlow<ThemePreference> = preferences.themePreference
@@ -37,4 +39,6 @@ class SettingsViewModel @Inject constructor(
     fun clearMemory() {
         viewModelScope.launch { memory.clearAll() }
     }
+
+    fun clearOfflineMaps() = offlineMap.deleteAll()
 }

@@ -95,6 +95,7 @@ fun RootScreen(
                             onThemeChange = settingsViewModel::setTheme,
                             answerStyle = answerStyle,
                             onAnswerStyleChange = settingsViewModel::setAnswerStyle,
+                            onClearOfflineMaps = settingsViewModel::clearOfflineMaps,
                             onClearMemory = settingsViewModel::clearMemory,
                         )
                     },
@@ -126,6 +127,7 @@ private fun SettingsMenu(
     onThemeChange: (ThemePreference) -> Unit,
     answerStyle: AnswerStyle,
     onAnswerStyleChange: (AnswerStyle) -> Unit,
+    onClearOfflineMaps: () -> Unit,
     onClearMemory: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -149,6 +151,10 @@ private fun SettingsMenu(
         RadioItem(AnswerStyle.DETAILED, R.string.answer_detailed, answerStyle, onAnswerStyleChange, close)
 
         HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.clear_offline_maps)) },
+            onClick = { close(); onClearOfflineMaps() },
+        )
         DropdownMenuItem(
             text = { Text(stringResource(R.string.clear_memory), color = MaterialTheme.colorScheme.error) },
             onClick = { open = false; confirmClear = true },
