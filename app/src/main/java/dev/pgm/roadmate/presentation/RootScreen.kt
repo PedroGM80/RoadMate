@@ -1,5 +1,6 @@
 package dev.pgm.roadmate.presentation
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -84,9 +85,11 @@ fun RootScreen(
                     )
                 }
             } else {
-                when (tab) {
-                    0 -> HomeScreen(viewModel = roadMateViewModel, modifier = paneModifier.fillMaxSize())
-                    else -> MapScreen(viewModel = mapViewModel, modifier = paneModifier.fillMaxSize())
+                Crossfade(targetState = tab, label = "voz-mapa") { current ->
+                    when (current) {
+                        0 -> HomeScreen(viewModel = roadMateViewModel, modifier = paneModifier.fillMaxSize())
+                        else -> MapScreen(viewModel = mapViewModel, modifier = paneModifier.fillMaxSize())
+                    }
                 }
             }
         }
