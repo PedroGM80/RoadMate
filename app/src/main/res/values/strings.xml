@@ -11,6 +11,7 @@
     <string name="theme_system">Según el sistema</string>
     <string name="theme_light">Claro</string>
     <string name="theme_dark">Oscuro</string>
+    <string name="theme_auto">Automático (oscuro de noche)</string>
     <string name="clear_memory">Borrar lo aprendido</string>
     <string name="clear_memory_confirm_title">¿Borrar lo aprendido?</string>
     <string name="clear_memory_confirm_body">RoadMate olvidará el historial de conversación y todo lo que le has enseñado (preferencias, casa, trabajo, contactos). No se puede deshacer.</string>

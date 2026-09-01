@@ -138,6 +138,7 @@ private fun SettingsMenu(
         ThemeItem(ThemePreference.SYSTEM, R.string.theme_system, theme, onThemeChange) { open = false }
         ThemeItem(ThemePreference.LIGHT, R.string.theme_light, theme, onThemeChange) { open = false }
         ThemeItem(ThemePreference.DARK, R.string.theme_dark, theme, onThemeChange) { open = false }
+        ThemeItem(ThemePreference.AUTO, R.string.theme_auto, theme, onThemeChange) { open = false }
         HorizontalDivider()
         DropdownMenuItem(
             text = { Text(stringResource(R.string.clear_memory), color = MaterialTheme.colorScheme.error) },

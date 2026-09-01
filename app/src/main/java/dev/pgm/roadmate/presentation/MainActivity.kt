@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
                 ThemePreference.SYSTEM -> isSystemInDarkTheme()
                 ThemePreference.LIGHT -> false
                 ThemePreference.DARK -> true
+                ThemePreference.AUTO -> ThemePreference.isNightHour(java.time.LocalTime.now().hour)
             }
             RoadMateTheme(darkTheme = dark) {
                 val isOnboardingCompleted by onboardingRepository.isOnboardingCompleted
