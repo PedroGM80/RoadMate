@@ -9,6 +9,16 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
+// Crashlytics is wired only when app/google-services.json is present. That
+// file is gitignored — drop in your own Firebase config to turn crash
+// reporting on. No file, no Firebase, and the build stays green (same
+// graceful-degradation pattern as the optional OpenWeather API key).
+val firebaseEnabled = file("google-services.json").exists()
+if (firebaseEnabled) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
+}
+
 // Per-machine overrides (gitignored). Only MAP_STYLE_URL is read here today.
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
@@ -87,6 +97,13 @@ android {
 dependencies {
     implementation(project(":domain"))
     implementation(project(":data"))
+
+    // Crash reporting only — no Analytics. Pulled in only when Firebase is
+    // configured (see the firebaseEnabled check above).
+    if (firebaseEnabled) {
+        implementation(platform(libs.firebase.bom))
+        implementation(libs.firebase.crashlytics)
+    }
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.accompanist.permissions)

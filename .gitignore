@@ -17,3 +17,8 @@ local.properties
 # Vosk offline Spanish speech model — fetched into assets at build time by
 # the :app downloadVoskModel task, not stored in git (see app/build.gradle.kts).
 /app/src/main/assets/vosk-model-small-es-0.42.zip
+
+# Firebase config — per-project, embeds an API key + project number. Add your
+# own to turn Crashlytics on; its absence just disables Firebase (see
+# app/build.gradle.kts).
+/app/google-services.json
