@@ -1,5 +1,6 @@
 package dev.pgm.roadmate.presentation
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -40,8 +41,12 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var onboardingRepository: OnboardingRepository
 
+    /** Set by the Quick Settings tile; consumed in onResume once the UI is up. */
+    private var pendingStartListening = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingStartListening = intent.getBooleanExtra(EXTRA_START_LISTENING, false)
         enableEdgeToEdge()
         setContent {
             val themePreference by settingsViewModel.theme.collectAsState()
@@ -74,11 +79,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingStartListening = intent.getBooleanExtra(EXTRA_START_LISTENING, false)
+    }
+
     override fun onResume() {
         super.onResume()
         SilenceDetectionForegroundService.stop(this)
         if (permissionManager.hasRecordAudioPermission()) {
             viewModel.startSilenceMonitoring()
+            if (pendingStartListening) {
+                pendingStartListening = false
+                viewModel.startListening()
+            }
         }
     }
 
@@ -93,5 +108,10 @@ class MainActivity : ComponentActivity() {
         if (permissionManager.hasRecordAudioPermission()) {
             SilenceDetectionForegroundService.start(this)
         }
+    }
+
+    companion object {
+        /** Intent extra: open straight into listening (from the QS tile). */
+        const val EXTRA_START_LISTENING = "dev.pgm.roadmate.START_LISTENING"
     }
 }

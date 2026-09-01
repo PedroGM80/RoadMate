@@ -5,6 +5,9 @@
     <string name="tab_voice">Voz</string>
     <string name="tab_map">Mapa</string>
 
+    <!-- Quick Settings tile -->
+    <string name="tile_label">Preguntar a RoadMate</string>
+
     <!-- Settings menu -->
     <string name="settings">Ajustes</string>
     <string name="settings_theme_header">Tema</string>
