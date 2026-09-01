@@ -77,11 +77,17 @@ class FakeGeminiRepository(
 
 class FakeSpeechSynthesisRepository : SpeechSynthesisRepository {
     val spoken = mutableListOf<String>()
+    private val _isSpeaking = MutableStateFlow(false)
+    override val isSpeaking: StateFlow<Boolean> = _isSpeaking
+
+    fun setSpeaking(value: Boolean) { _isSpeaking.value = value }
+
     override fun speak(text: String, onDone: () -> Unit) {
         spoken.add(text)
         onDone()
     }
-    override fun stop() = Unit
+    override fun stop() { _isSpeaking.value = false }
+    override suspend fun awaitDoneSpeaking() { _isSpeaking.value = false }
 }
 
 class FakeSpeechRecognitionRepository(

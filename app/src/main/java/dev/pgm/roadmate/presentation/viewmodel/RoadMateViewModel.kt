@@ -149,7 +149,9 @@ class RoadMateViewModel @Inject constructor(
     fun startSilenceMonitoring() {
         if (silenceMonitoringJob?.isActive == true) return
         silenceMonitoringJob = detectSilenceUseCase.observeSilence()
-            .onEach { handleRestReminder() }
+            // Ignore a "silence over" event that fires while RoadMate itself is
+            // talking — the mic is only hearing our own TTS, not the driver.
+            .onEach { if (!speechSynthesisRepository.isSpeaking.value) handleRestReminder() }
             .catch { /* transient audio read errors shouldn't kill the monitor */ }
             .launchIn(viewModelScope)
     }

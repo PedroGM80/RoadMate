@@ -57,7 +57,7 @@ class RoadMateViewModelTest {
         } else {
             FakeSpeechRecognitionRepository(recognizedSpeech)
         }
-        val recordAudioUseCase = RecordAudioUseCase(speechRepo)
+        val recordAudioUseCase = RecordAudioUseCase(speechRepo, speechSynthesisRepository)
         val detectSilenceUseCase = DetectSilenceUseCase(FakeSilenceDetectionRepository(), generateResponseUseCase)
         val locationRepository = FakeLocationRepository(fetchDelayMs = locationFetchDelayMs, fetchResult = location)
 
