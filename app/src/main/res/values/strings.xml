@@ -8,6 +8,11 @@
     <!-- Quick Settings tile -->
     <string name="tile_label">Preguntar a RoadMate</string>
 
+    <!-- Home-screen widget -->
+    <string name="widget_label">RoadMate</string>
+    <string name="widget_cta">Preguntar</string>
+    <string name="widget_description">Toca para preguntar a RoadMate sin abrir la app.</string>
+
     <!-- Settings menu -->
     <string name="settings">Ajustes</string>
     <string name="settings_theme_header">Tema</string>

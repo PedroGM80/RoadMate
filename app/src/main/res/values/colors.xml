@@ -7,4 +7,10 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Home-screen widget. Brand RoadBlue (matches the Compose primary) with
+         a white foreground; fixed rather than themed so it reads the same on
+         any launcher wallpaper. -->
+    <color name="widget_bg">#FF2F5FA8</color>
+    <color name="widget_fg">#FFFFFFFF</color>
 </resources>

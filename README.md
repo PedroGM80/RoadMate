@@ -55,8 +55,9 @@ builds without a `google-services.json` have no crash reporting.
   without conversation and offers to suggest a break, spoken through TTS.
 - **Android Auto.** Shows up as a Car App Library service (`POI` category)
   so the same assistant is reachable from the car's head unit.
-- **Quick Settings tile.** "Preguntar a RoadMate" in the pull-down opens
-  the app straight into listening.
+- **Quick Settings tile + home-screen widget.** "Preguntar a RoadMate" in
+  the pull-down, or a resizable home-screen widget, both open the app
+  straight into listening.
 
 ## Why offline-first
 

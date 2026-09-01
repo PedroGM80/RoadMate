@@ -91,9 +91,11 @@ without reading the full git log.
 - **Voice UX polish** (build-verified): a synthesised two-note earcon
   (`Earcon`, no bundled asset) on mic start/stop instead of the generic
   `ToneGenerator` beep; a same-session follow-up for an ambiguous "llama a
-  X" ("la segunda" / a surname), state kept in `GenerateResponseUseCase`;
-  a Quick Settings tile ("Preguntar a RoadMate") that opens straight into
-  listening via `MainActivity.EXTRA_START_LISTENING`.
+  X" ("la segunda" / a surname / "la del móvil" / "la del trabajo" — the
+  last two label-aware via `PhoneLabel` off `Phone.TYPE`), state kept in
+  `GenerateResponseUseCase`; a Quick Settings tile and a resizable
+  home-screen widget (`RoadMateWidgetProvider`, RemoteViews) that both open
+  straight into listening via `MainActivity.EXTRA_START_LISTENING`.
 - **Rest reminders**: `SilenceDetectionForegroundService` +
   `AudioLevelDetector` detect long silences and speak a reminder in the
   background. Verified live via logcat/dumpsys — clean foreground-service

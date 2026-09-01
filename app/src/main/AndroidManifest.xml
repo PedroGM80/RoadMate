@@ -71,6 +71,17 @@
             </intent-filter>
         </service>
 
+        <receiver
+            android:name="dev.pgm.roadmate.widget.RoadMateWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_ask_info" />
+        </receiver>
+
         <service
             android:name="dev.pgm.roadmate.car.RoadMateCarAppService"
             android:exported="true">

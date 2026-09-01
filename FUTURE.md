@@ -46,9 +46,12 @@ commitment, just a starting point for the next session. See
   - *Better base model (build-time).* `LOCAL_AI_MODEL_URL` is overridable —
     LoRA-finetune Qwen2.5-0.5B on a driving-assistant set offline, merge,
     convert to `.task`, ship that URL.
-- **Home screen widget.** The Quick Settings tile ("Preguntar a RoadMate")
-  now exists; a resizable home-screen widget with the same one-tap-to-listen
-  action would reach users who don't use the QS panel.
+- **Home screen widget — done.** `RoadMateWidgetProvider` (plain
+  `AppWidgetProvider`, RemoteViews, no Glance dependency) puts the same
+  one-tap-to-listen action on the home screen: brand-blue pill, mic icon +
+  "Preguntar", resizable, `updatePeriodMillis=0` (nothing to refresh). Taps
+  fire `MainActivity` with `EXTRA_START_LISTENING`, same path as the tile.
+  Not yet checked on a device.
 - **Accessibility audit beyond the current pass.** TalkBack live regions
   and merged semantics exist on the core screens, and the design pass added
   reduce-motion handling + 48dp targets, but there's been no dedicated
