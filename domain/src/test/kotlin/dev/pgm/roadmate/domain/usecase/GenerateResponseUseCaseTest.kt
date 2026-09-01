@@ -2,10 +2,12 @@ package dev.pgm.roadmate.domain.usecase
 
 import dev.pgm.roadmate.domain.fake.FakeGeminiRepository
 import dev.pgm.roadmate.domain.fake.FakeMapSearchRepository
+import dev.pgm.roadmate.domain.fake.FakeMediaRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
 import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.ContactMatch
+import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.utils.JokeProvider
 import kotlinx.coroutines.flow.toList
@@ -23,8 +25,15 @@ class GenerateResponseUseCaseTest {
         geminiRepository: FakeGeminiRepository = FakeGeminiRepository(),
         speechSynthesisRepository: FakeSpeechSynthesisRepository = FakeSpeechSynthesisRepository(),
         phoneCallRepository: FakePhoneCallRepository = FakePhoneCallRepository(),
-        mapSearchRepository: FakeMapSearchRepository = FakeMapSearchRepository()
-    ) = GenerateResponseUseCase(geminiRepository, speechSynthesisRepository, phoneCallRepository, mapSearchRepository)
+        mapSearchRepository: FakeMapSearchRepository = FakeMapSearchRepository(),
+        mediaRepository: FakeMediaRepository = FakeMediaRepository()
+    ) = GenerateResponseUseCase(
+        geminiRepository,
+        speechSynthesisRepository,
+        phoneCallRepository,
+        mapSearchRepository,
+        mediaRepository
+    )
 
     @Test
     fun `builds a prompt, asks Gemini, speaks and emits the response`() = runTest {
@@ -116,5 +125,30 @@ class GenerateResponseUseCaseTest {
         useCase(mapSearchRepository = mapSearchRepository)(context, "dónde hay un hotel").toList()
 
         assertEquals("un hotel", mapSearchRepository.lastQuery)
+    }
+
+    @Test
+    fun `media requests launch the app and bypass Gemini`() = runTest {
+        val geminiRepository = FakeGeminiRepository(response = "no debería usarse")
+        val mediaRepository = FakeMediaRepository()
+
+        val emitted = useCase(geminiRepository, mediaRepository = mediaRepository)(
+            context,
+            "pon música en Spotify"
+        ).toList()
+
+        assertEquals(0, geminiRepository.responseCount)
+        assertEquals(MediaApp.SPOTIFY, mediaRepository.lastLaunchedApp)
+        assertEquals(listOf("Abriendo Spotify"), emitted)
+    }
+
+    @Test
+    fun `a media request for an app that is not installed explains instead of claiming success`() = runTest {
+        val mediaRepository = FakeMediaRepository(canLaunch = false)
+
+        val emitted = useCase(mediaRepository = mediaRepository)(context, "abre YouTube Music").toList()
+
+        assertEquals(MediaApp.YOUTUBE_MUSIC, mediaRepository.lastLaunchedApp)
+        assertTrue(emitted.first().contains("No he podido abrir"))
     }
 }

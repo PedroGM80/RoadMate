@@ -2,12 +2,14 @@ package dev.pgm.roadmate.presentation.viewmodel.fake
 
 import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.LocalAiStatus
+import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.SilenceEvent
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchRepository
+import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
@@ -109,6 +111,14 @@ class FakeMapSearchRepository : MapSearchRepository {
     var lastQuery: String? = null
     override fun searchNearby(query: String, location: Pair<Double, Double>?) {
         lastQuery = query
+    }
+}
+
+class FakeMediaRepository(private val canLaunch: Boolean = true) : MediaRepository {
+    var lastLaunchedApp: MediaApp? = null
+    override fun launchMediaApp(app: MediaApp): Boolean {
+        lastLaunchedApp = app
+        return canLaunch
     }
 }
 

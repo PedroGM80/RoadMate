@@ -18,6 +18,10 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="geo" />
         </intent>
+        <!-- Music apps RoadMate can open by voice — needed for
+             getLaunchIntentForPackage() to see them on Android 11+. -->
+        <package android:name="com.spotify.music" />
+        <package android:name="com.google.android.apps.youtube.music" />
     </queries>
 
     <application
