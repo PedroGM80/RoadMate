@@ -126,10 +126,11 @@ commitment, just a starting point for the next session. See
   `LlmInference` close/reload on `onTrimMemory`. (ABI splits and the
   `com.google.mediapipe.**` keep rules are now in place — see "APK size"
   below; R8 itself is still off pending a device check.)
-- **CI pipeline.** No automated build/test run exists outside manually
-  invoking Gradle locally. Even a minimal `./gradlew test` on push would
-  catch the kind of constructor-signature breakage this session ran into
-  by hand each time.
+- **CI pipeline — done.** `.github/workflows/ci.yml` runs
+  `:domain:test :app:testDebugUnitTest` on push / PR / manual dispatch
+  (JDK 21 Temurin, `gradle/actions/setup-gradle`, Vosk model cached).
+  Open: no instrumented-test or `assembleRelease` job yet (the latter needs
+  signing config + a device to be meaningful).
 - **Crash reporting — finish it.** Firebase Crashlytics is now wired
   (opt-in via `app/google-services.json`, diagnostics-only, no Analytics).
   Still open: it covers JVM crashes but **not native ones** — MediaPipe,
