@@ -33,7 +33,8 @@ device, and the few cases where something leaves it.
 | Data | Why | Where it goes |
 |---|---|---|
 | Microphone audio | Speech-to-text while you are asking something | Processed in memory on-device by Vosk, then discarded. Not written to storage, not transmitted. |
-| Your question / the spoken answer | To answer you | Processed on-device (AICore / a locally-run model). Recent answers from the current trip are kept in memory for continuity and cleared when the app stops. |
+| Your question / the spoken answer | To answer you | Processed on-device (AICore / a locally-run model). |
+| Conversation history and things you tell RoadMate to remember ("recuerda que…", places you search for) | So replies build on what was just said and match what you've told it | Stored locally in an on-device database (Room). Never transmitted. History older than a week is deleted automatically; "olvida lo de…" drops a remembered preference. |
 | Approximate & precise location | Trip context for answers, centring the map, and biasing a "find a petrol station" search | Stays on-device, **except** it is sent to the weather provider when the weather feature is enabled (see below). |
 | Contacts | To turn "call Ana" into a phone number | Read locally at the moment you ask. Not uploaded, not stored by RoadMate. |
 | Onboarding state, the date of the last daily greeting, and your answer-length preference | So the intro/greeting show once and answers match how you like them | Stored locally (Android DataStore). Never transmitted. |

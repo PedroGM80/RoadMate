@@ -32,8 +32,13 @@ builds without a `google-services.json` have no crash reporting.
   app that isn't installed gets a spoken explanation.
 - **"Respuestas cortas" / "con más detalle" / "normales"** — RoadMate
   remembers how long you like answers (across trips) and shapes every
-  Gemini reply to match. The first bit of it adapting to you rather than
-  answering everyone the same.
+  Gemini reply to match.
+- **It remembers.** Replies build on the last few things said this trip.
+  **"Recuerda que no me gustan las autovías"**, **"prefiero las
+  nacionales"** → stored on-device and fed into every future answer;
+  **"olvida lo de…"** drops it, **"¿qué sabes de mí?"** reads it back.
+  Places you search for build up as context too. All of it in a local
+  database, nothing sent anywhere.
 - **In-app map ("Mapa" tab).** A real vector map (MapLibre + OpenFreeMap,
   OpenStreetMap data, no API key) showing your position. **"Descargar esta
   zona"** saves the visible area so the map keeps working with no
@@ -113,7 +118,8 @@ Dependency injection is Hilt end to end (`@HiltAndroidApp`, `@AndroidEntryPoint`
   vendored as `<vector>` drawables (`app/.../res/drawable/lucide_ic_*`, see
   `third_party/lucide/`) instead of a dependency; no Material Icons artifact
 - Retrofit/Moshi/OkHttp — the one optional network call, for weather
-- DataStore Preferences — onboarding persistence
+- DataStore Preferences — onboarding + answer-style persistence
+- Room — the on-device memory DB (conversation history + driver facts)
 - `androidx.car.app` — Android Auto integration
 - Firebase Crashlytics — optional, opt-in via `app/google-services.json`;
   crash diagnostics only, no Analytics

@@ -33,19 +33,23 @@ commitment, just a starting point for the next session. See
 - **Adapt to the driver (continued).** Real weight-level learning isn't on
   the table — AICore is frozen, MediaPipe LLM Inference is inference-only,
   and anything server-side breaks the "nothing leaves the phone" stance.
-  What fits, roughly in order of value:
-  - *On-device memory.* `Room` is a dependency and sits unused. A local
-    store of durable facts (home/work, frequent destinations, stated
-    likes/dislikes, names/relationships from past chats) fed into
-    `PromptBuilder`. Also: `TravelContext.lastResponses` is currently just
-    the single last response — real in-trip continuity needs it to
-    accumulate.
-  - *STT vocabulary.* Vosk takes a phrase-list grammar at `Recognizer(...)`
-    construction; feeding it contact names + frequent place names sharply
-    improves recognition of exactly those.
+  Shipped so far: `RoadMateDatabase` (Room), conversation-history continuity,
+  `PREFERENCE` facts ("recuerda que…"), and `PLACE` facts from map searches —
+  all folded into the prompt. Still open:
+  - *HOME / WORK / RELATIONSHIP facts.* "esta es mi casa" (store current
+    location), "el trabajo es aquí", "X es mi hermano" → then "llama a mi
+    hermano" resolves through memory before hitting contacts by literal name.
+  - *FTS recall.* Room FTS4/5 over `trip_exchange` + `user_fact` so "¿qué te
+    dije sobre el hotel de Ronda?" works. No embeddings/vector DB needed at
+    this data scale — a phrase match covers it.
+  - *Capture from the map's own nav button*, not just voice "busca X".
+    Normalise place strings instead of storing raw queries.
+  - *Instrumented DAO test* — the Room layer is only exercised via fakes.
+  - *STT vocabulary.* Vosk takes a phrase-list grammar at `Recognizer(...)`;
+    feeding it contact names + frequent place names sharply improves
+    recognition of exactly those.
   - *Feedback → few-shot.* Let the driver react ("más corto", "no era eso");
-    store corrections locally and prepend a couple as guidance. The
-    answer-length preference (already shipped) is the first slice of this.
+    store corrections locally and prepend a couple as guidance.
   - *Better base model (build-time).* `LOCAL_AI_MODEL_URL` is overridable —
     LoRA-finetune Qwen2.5-0.5B on a driving-assistant set offline, merge,
     convert to `.task`, ship that URL.

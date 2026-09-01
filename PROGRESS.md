@@ -57,9 +57,17 @@ without reading the full git log.
   saved int). Not checked on a real tablet/foldable.
 - **Answer-length preference** (build- & unit-verified): "respuestas cortas /
   con más detalle / normales" persists an `AnswerStyle` in DataStore, and
-  `PromptBuilder` folds it into every Gemini prompt. First step of "adapt to
-  this driver" — see FUTURE.md for where that goes (on-device memory, STT
-  vocab from contacts, feedback → few-shot).
+  `PromptBuilder` folds it into every Gemini prompt.
+- **On-device memory** (build- & unit-verified; DAO not instrumented-tested):
+  new `RoadMateDatabase` (Room, in `:data` — the dep moved from `:app` where
+  it was unused). `GenerateResponseUseCase` now (a) gives real questions the
+  last few Q&A exchanges for continuity and records the new pair, (b) takes
+  "recuerda que… / prefiero… / olvida lo de… / ¿qué sabes de mí?" as
+  PREFERENCE facts, (c) bumps a PLACE fact on every "busca X". Preferences
+  and frequent places are folded into every Gemini prompt. Replaces the
+  vestigial `TravelContext.lastResponses`. Still to do: HOME/WORK/
+  RELATIONSHIP facts, FTS free-text recall, capture from the map's own nav
+  button, an instrumented DAO test.
 - **Location + weather context**: `LocationRepository` (FusedLocationProvider)
   feeds `TravelContext`; weather is the one optional network call, disclosed
   on first run. `refreshLocation()` times out via
