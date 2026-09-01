@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.annotation.UiThread
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.pgm.roadmate.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -93,7 +94,7 @@ class OfflineMapManager @Inject constructor(
 
                 override fun onError(error: String) {
                     Log.w(TAG, "createOfflineRegion: $error")
-                    _status.value = OfflineMapStatus.Failed("No se pudo iniciar la descarga.")
+                    _status.value = OfflineMapStatus.Failed(R.string.map_offline_error_start)
                 }
             },
         )
@@ -116,14 +117,14 @@ class OfflineMapManager @Inject constructor(
 
             override fun onError(error: OfflineRegionError) {
                 Log.w(TAG, "offline region error: ${error.reason} ${error.message}")
-                _status.value = OfflineMapStatus.Failed("Fallo al descargar la zona.")
+                _status.value = OfflineMapStatus.Failed(R.string.map_offline_error_download)
             }
 
             override fun mapboxTileCountLimitExceeded(limit: Long) {
                 region.setDownloadState(OfflineRegion.STATE_INACTIVE)
                 activeRegion = null
                 _status.value =
-                    OfflineMapStatus.Failed("La zona es demasiado grande. Aleja el mapa e inténtalo otra vez.")
+                    OfflineMapStatus.Failed(R.string.map_offline_error_too_big)
             }
         }
 

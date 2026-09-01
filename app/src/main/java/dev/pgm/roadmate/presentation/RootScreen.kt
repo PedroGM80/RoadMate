@@ -17,6 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.window.core.layout.WindowSizeClass
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.presentation.map.MapScreen
@@ -56,13 +57,13 @@ fun RootScreen(
                 selected = tab == 0,
                 onClick = { tab = 0 },
                 icon = { Icon(painterResource(R.drawable.lucide_ic_mic), contentDescription = null) },
-                label = { Text("Voz") },
+                label = { Text(stringResource(R.string.tab_voice)) },
             )
             item(
                 selected = tab == 1,
                 onClick = { tab = 1 },
                 icon = { Icon(painterResource(R.drawable.lucide_ic_map), contentDescription = null) },
-                label = { Text("Mapa") },
+                label = { Text(stringResource(R.string.tab_map)) },
             )
         },
     ) {

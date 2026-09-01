@@ -1,5 +1,7 @@
 package dev.pgm.roadmate.presentation.map
 
+import androidx.annotation.StringRes
+
 /**
  * State of the downloaded-for-offline map area(s), surfaced on [MapScreen].
  */
@@ -17,8 +19,8 @@ sealed interface OfflineMapStatus {
     /** At least one area is saved and usable without a connection. */
     data class Ready(val regionCount: Int) : OfflineMapStatus
 
-    /** The download failed; [message] is user-facing Spanish text. */
-    data class Failed(val message: String) : OfflineMapStatus
+    /** The download failed; [messageRes] is the user-facing explanation. */
+    data class Failed(@StringRes val messageRes: Int) : OfflineMapStatus
 }
 
 /**

@@ -1,3 +1,61 @@
 <resources>
     <string name="app_name">RoadMate</string>
+
+    <!-- Navigation -->
+    <string name="tab_voice">Voz</string>
+    <string name="tab_map">Mapa</string>
+
+    <!-- Home -->
+    <string name="home_tagline">Tu copiloto de viaje, 100% en tu móvil.</string>
+    <string name="home_prompt_idle">Pulsa el micrófono y pregunta.</string>
+    <string name="home_listening">Escuchando…</string>
+    <string name="home_recognized_quote">Tú: “%1$s”</string>
+    <string name="home_state_listening">Escuchando…</string>
+    <string name="home_state_processing">Procesando…</string>
+    <string name="home_state_speaking">Respondiendo</string>
+
+    <!-- Mic button -->
+    <string name="mic_start">Escuchar</string>
+    <string name="mic_stop">Detener</string>
+
+    <!-- Local-AI status -->
+    <string name="ai_ready">IA local activa</string>
+    <string name="ai_checking">Comprobando IA local…</string>
+    <string name="ai_preparing_download">Modo básico · preparando descarga de IA local…</string>
+    <string name="ai_downloading">Descargando IA local… %1$d %%</string>
+    <string name="ai_waiting_wifi">IA local · se descargará al conectar a Wi-Fi</string>
+    <string name="ai_download_failed">No se pudo descargar la IA local</string>
+    <string name="ai_unavailable">Modo básico · sin IA local en este dispositivo</string>
+    <string name="action_retry">Reintentar</string>
+
+    <!-- Location chip -->
+    <string name="location_coords">%1$.4f, %2$.4f</string>
+    <string name="location_unavailable">Ubicación no disponible · toca para reintentar</string>
+    <string name="location_searching">Buscando ubicación…</string>
+
+    <!-- Permissions -->
+    <string name="permission_rationale">RoadMate necesita el micrófono y la ubicación para responder tus preguntas.</string>
+    <string name="permission_request">Concede permisos de micrófono y ubicación para empezar.</string>
+    <string name="permission_grant">Conceder permisos</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_value_privacy">Tu voz y tus preguntas nunca salen del móvil. Solo el tiempo necesita internet, y es opcional.</string>
+    <string name="onboarding_value_rest">Vigila los silencios largos y te sugiere parar a descansar, sin que se lo pidas.</string>
+    <string name="onboarding_disclaimer">RoadMate no sustituye tu atención a la carretera. Úsalo solo cuando sea seguro hacerlo.</string>
+    <string name="onboarding_continue">Entendido, empezar</string>
+
+    <!-- Map -->
+    <string name="map_poi_fuel">Gasolineras</string>
+    <string name="map_poi_hotel">Hoteles</string>
+    <string name="map_poi_food">Comida</string>
+    <string name="map_poi_fallback_name">Sitio</string>
+    <string name="map_download_area">Descargar esta zona</string>
+    <string name="map_navigate">Ir con Google Maps</string>
+    <string name="map_close">Cerrar</string>
+    <string name="map_offline_idle">Mapa online · pulsa “Descargar esta zona” para usarlo sin conexión</string>
+    <string name="map_offline_downloading">Descargando mapa offline… %1$d %%</string>
+    <string name="map_offline_ready">Mapa offline listo</string>
+    <string name="map_offline_error_start">No se pudo iniciar la descarga.</string>
+    <string name="map_offline_error_download">Fallo al descargar la zona.</string>
+    <string name="map_offline_error_too_big">La zona es demasiado grande. Aleja el mapa e inténtalo otra vez.</string>
 </resources>

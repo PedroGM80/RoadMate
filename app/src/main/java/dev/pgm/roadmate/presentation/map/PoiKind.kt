@@ -1,6 +1,8 @@
 package dev.pgm.roadmate.presentation.map
 
 import androidx.annotation.ColorInt
+import androidx.annotation.StringRes
+import dev.pgm.roadmate.R
 
 /**
  * The POI categories the in-app map can pin. Matching is done against the
@@ -8,11 +10,11 @@ import androidx.annotation.ColorInt
  * (OpenMapTiles / OpenFreeMap schema) — no network, no places API.
  */
 enum class PoiKind(
-    val label: String,
+    @StringRes val labelRes: Int,
     val classes: Set<String>,
     @ColorInt val tint: Int,
 ) {
-    FUEL("Gasolineras", setOf("fuel"), 0xFF2E7D32.toInt()),
-    HOTEL("Hoteles", setOf("hotel", "hostel", "motel", "guest_house"), 0xFF1565C0.toInt()),
-    FOOD("Comida", setOf("restaurant", "fast_food", "cafe", "bar", "pub", "food_court"), 0xFFE65100.toInt()),
+    FUEL(R.string.map_poi_fuel, setOf("fuel"), 0xFF2E7D32.toInt()),
+    HOTEL(R.string.map_poi_hotel, setOf("hotel", "hostel", "motel", "guest_house"), 0xFF1565C0.toInt()),
+    FOOD(R.string.map_poi_food, setOf("restaurant", "fast_food", "cafe", "bar", "pub", "food_court"), 0xFFE65100.toInt()),
 }

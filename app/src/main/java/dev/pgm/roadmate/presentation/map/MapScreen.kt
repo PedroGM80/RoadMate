@@ -38,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -141,7 +142,7 @@ fun MapScreen(
                 FilterChip(
                     selected = poiFilter == kind,
                     onClick = { viewModel.togglePoiFilter(kind) },
-                    label = { Text(kind.label) },
+                    label = { Text(stringResource(kind.labelRes)) },
                 )
             }
         }
@@ -155,13 +156,13 @@ fun MapScreen(
                 )
             },
             icon = { Icon(painterResource(R.drawable.lucide_ic_download), contentDescription = null) },
-            text = { Text("Descargar esta zona") },
+            text = { Text(stringResource(R.string.map_download_area)) },
             modifier = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 20.dp),
         )
 
         selectedPoi?.let { (name, latLng) ->
             PoiSheet(
-                name = name.ifBlank { "Sitio" },
+                name = name.ifBlank { stringResource(R.string.map_poi_fallback_name) },
                 onNavigate = {
                     viewModel.recordVisit(name)
                     launchNavigation(context, name, latLng)
@@ -178,10 +179,11 @@ fun MapScreen(
 private fun OfflineStatusChip(status: OfflineMapStatus, modifier: Modifier = Modifier) {
     val text = when (status) {
         OfflineMapStatus.Unknown -> return
-        OfflineMapStatus.Idle -> "Mapa online · pulsa “Descargar esta zona” para usarlo sin conexión"
-        is OfflineMapStatus.Downloading -> "Descargando mapa offline... ${(status.progress * 100).toInt()} %"
-        is OfflineMapStatus.Ready -> "Mapa offline listo"
-        is OfflineMapStatus.Failed -> status.message
+        OfflineMapStatus.Idle -> stringResource(R.string.map_offline_idle)
+        is OfflineMapStatus.Downloading ->
+            stringResource(R.string.map_offline_downloading, (status.progress * 100).toInt())
+        is OfflineMapStatus.Ready -> stringResource(R.string.map_offline_ready)
+        is OfflineMapStatus.Failed -> stringResource(status.messageRes)
     }
     Surface(
         modifier = modifier,
@@ -227,8 +229,8 @@ private fun PoiSheet(
             Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onNavigate) { Text("Ir con Google Maps") }
-                TextButton(onClick = onDismiss) { Text("Cerrar") }
+                Button(onClick = onNavigate) { Text(stringResource(R.string.map_navigate)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.map_close)) }
             }
         }
     }
