@@ -3,6 +3,7 @@ package dev.pgm.roadmate.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
@@ -22,8 +23,15 @@ class SettingsViewModel @Inject constructor(
     val theme: StateFlow<ThemePreference> = preferences.themePreference
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemePreference.DEFAULT)
 
+    val answerStyle: StateFlow<AnswerStyle> = preferences.answerStyle
+        .stateIn(viewModelScope, SharingStarted.Eagerly, AnswerStyle.DEFAULT)
+
     fun setTheme(preference: ThemePreference) {
         viewModelScope.launch { preferences.setThemePreference(preference) }
+    }
+
+    fun setAnswerStyle(style: AnswerStyle) {
+        viewModelScope.launch { preferences.setAnswerStyle(style) }
     }
 
     fun clearMemory() {

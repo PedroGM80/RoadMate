@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import dev.pgm.roadmate.R
+import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.presentation.map.MapScreen
 import dev.pgm.roadmate.presentation.map.MapViewModel
@@ -60,6 +61,7 @@ fun RootScreen(
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val theme by settingsViewModel.theme.collectAsState()
+    val answerStyle by settingsViewModel.answerStyle.collectAsState()
 
     @Suppress("DEPRECATION")
     val dualPane = currentWindowAdaptiveInfo().windowSizeClass
@@ -91,6 +93,8 @@ fun RootScreen(
                         SettingsMenu(
                             theme = theme,
                             onThemeChange = settingsViewModel::setTheme,
+                            answerStyle = answerStyle,
+                            onAnswerStyleChange = settingsViewModel::setAnswerStyle,
                             onClearMemory = settingsViewModel::clearMemory,
                         )
                     },
@@ -120,25 +124,30 @@ fun RootScreen(
 private fun SettingsMenu(
     theme: ThemePreference,
     onThemeChange: (ThemePreference) -> Unit,
+    answerStyle: AnswerStyle,
+    onAnswerStyleChange: (AnswerStyle) -> Unit,
     onClearMemory: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    val close = { open = false }
 
     IconButton(onClick = { open = true }) {
         Icon(painterResource(R.drawable.lucide_ic_settings), contentDescription = stringResource(R.string.settings))
     }
-    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-        Text(
-            stringResource(R.string.settings_theme_header),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-        ThemeItem(ThemePreference.SYSTEM, R.string.theme_system, theme, onThemeChange) { open = false }
-        ThemeItem(ThemePreference.LIGHT, R.string.theme_light, theme, onThemeChange) { open = false }
-        ThemeItem(ThemePreference.DARK, R.string.theme_dark, theme, onThemeChange) { open = false }
-        ThemeItem(ThemePreference.AUTO, R.string.theme_auto, theme, onThemeChange) { open = false }
+    DropdownMenu(expanded = open, onDismissRequest = close) {
+        MenuHeader(R.string.settings_theme_header)
+        RadioItem(ThemePreference.SYSTEM, R.string.theme_system, theme, onThemeChange, close)
+        RadioItem(ThemePreference.LIGHT, R.string.theme_light, theme, onThemeChange, close)
+        RadioItem(ThemePreference.DARK, R.string.theme_dark, theme, onThemeChange, close)
+        RadioItem(ThemePreference.AUTO, R.string.theme_auto, theme, onThemeChange, close)
+
+        HorizontalDivider()
+        MenuHeader(R.string.settings_answers_header)
+        RadioItem(AnswerStyle.BRIEF, R.string.answer_brief, answerStyle, onAnswerStyleChange, close)
+        RadioItem(AnswerStyle.NORMAL, R.string.answer_normal, answerStyle, onAnswerStyleChange, close)
+        RadioItem(AnswerStyle.DETAILED, R.string.answer_detailed, answerStyle, onAnswerStyleChange, close)
+
         HorizontalDivider()
         DropdownMenuItem(
             text = { Text(stringResource(R.string.clear_memory), color = MaterialTheme.colorScheme.error) },
@@ -164,11 +173,21 @@ private fun SettingsMenu(
 }
 
 @Composable
-private fun ThemeItem(
-    value: ThemePreference,
+private fun MenuHeader(labelRes: Int) {
+    Text(
+        stringResource(labelRes),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun <T> RadioItem(
+    value: T,
     labelRes: Int,
-    current: ThemePreference,
-    onChange: (ThemePreference) -> Unit,
+    current: T,
+    onChange: (T) -> Unit,
     close: () -> Unit,
 ) {
     DropdownMenuItem(
