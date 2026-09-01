@@ -91,7 +91,9 @@ without reading the full git log.
 - **Voice UX polish** (build-verified): a synthesised two-note earcon
   (`Earcon`, no bundled asset) on mic start/stop instead of the generic
   `ToneGenerator` beep; a same-session follow-up for an ambiguous "llama a
-  X" ("la segunda" / a surname), state kept in `GenerateResponseUseCase`.
+  X" ("la segunda" / a surname), state kept in `GenerateResponseUseCase`;
+  a Quick Settings tile ("Preguntar a RoadMate") that opens straight into
+  listening via `MainActivity.EXTRA_START_LISTENING`.
 - **Rest reminders**: `SilenceDetectionForegroundService` +
   `AudioLevelDetector` detect long silences and speak a reminder in the
   background. Verified live via logcat/dumpsys — clean foreground-service
@@ -183,3 +185,8 @@ without reading the full git log.
   separately in `:domain/src/test` and `:app/src/test` (module test sources
   aren't cross-visible without a testFixtures setup, judged not worth the
   extra Gradle wiring for this size of project).
+- **Spanish only.** Not a gap — the voice model (Vosk ES), the assistant's
+  tone, the joke bank and every intent regex are Spanish, and the target
+  user is Spanish-speaking. UI strings are in `strings.xml` so a `values-xx/`
+  is cheap later, but a real other-language experience needs the whole voice
+  layer and isn't planned.

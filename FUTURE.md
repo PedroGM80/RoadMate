@@ -40,13 +40,9 @@ commitment, just a starting point for the next session. See
   - *Better base model (build-time).* `LOCAL_AI_MODEL_URL` is overridable —
     LoRA-finetune Qwen2.5-0.5B on a driving-assistant set offline, merge,
     convert to `.task`, ship that URL.
-- **Quick Settings Tile / home screen widget.** A one-tap "ask RoadMate"
-  entry point without opening the app first. Real effort (new Android
-  surface, its own lifecycle), but a plausible retention lever.
-- **Multi-language support.** Everything — prompts, fixed phrases, jokes,
-  UI copy — is Spanish-only right now. Would need `PromptBuilder`,
-  `Constants`, `JokeProvider`, `CallIntentParser`/`MapSearchIntentParser`'s
-  regexes, and every Compose string reworked for locale awareness.
+- **Home screen widget.** The Quick Settings tile ("Preguntar a RoadMate")
+  now exists; a resizable home-screen widget with the same one-tap-to-listen
+  action would reach users who don't use the QS panel.
 - **Accessibility audit beyond the current pass.** TalkBack live regions
   and merged semantics exist on the core screens, and the design pass added
   reduce-motion handling + 48dp targets, but there's been no dedicated
