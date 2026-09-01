@@ -7,9 +7,12 @@ commitment, just a starting point for the next session. See
 
 ## Quick wins (small effort, real impact)
 
-- **Wider `MapSearchIntentParser` coverage.** The obvious false positive
-  ("busca información sobre…" → Maps) is now guarded and there's a test
-  file, but it's still hand-written regex; revisit against real phrasing.
+- **Wider `MapSearchIntentParser` coverage.** Now handles navigation
+  phrasings ("llévame a…", "cómo llego a…", "guíame hasta…") separately from
+  the "busca/encuentra/dónde hay/dónde está/hay alguna" find family, strips
+  more proximity filler ("por aquí", "en la zona", bare "cercana"), and the
+  fact-lookup guard covers "quién/cuánto/cuándo/qué significa". Still
+  hand-written regex — revisit against real spoken phrasing on a device.
 - **Contact follow-up: label-aware.** The same-session follow-up handles
   ordinals ("la segunda") and name words ("García"), but not "la de
   trabajo" / "la del móvil" — `ContactMatch` carries no label/type. Add the
