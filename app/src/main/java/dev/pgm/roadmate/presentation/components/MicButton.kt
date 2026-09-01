@@ -1,7 +1,5 @@
 package dev.pgm.roadmate.presentation.components
 
-import android.media.AudioManager
-import android.media.ToneGenerator
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -43,6 +41,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.pgm.roadmate.R
+import dev.pgm.roadmate.audio.Earcon
 import dev.pgm.roadmate.ui.theme.Spacing
 
 /**
@@ -60,10 +59,8 @@ fun MicButton(
     reduceMotion: Boolean = false,
 ) {
     val haptics = LocalHapticFeedback.current
-    val toneGenerator = remember {
-        runCatching { ToneGenerator(AudioManager.STREAM_NOTIFICATION, 70) }.getOrNull()
-    }
-    DisposableEffect(Unit) { onDispose { toneGenerator?.release() } }
+    val earcon = remember { Earcon() }
+    DisposableEffect(Unit) { onDispose { earcon.release() } }
 
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
@@ -101,10 +98,7 @@ fun MicButton(
                     haptics.performHapticFeedback(
                         if (isListening) HapticFeedbackType.ToggleOff else HapticFeedbackType.ToggleOn,
                     )
-                    toneGenerator?.startTone(
-                        if (isListening) ToneGenerator.TONE_PROP_BEEP2 else ToneGenerator.TONE_PROP_BEEP,
-                        120,
-                    )
+                    if (isListening) earcon.stop() else earcon.start()
                     onClick()
                 },
                 shape = CircleShape,
