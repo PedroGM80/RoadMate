@@ -22,3 +22,5 @@ local.properties
 # own to turn Crashlytics on; its absence just disables Firebase (see
 # app/build.gradle.kts).
 /app/google-services.json
+
+.idea/

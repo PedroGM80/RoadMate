@@ -2,6 +2,7 @@ package dev.pgm.roadmate.data.repository
 
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.repository.GeminiRepository
+import dev.pgm.roadmate.ml.DebugTrace
 import dev.pgm.roadmate.ml.GeminiNanoManager
 import dev.pgm.roadmate.ml.LocalAiModelManager
 import dev.pgm.roadmate.ml.LocalLlmManager
@@ -31,7 +32,10 @@ class GeminiRepositoryImpl @Inject constructor(
     private val responseCache = mutableMapOf<String, String>()
 
     override suspend fun getResponse(prompt: String): String {
-        responseCache[prompt]?.let { return it }
+        responseCache[prompt]?.let {
+            DebugTrace.log("GEMINI cache hit")
+            return it
+        }
         val response = generate(prompt)
         responseCache[prompt] = response
         return response
@@ -39,10 +43,15 @@ class GeminiRepositoryImpl @Inject constructor(
 
     private suspend fun generate(prompt: String): String {
         if (geminiNanoManager.checkAvailability()) {
+            DebugTrace.log("GEMINI backend = AICore/Nano")
             return geminiNanoManager.generateResponse(prompt)
         }
         if (localLlmManager.isReady()) {
+            DebugTrace.log("GEMINI backend = LocalLlm (downloaded model)")
             localLlmManager.generateResponse(prompt)?.let { return it }
+            DebugTrace.log("GEMINI LocalLlm returned null -> FALLBACK")
+        } else {
+            DebugTrace.log("GEMINI backend = FALLBACK (no AICore, model not ready)")
         }
         return GeminiNanoManager.FALLBACK_RESPONSE
     }

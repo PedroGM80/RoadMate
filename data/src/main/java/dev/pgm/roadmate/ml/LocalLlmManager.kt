@@ -9,6 +9,7 @@ import dev.pgm.roadmate.utils.Constants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,6 +36,12 @@ class LocalLlmManager @Inject constructor(
 
     @Volatile
     private var engine: LlmInference? = null
+
+    init {
+        DebugTrace.init(File(context.filesDir, "aicore_debug.log"))
+    }
+
+    private fun dbg(line: String) = DebugTrace.log("LLM $line")
 
     private fun obtainEngine(): LlmInference? {
         engine?.let { return it }
@@ -67,19 +74,51 @@ class LocalLlmManager @Inject constructor(
                         .build()
                 )
                 try {
-                    session.addQueryChunk(prompt)
-                    session.generateResponse()
+                    // Keep MediaPipe's native tokenizer away from control
+                    // chars and pathological lengths — a garbage/huge prompt
+                    // has crashed nativePredictSync with a JNI abort on-device.
+                    // The .task bundle applies its own chat template, so send
+                    // clean plain text, not hand-rolled ChatML markers.
+                    val safe = prompt
+                        .replace(Regex("[\\p{Cntrl}&&[^\n]]"), " ")
+                        .take(MAX_PROMPT_CHARS)
+                    dbg("PROMPT (${safe.length} chars) >>>\n$safe")
+                    session.addQueryChunk(safe)
+                    val t0 = System.currentTimeMillis()
+                    session.generateResponse().fixMojibake().also {
+                        dbg("RESPONSE (${System.currentTimeMillis() - t0} ms) <<< \"$it\"")
+                    }
                 } finally {
                     session.close()
                 }
-            }.onFailure { Log.w(TAG, "generateResponse failed", it) }.getOrNull()
+            }.onFailure {
+                Log.w(TAG, "generateResponse failed", it)
+                dbg("generateResponse FAILED: ${it.stackTraceToString()}")
+            }.getOrNull()
         }?.takeIf { it.isNotBlank() }
+    }
+
+    /**
+     * MediaPipe `tasks-genai` hands back the model's UTF-8 output decoded as
+     * Latin-1, so "kilómetros" arrives as "kilÃ³metros". If the string carries
+     * that signature, round-trip the bytes back through UTF-8.
+     */
+    private fun String?.fixMojibake(): String? {
+        val s = this ?: return null
+        if (!s.contains('Ã') && !s.contains('Â')) return s
+        return runCatching {
+            String(s.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
+        }.getOrDefault(s)
     }
 
     private companion object {
         const val MAX_TOKENS = 512
         const val TOP_K = 40
         const val TEMPERATURE = 0.2f
+
+        /** Hard ceiling on prompt length fed to the native engine. Well under
+         *  the model's KV window; PromptBuilder already caps to a similar size. */
+        const val MAX_PROMPT_CHARS = 1400
         const val TAG = "LocalLlmManager"
     }
 }

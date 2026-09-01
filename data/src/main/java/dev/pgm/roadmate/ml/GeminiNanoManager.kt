@@ -1,11 +1,13 @@
 package dev.pgm.roadmate.ml
 
 import android.content.Context
+import android.util.Log
 import com.google.ai.edge.aicore.GenerativeModel
 import com.google.ai.edge.aicore.generationConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.utils.Constants
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,6 +22,12 @@ import javax.inject.Singleton
  */
 @Singleton
 class GeminiNanoManager @Inject constructor(@ApplicationContext context: Context) {
+
+    init {
+        DebugTrace.init(File(context.filesDir, "aicore_debug.log"))
+    }
+
+    private fun dbg(line: String) = DebugTrace.log("NANO $line")
 
     private val model: GenerativeModel by lazy {
         GenerativeModel(
@@ -36,9 +44,14 @@ class GeminiNanoManager @Inject constructor(@ApplicationContext context: Context
     private var lastKnownAvailable: Boolean? = null
 
     suspend fun generateResponse(prompt: String): String {
+        dbg("PROMPT >>>\n$prompt")
         val response = withTimeoutOrNull(Constants.GEMINI_TIMEOUT_MS) {
-            runCatching { model.generateContent(prompt).text }.getOrNull()
+            runCatching { model.generateContent(prompt).text }
+                .onFailure { dbg("generateContent FAILED: ${it.stackTraceToString()}") }
+                .getOrNull()
         }
+        dbg("RAW RESPONSE <<< ${response?.let { "\"$it\"" } ?: "null (timeout/exception)"}")
+        Log.d(TAG, "RAW RESPONSE <<<\n$response")
         lastKnownAvailable = response != null
         return response?.takeIf { it.isNotBlank() } ?: FALLBACK_RESPONSE
     }
@@ -54,12 +67,17 @@ class GeminiNanoManager @Inject constructor(@ApplicationContext context: Context
     suspend fun checkAvailability(): Boolean {
         lastKnownAvailable?.let { return it }
         val probe = withTimeoutOrNull(Constants.GEMINI_TIMEOUT_MS) {
-            runCatching { model.generateContent("ok").text }.getOrNull()
+            runCatching { model.generateContent("ok").text }
+                .onFailure { dbg("PROBE FAILED: ${it.stackTraceToString()}") }
+                .getOrNull()
         }
+        dbg("PROBE 'ok' -> ${probe?.let { "\"$it\"" } ?: "null"}")
         return (probe != null).also { lastKnownAvailable = it }
     }
 
     companion object {
+        private const val TAG = "GeminiNanoManager"
+
         /** Shared with [dev.pgm.roadmate.data.repository.GeminiRepositoryImpl]
          *  as the last-resort "modo básico" answer when no local backend
          *  (AICore or the downloaded model) can respond. */

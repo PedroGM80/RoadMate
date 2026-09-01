@@ -49,6 +49,7 @@ class VoskSpeechRecognizer @Inject constructor(
     private var model: Model? = null
 
     init {
+        DebugTrace.init(File(context.filesDir, "aicore_debug.log"))
         // Warm the model so the first mic tap isn't a 1–2 s cold load.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { runCatching { loadModel() } }
     }
@@ -62,31 +63,41 @@ class VoskSpeechRecognizer @Inject constructor(
         }
 
         carMicrophonePreference.preferCarMicrophoneIfAvailable()
+        val startedAt = System.currentTimeMillis()
+        DebugTrace.log("STT listening…")
 
         val recognizer = Recognizer(loadedModel, SAMPLE_RATE)
         val listener = object : RecognitionListener {
             override fun onPartialResult(hypothesis: String?) {
                 val text = hypothesis.field("partial")
-                if (text.isNotBlank()) trySend(SpeechRecognitionEvent.Partial(text))
+                if (text.isNotBlank()) {
+                    DebugTrace.log("STT partial: \"$text\"")
+                    trySend(SpeechRecognitionEvent.Partial(text))
+                }
             }
 
             override fun onResult(hypothesis: String?) {
-                trySend(SpeechRecognitionEvent.Result(hypothesis.field("text")))
+                val text = hypothesis.field("text")
+                DebugTrace.log("STT RESULT (${System.currentTimeMillis() - startedAt} ms): \"$text\"")
+                trySend(SpeechRecognitionEvent.Result(text))
                 close()
             }
 
             override fun onFinalResult(hypothesis: String?) {
                 val text = hypothesis.field("text")
+                DebugTrace.log("STT finalResult: \"$text\"")
                 if (trySend(SpeechRecognitionEvent.Result(text)).isSuccess) close()
             }
 
             override fun onError(exception: Exception?) {
                 Log.w(TAG, "recognition error", exception)
+                DebugTrace.log("STT error: ${exception?.message}")
                 trySend(SpeechRecognitionEvent.Failed(SpokenText.SPEECH_FLOW_ERROR))
                 close()
             }
 
             override fun onTimeout() {
+                DebugTrace.log("STT timeout (no speech)")
                 trySend(SpeechRecognitionEvent.Result(""))
                 close()
             }

@@ -21,9 +21,22 @@ import java.util.Locale
  */
 object PromptBuilder {
 
-    private const val MAX_EXCHANGES = 3
+    private const val MAX_EXCHANGES = 2
     private const val MAX_FIELD_CHARS = 200
     private const val MAX_EXCHANGE_CHARS = 160
+
+    /**
+     * Only worth spending prompt budget on past turns when the question can't
+     * stand alone. A small model given unrelated history tends to answer the
+     * old question instead of the new one, so a self-contained question like
+     * "¿cuál es la capital de Francia?" gets no history at all.
+     */
+    private val FOLLOW_UP = Regex(
+        """\b(?:eso|esa|ese|esos|esas|est[oae]s?|aquell[oa]s?|ah[ií]|all[ií]|""" +
+            """s[ií]|no|vale|y\s|entonces|tambi[eé]n|otra|otro|m[aá]s|repite|repítelo|""" +
+            """por\s+qu[eé]|cu[aá]l\s+de|el\s+primero|el\s+segundo|la\s+primera|la\s+segunda)\b""",
+        RegexOption.IGNORE_CASE,
+    )
 
     fun buildPrompt(
         context: TravelContext,
@@ -67,9 +80,9 @@ object PromptBuilder {
 
             val exchanges = recentExchanges.takeLast(MAX_EXCHANGES)
                 .filter { it.question.isNotBlank() || it.answer.isNotBlank() }
-            if (exchanges.isNotEmpty()) {
+            if (exchanges.isNotEmpty() && FOLLOW_UP.containsMatchIn(question)) {
                 appendLine()
-                appendLine("Conversación reciente:")
+                appendLine("Conversación reciente (solo como contexto, responde a la última pregunta):")
                 exchanges.forEach {
                     appendLine("- Conductor: ${it.question.oneLine(MAX_EXCHANGE_CHARS)}")
                     appendLine("- Tú: ${it.answer.oneLine(MAX_EXCHANGE_CHARS)}")

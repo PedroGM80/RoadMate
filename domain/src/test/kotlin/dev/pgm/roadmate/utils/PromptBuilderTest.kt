@@ -96,19 +96,37 @@ class PromptBuilderTest {
 
     @Test
     fun `omits the conversation section when there are no recent exchanges`() {
-        assertFalse(PromptBuilder.buildPrompt(context(), "hola").contains("Conversación reciente"))
+        assertFalse(PromptBuilder.buildPrompt(context(), "¿y eso?").contains("Conversación reciente"))
     }
 
     @Test
-    fun `includes only the last three exchanges`() {
-        val exchanges = listOf("uno", "dos", "tres", "cuatro").map { Exchange("p-$it", "r-$it") }
+    fun `includes history only for a follow-up question`() {
+        val exchanges = listOf("uno", "dos", "tres").map { Exchange("p-$it", "r-$it") }
 
-        val prompt = PromptBuilder.buildPrompt(context(), "hola", recentExchanges = exchanges)
+        val standalone = PromptBuilder.buildPrompt(
+            context(input = "¿cuál es la capital de Francia?"), "¿cuál es la capital de Francia?",
+            recentExchanges = exchanges,
+        )
+        val followUp = PromptBuilder.buildPrompt(
+            context(input = "¿y por qué?"), "¿y por qué?",
+            recentExchanges = exchanges,
+        )
+
+        assertFalse(standalone.contains("Conversación reciente"))
+        assertTrue(followUp.contains("Conversación reciente"))
+    }
+
+    @Test
+    fun `includes only the last two exchanges, and only on a follow-up`() {
+        val exchanges = listOf("uno", "dos", "tres").map { Exchange("p-$it", "r-$it") }
+
+        val prompt = PromptBuilder.buildPrompt(
+            context(input = "¿y eso?"), "¿y eso?", recentExchanges = exchanges,
+        )
 
         assertFalse(prompt.contains("p-uno"))
         assertTrue(prompt.contains("p-dos"))
         assertTrue(prompt.contains("r-tres"))
-        assertTrue(prompt.contains("p-cuatro"))
     }
 
     @Test
@@ -116,7 +134,7 @@ class PromptBuilderTest {
         val long = "x".repeat(400)
 
         val prompt = PromptBuilder.buildPrompt(
-            context(), "hola",
+            context(input = "¿y eso?"), "¿y eso?",
             recentExchanges = listOf(Exchange(long, long)),
         )
 
