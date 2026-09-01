@@ -281,4 +281,53 @@ class GenerateResponseUseCaseTest {
         assertEquals(listOf("gasolineras"), memory.frequentPlaces().map { it.value })
         assertTrue(gemini.lastPrompt!!.contains("gasolineras"))
     }
+
+    @Test
+    fun `esta es mi casa saves the current location as HOME`() = runTest {
+        val memory = FakeMemoryRepository()
+
+        val emitted = useCase(memoryRepository = memory)(context, "esta es mi casa").toList()
+
+        assertEquals(listOf(UserFact(FactType.HOME, value = "36.46,-6.19")), memory.facts(FactType.HOME))
+        assertTrue(emitted.first().contains("casa"))
+    }
+
+    @Test
+    fun `set home with no location explains instead of saving`() = runTest {
+        val memory = FakeMemoryRepository()
+        val noLocation = context.copy(currentLocation = null)
+
+        val emitted = useCase(memoryRepository = memory)(noLocation, "esta es mi casa").toList()
+
+        assertTrue(memory.facts(FactType.HOME).isEmpty())
+        assertTrue(emitted.first().contains("ubicación"))
+    }
+
+    @Test
+    fun `a relationship is stored and then resolves a call`() = runTest {
+        val memory = FakeMemoryRepository()
+        val phone = FakePhoneCallRepository(
+            lookupResult = ContactLookupResult.Found(ContactMatch("Juan", "600999888")),
+        )
+
+        useCase(memoryRepository = memory)(context, "Juan es mi hermano").toList()
+        val emitted = useCase(phoneCallRepository = phone, memoryRepository = memory)(
+            context, "llama a mi hermano",
+        ).toList()
+
+        assertEquals("600999888", phone.placedCallTo)
+        assertEquals(listOf("Llamando a Juan"), emitted)
+    }
+
+    @Test
+    fun `calling an unknown relationship asks to be taught first`() = runTest {
+        val phone = FakePhoneCallRepository()
+
+        val emitted = useCase(phoneCallRepository = phone, memoryRepository = FakeMemoryRepository())(
+            context, "llama a mi hermano",
+        ).toList()
+
+        assertEquals(null, phone.placedCallTo)
+        assertTrue(emitted.first().contains("No sé quién es tu hermano"))
+    }
 }

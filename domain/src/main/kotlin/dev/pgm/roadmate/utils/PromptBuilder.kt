@@ -21,6 +21,8 @@ object PromptBuilder {
         recentExchanges: List<Exchange> = emptyList(),
         driverPreferences: List<String> = emptyList(),
         frequentPlaces: List<String> = emptyList(),
+        home: String? = null,
+        work: String? = null,
     ): String {
         val location = context.currentLocation
             ?.let { "${it.first}, ${it.second}" }
@@ -47,6 +49,9 @@ object PromptBuilder {
             if (frequentPlaces.isNotEmpty()) {
                 appendLine("Sitios a los que suele ir: ${frequentPlaces.joinToString(", ")}.")
             }
+
+            if (home != null) appendLine("Casa del conductor (lat,lon): [$home]")
+            if (work != null) appendLine("Trabajo del conductor (lat,lon): [$work]")
 
             if (recentExchanges.isNotEmpty()) {
                 appendLine("Antes en esta conversación (para dar continuidad):")

@@ -27,7 +27,14 @@ class MemoryRepositoryImpl @Inject constructor(
     }
 
     override suspend fun remember(fact: UserFact) {
-        if (dao.findFact(fact.type.name, fact.value) != null) return
+        // Keyed facts (e.g. a relationship) are single-valued: replace any
+        // existing one for that key. Keyless facts just dedupe by value.
+        val key = fact.key
+        if (key != null) {
+            dao.deleteFactByKey(fact.type.name, key)
+        } else if (dao.findFact(fact.type.name, fact.value) != null) {
+            return
+        }
         dao.insertFact(
             UserFactEntity(
                 type = fact.type.name,

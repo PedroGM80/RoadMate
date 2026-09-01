@@ -166,6 +166,7 @@ class FakeMemoryRepository(
     private val placeHits = linkedMapOf<String, Int>()
 
     override suspend fun remember(fact: UserFact) {
+        if (fact.key != null) storedFacts.removeAll { it.type == fact.type && it.key == fact.key }
         if (storedFacts.none { it.type == fact.type && it.value == fact.value }) storedFacts += fact
     }
 

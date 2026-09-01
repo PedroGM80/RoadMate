@@ -43,9 +43,11 @@ import javax.inject.Inject
  *  5. "respuestas cortas / normales / con más detalle" — persists an
  *     [AssistantPreferencesRepository] setting and acknowledges it; that
  *     setting then shapes every future Gemini answer's length.
- *  6. "recuerda que…" / "prefiero…" / "olvida lo de…" / "¿qué sabes de mí?"
- *     — writes, drops, or reads back PREFERENCE facts in [MemoryRepository];
- *     stored preferences are fed into every future Gemini prompt.
+ *  6. Memory management — "recuerda que…" / "prefiero…" / "olvida lo de…" /
+ *     "¿qué sabes de mí?" (PREFERENCE facts), "esta es mi casa" / "aquí es
+ *     mi trabajo" (HOME/WORK, from the current location), "X es mi hermano"
+ *     (RELATIONSHIP, so "llama a mi hermano" then resolves to X). Everything
+ *     stored is fed into future Gemini prompts.
  * All of these work identically whether or not this device has on-device AI,
  * unlike every other question, which falls back to GeminiNanoManager's
  * generic FALLBACK_RESPONSE in "modo básico".
@@ -76,31 +78,51 @@ class GenerateResponseUseCase @Inject constructor(
             mediaApp != null -> handleMediaRequest(mediaApp)
             JokeProvider.matchesJokeIntent(userInput) -> JokeProvider.randomJoke()
             styleChange != null -> handleStyleChange(styleChange)
-            memoryCommand != null -> handleMemoryCommand(memoryCommand)
+            memoryCommand != null -> handleMemoryCommand(memoryCommand, context)
             else -> askGemini(context, userInput)
         }
         speechSynthesisRepository.speak(response)
         emit(response)
     }
 
-    private suspend fun handleMemoryCommand(command: MemoryCommandParser.Command): String =
-        when (command) {
-            is MemoryCommandParser.Command.Remember -> {
-                memoryRepository.remember(UserFact(FactType.PREFERENCE, value = command.value))
-                "Anotado."
-            }
-
-            is MemoryCommandParser.Command.Forget -> {
-                val dropped = memoryRepository.forget(FactType.PREFERENCE, command.match)
-                if (dropped > 0) "Vale, lo olvido." else "No tenía nada apuntado sobre eso."
-            }
-
-            MemoryCommandParser.Command.Recall -> {
-                val prefs = memoryRepository.facts(FactType.PREFERENCE)
-                if (prefs.isEmpty()) "Aún no he aprendido nada sobre ti."
-                else "Recuerdo esto: " + prefs.joinToString("; ") { it.value } + "."
-            }
+    private suspend fun handleMemoryCommand(
+        command: MemoryCommandParser.Command,
+        context: TravelContext,
+    ): String = when (command) {
+        is MemoryCommandParser.Command.Remember -> {
+            memoryRepository.remember(UserFact(FactType.PREFERENCE, value = command.value))
+            "Anotado."
         }
+
+        is MemoryCommandParser.Command.Forget -> {
+            val dropped = memoryRepository.forget(FactType.PREFERENCE, command.match)
+            if (dropped > 0) "Vale, lo olvido." else "No tenía nada apuntado sobre eso."
+        }
+
+        MemoryCommandParser.Command.Recall -> {
+            val prefs = memoryRepository.facts(FactType.PREFERENCE)
+            if (prefs.isEmpty()) "Aún no he aprendido nada sobre ti."
+            else "Recuerdo esto: " + prefs.joinToString("; ") { it.value } + "."
+        }
+
+        MemoryCommandParser.Command.SetHome -> saveNamedLocation(FactType.HOME, "casa", context)
+        MemoryCommandParser.Command.SetWork -> saveNamedLocation(FactType.WORK, "trabajo", context)
+
+        is MemoryCommandParser.Command.SetRelationship -> {
+            memoryRepository.remember(
+                UserFact(FactType.RELATIONSHIP, key = command.relation, value = command.name)
+            )
+            "Vale, ${command.name} es tu ${command.relation}."
+        }
+    }
+
+    private suspend fun saveNamedLocation(type: FactType, label: String, context: TravelContext): String {
+        val here = context.currentLocation
+            ?: return "No tengo tu ubicación ahora mismo. Dímelo cuando tenga señal."
+        memoryRepository.forget(type)
+        memoryRepository.remember(UserFact(type, value = "${here.first},${here.second}"))
+        return "Guardado. Esta es tu $label."
+    }
 
     private suspend fun askGemini(context: TravelContext, userInput: String): String {
         val prompt = PromptBuilder.buildPrompt(
@@ -110,6 +132,8 @@ class GenerateResponseUseCase @Inject constructor(
             recentExchanges = memoryRepository.recentExchanges(),
             driverPreferences = memoryRepository.facts(FactType.PREFERENCE).map { it.value },
             frequentPlaces = memoryRepository.frequentPlaces().map { it.value },
+            home = memoryRepository.facts(FactType.HOME).firstOrNull()?.value,
+            work = memoryRepository.facts(FactType.WORK).firstOrNull()?.value,
         )
         val answer = geminiRepository.getResponse(prompt)
         memoryRepository.recordExchange(userInput, answer)
@@ -121,9 +145,18 @@ class GenerateResponseUseCase @Inject constructor(
         return style.spokenAck
     }
 
-    private suspend fun handleCallRequest(contactName: String): String {
+    private suspend fun handleCallRequest(rawName: String): String {
         if (!phoneCallRepository.hasCallPermission()) {
             return "No puedo llamar sin permiso. Actívalo en ajustes: contactos y teléfono."
+        }
+        // "llama a mi hermano" → resolve the relationship to a real name first.
+        val relation = Regex("""^mi\s+(\p{L}+)$""", RegexOption.IGNORE_CASE)
+            .find(rawName.trim())?.groupValues?.get(1)?.lowercase()
+        val contactName = if (relation != null && relation in MemoryCommandParser.RELATIONS) {
+            memoryRepository.facts(FactType.RELATIONSHIP).firstOrNull { it.key == relation }?.value
+                ?: return "No sé quién es tu $relation. Dime antes \"nombre es mi $relation\"."
+        } else {
+            rawName
         }
         return when (val result = phoneCallRepository.findContactByName(contactName)) {
             is ContactLookupResult.Found -> {

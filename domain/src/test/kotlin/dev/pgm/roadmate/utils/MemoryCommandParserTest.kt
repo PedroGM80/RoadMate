@@ -44,4 +44,24 @@ class MemoryCommandParserTest {
         assertNull(MemoryCommandParser.parse("¿esto te recuerda a algo?"))
         assertNull(MemoryCommandParser.parse("cuéntame algo de este pueblo"))
     }
+
+    @Test
+    fun `recognizes set home and set work`() {
+        assertEquals(Command.SetHome, MemoryCommandParser.parse("esta es mi casa"))
+        assertEquals(Command.SetHome, MemoryCommandParser.parse("aquí vivo"))
+        assertEquals(Command.SetWork, MemoryCommandParser.parse("aquí está mi trabajo"))
+        assertEquals(Command.SetWork, MemoryCommandParser.parse("aquí trabajo"))
+    }
+
+    @Test
+    fun `recognizes a relationship statement and lowercases the relation`() {
+        assertEquals(
+            Command.SetRelationship("hermano", "Juan"),
+            MemoryCommandParser.parse("Juan es mi hermano"),
+        )
+        assertEquals(
+            Command.SetRelationship("jefa", "Marta García"),
+            MemoryCommandParser.parse("guarda a Marta García como mi jefa"),
+        )
+    }
 }

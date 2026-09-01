@@ -145,7 +145,10 @@ class FakeMemoryRepository : MemoryRepository {
     }
     override suspend fun recentExchanges(limit: Int): List<Exchange> = recorded.takeLast(limit)
     private val places = mutableListOf<String>()
-    override suspend fun remember(fact: UserFact) { facts += fact }
+    override suspend fun remember(fact: UserFact) {
+        if (fact.key != null) facts.removeAll { it.type == fact.type && it.key == fact.key }
+        facts += fact
+    }
     override suspend fun rememberPlace(place: String) { places += place }
     override suspend fun facts(type: FactType): List<UserFact> = facts.filter { it.type == type }
     override suspend fun frequentPlaces(limit: Int): List<UserFact> =
