@@ -1,20 +1,24 @@
 package dev.pgm.roadmate.utils
 
 import dev.pgm.roadmate.domain.model.AnswerStyle
+import dev.pgm.roadmate.domain.model.Exchange
 import dev.pgm.roadmate.domain.model.TravelContext
 
 /**
- * Assembles the text prompt sent to Gemini Nano from the current [TravelContext].
- * Pure Kotlin, no Android dependency — safe to unit test directly.
+ * Assembles the text prompt sent to Gemini Nano from the current
+ * [TravelContext], the driver's [AnswerStyle] preference, and any
+ * [recentExchanges] from on-device memory. Pure Kotlin, no Android
+ * dependency — safe to unit test directly.
  */
 object PromptBuilder {
 
-    private const val MAX_LAST_RESPONSES = 3
+    private const val MAX_EXCHANGES = 3
 
     fun buildPrompt(
         context: TravelContext,
         userInput: String,
         style: AnswerStyle = AnswerStyle.DEFAULT,
+        recentExchanges: List<Exchange> = emptyList(),
     ): String {
         val location = context.currentLocation
             ?.let { "${it.first}, ${it.second}" }
@@ -33,9 +37,12 @@ object PromptBuilder {
                 appendLine("Clima actual: ${context.weatherDescription}")
             }
 
-            if (context.lastResponses.isNotEmpty()) {
-                appendLine("Respuestas anteriores en este viaje (para continuidad):")
-                context.lastResponses.takeLast(MAX_LAST_RESPONSES).forEach { appendLine("- $it") }
+            if (recentExchanges.isNotEmpty()) {
+                appendLine("Antes en esta conversación (para dar continuidad):")
+                recentExchanges.takeLast(MAX_EXCHANGES).forEach {
+                    appendLine("- Él/ella: ${it.question}")
+                    appendLine("  Tú respondiste: ${it.answer}")
+                }
             }
         }.trim()
 

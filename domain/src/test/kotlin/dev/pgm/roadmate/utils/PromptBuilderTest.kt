@@ -1,6 +1,7 @@
 package dev.pgm.roadmate.utils
 
 import dev.pgm.roadmate.domain.model.AnswerStyle
+import dev.pgm.roadmate.domain.model.Exchange
 import dev.pgm.roadmate.domain.model.TravelContext
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -76,29 +77,24 @@ class PromptBuilderTest {
     }
 
     @Test
-    fun `omits last responses section when there are none`() {
-        val context = TravelContext(null, null, 0, Date(), "hola", lastResponses = emptyList())
+    fun `omits the conversation section when there are no recent exchanges`() {
+        val context = TravelContext(null, null, 0, Date(), "hola")
 
         val prompt = PromptBuilder.buildPrompt(context, "hola")
 
-        assertFalse(prompt.contains("Respuestas anteriores"))
+        assertFalse(prompt.contains("Antes en esta conversación"))
     }
 
     @Test
-    fun `includes only the last three responses`() {
-        val context = TravelContext(
-            currentLocation = null,
-            hour = 0,
-            date = Date(),
-            userInput = "hola",
-            lastResponses = listOf("uno", "dos", "tres", "cuatro")
-        )
+    fun `includes only the last three exchanges`() {
+        val context = TravelContext(null, null, 0, Date(), "hola")
+        val exchanges = listOf("uno", "dos", "tres", "cuatro").map { Exchange("p-$it", "r-$it") }
 
-        val prompt = PromptBuilder.buildPrompt(context, "hola")
+        val prompt = PromptBuilder.buildPrompt(context, "hola", recentExchanges = exchanges)
 
-        assertFalse(prompt.contains("- uno"))
-        assertTrue(prompt.contains("- dos"))
-        assertTrue(prompt.contains("- tres"))
-        assertTrue(prompt.contains("- cuatro"))
+        assertFalse(prompt.contains("p-uno"))
+        assertTrue(prompt.contains("p-dos"))
+        assertTrue(prompt.contains("r-tres"))
+        assertTrue(prompt.contains("p-cuatro"))
     }
 }

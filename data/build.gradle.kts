@@ -58,11 +58,21 @@ android {
     }
 }
 
+ksp {
+    // Exported schemas make future Room migrations reviewable in git.
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     implementation(project(":domain"))
 
     implementation(libs.hilt.android)
     "ksp"(libs.hilt.compiler)
+
+    // On-device memory: conversation history + durable facts about the driver.
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    "ksp"(libs.androidx.room.compiler)
 
     implementation(libs.aicore)
     // Universal local-AI fallback: a small model downloaded at runtime over

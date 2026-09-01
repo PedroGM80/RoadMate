@@ -2,6 +2,7 @@ package dev.pgm.roadmate.presentation.viewmodel.fake
 
 import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ContactLookupResult
+import dev.pgm.roadmate.domain.model.Exchange
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.SilenceEvent
@@ -12,6 +13,7 @@ import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchRepository
 import dev.pgm.roadmate.domain.repository.MediaRepository
+import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
@@ -131,6 +133,14 @@ class FakeAssistantPreferencesRepository : AssistantPreferencesRepository {
     override suspend fun setAnswerStyle(style: AnswerStyle) {
         styleFlow.value = style
     }
+}
+
+class FakeMemoryRepository : MemoryRepository {
+    val recorded = mutableListOf<Exchange>()
+    override suspend fun recordExchange(question: String, answer: String) {
+        recorded += Exchange(question, answer)
+    }
+    override suspend fun recentExchanges(limit: Int): List<Exchange> = recorded.takeLast(limit)
 }
 
 class FakeGreetingRepository(private val shouldGreet: Boolean = false) : GreetingRepository {

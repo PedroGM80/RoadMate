@@ -8,6 +8,7 @@ import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.MapSearchRepository
 import dev.pgm.roadmate.domain.repository.MediaRepository
+import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.utils.CallIntentParser
@@ -42,6 +43,11 @@ import javax.inject.Inject
  * All of these work identically whether or not this device has on-device AI,
  * unlike every other question, which falls back to GeminiNanoManager's
  * generic FALLBACK_RESPONSE in "modo básico".
+ *
+ * Real questions (the Gemini path) are also given the last few exchanges
+ * from [MemoryRepository] for continuity, and the new question/answer pair
+ * is written back to it. The shortcuts aren't remembered — they're actions,
+ * not conversation.
  */
 class GenerateResponseUseCase @Inject constructor(
     private val geminiRepository: GeminiRepository,
@@ -49,7 +55,8 @@ class GenerateResponseUseCase @Inject constructor(
     private val phoneCallRepository: PhoneCallRepository,
     private val mapSearchRepository: MapSearchRepository,
     private val mediaRepository: MediaRepository,
-    private val assistantPreferencesRepository: AssistantPreferencesRepository
+    private val assistantPreferencesRepository: AssistantPreferencesRepository,
+    private val memoryRepository: MemoryRepository
 ) {
     operator fun invoke(context: TravelContext, userInput: String): Flow<String> = flow {
         val contactName = CallIntentParser.extractContactName(userInput)
@@ -62,12 +69,22 @@ class GenerateResponseUseCase @Inject constructor(
             mediaApp != null -> handleMediaRequest(mediaApp)
             JokeProvider.matchesJokeIntent(userInput) -> JokeProvider.randomJoke()
             styleChange != null -> handleStyleChange(styleChange)
-            else -> geminiRepository.getResponse(
-                PromptBuilder.buildPrompt(context, userInput, assistantPreferencesRepository.answerStyle.first())
-            )
+            else -> askGemini(context, userInput)
         }
         speechSynthesisRepository.speak(response)
         emit(response)
+    }
+
+    private suspend fun askGemini(context: TravelContext, userInput: String): String {
+        val prompt = PromptBuilder.buildPrompt(
+            context = context,
+            userInput = userInput,
+            style = assistantPreferencesRepository.answerStyle.first(),
+            recentExchanges = memoryRepository.recentExchanges(),
+        )
+        val answer = geminiRepository.getResponse(prompt)
+        memoryRepository.recordExchange(userInput, answer)
+        return answer
     }
 
     private suspend fun handleStyleChange(style: AnswerStyle): String {

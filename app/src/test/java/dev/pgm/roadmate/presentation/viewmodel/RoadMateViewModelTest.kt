@@ -11,6 +11,7 @@ import dev.pgm.roadmate.presentation.viewmodel.fake.FakeLocationRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMapSearchRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeAssistantPreferencesRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMediaRepository
+import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMemoryRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeSilenceDetectionRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeSpeechRecognitionRepository
@@ -48,7 +49,8 @@ class RoadMateViewModelTest {
             FakePhoneCallRepository(),
             FakeMapSearchRepository(),
             FakeMediaRepository(),
-            FakeAssistantPreferencesRepository()
+            FakeAssistantPreferencesRepository(),
+            FakeMemoryRepository()
         )
         val speechRepo = if (speechEvents != null) {
             FakeSpeechRecognitionRepository(speechEvents)

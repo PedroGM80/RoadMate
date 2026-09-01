@@ -260,7 +260,6 @@ class RoadMateViewModel @Inject constructor(
             hour = calendar.get(Calendar.HOUR_OF_DAY),
             date = calendar.time,
             userInput = userInput,
-            lastResponses = listOfNotNull(_uiState.value.currentResponse.takeIf { it.isNotBlank() }),
             weatherDescription = weatherDescription
         )
     }

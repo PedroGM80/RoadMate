@@ -4,6 +4,7 @@ import dev.pgm.roadmate.domain.fake.FakeAssistantPreferencesRepository
 import dev.pgm.roadmate.domain.fake.FakeGeminiRepository
 import dev.pgm.roadmate.domain.fake.FakeMapSearchRepository
 import dev.pgm.roadmate.domain.fake.FakeMediaRepository
+import dev.pgm.roadmate.domain.fake.FakeMemoryRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.domain.fake.FakeSilenceDetectionRepository
 import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
@@ -27,7 +28,8 @@ class DetectSilenceUseCaseTest {
             FakePhoneCallRepository(),
             FakeMapSearchRepository(),
             FakeMediaRepository(),
-            FakeAssistantPreferencesRepository()
+            FakeAssistantPreferencesRepository(),
+            FakeMemoryRepository()
         )
         val useCase = DetectSilenceUseCase(silenceDetectionRepository, generateResponseUseCase)
 
@@ -46,7 +48,8 @@ class DetectSilenceUseCaseTest {
             FakePhoneCallRepository(),
             FakeMapSearchRepository(),
             FakeMediaRepository(),
-            FakeAssistantPreferencesRepository()
+            FakeAssistantPreferencesRepository(),
+            FakeMemoryRepository()
         )
         val useCase = DetectSilenceUseCase(FakeSilenceDetectionRepository(), generateResponseUseCase)
 

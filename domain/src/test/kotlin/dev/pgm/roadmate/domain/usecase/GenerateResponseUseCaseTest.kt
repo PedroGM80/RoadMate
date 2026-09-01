@@ -4,10 +4,12 @@ import dev.pgm.roadmate.domain.fake.FakeAssistantPreferencesRepository
 import dev.pgm.roadmate.domain.fake.FakeGeminiRepository
 import dev.pgm.roadmate.domain.fake.FakeMapSearchRepository
 import dev.pgm.roadmate.domain.fake.FakeMediaRepository
+import dev.pgm.roadmate.domain.fake.FakeMemoryRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
 import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ContactLookupResult
+import dev.pgm.roadmate.domain.model.Exchange
 import dev.pgm.roadmate.domain.model.ContactMatch
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.TravelContext
@@ -29,14 +31,16 @@ class GenerateResponseUseCaseTest {
         phoneCallRepository: FakePhoneCallRepository = FakePhoneCallRepository(),
         mapSearchRepository: FakeMapSearchRepository = FakeMapSearchRepository(),
         mediaRepository: FakeMediaRepository = FakeMediaRepository(),
-        assistantPreferencesRepository: FakeAssistantPreferencesRepository = FakeAssistantPreferencesRepository()
+        assistantPreferencesRepository: FakeAssistantPreferencesRepository = FakeAssistantPreferencesRepository(),
+        memoryRepository: FakeMemoryRepository = FakeMemoryRepository()
     ) = GenerateResponseUseCase(
         geminiRepository,
         speechSynthesisRepository,
         phoneCallRepository,
         mapSearchRepository,
         mediaRepository,
-        assistantPreferencesRepository
+        assistantPreferencesRepository,
+        memoryRepository
     )
 
     @Test
@@ -189,5 +193,37 @@ class GenerateResponseUseCaseTest {
         useCase(geminiRepository, assistantPreferencesRepository = prefs)(context, "¿cuánto queda?").toList()
 
         assertTrue(geminiRepository.lastPrompt!!.contains(AnswerStyle.BRIEF.promptInstruction))
+    }
+
+    @Test
+    fun `a real question and its answer are written to memory`() = runTest {
+        val geminiRepository = FakeGeminiRepository(response = "unos 40 minutos")
+        val memory = FakeMemoryRepository()
+
+        useCase(geminiRepository, memoryRepository = memory)(context, "¿cuánto queda a Cádiz?").toList()
+
+        assertEquals(1, memory.recorded.size)
+        assertEquals(Exchange("¿cuánto queda a Cádiz?", "unos 40 minutos"), memory.recorded.first())
+    }
+
+    @Test
+    fun `recent exchanges from memory are folded into the prompt`() = runTest {
+        val geminiRepository = FakeGeminiRepository(response = "vale")
+        val memory = FakeMemoryRepository(initial = listOf(Exchange("¿distancia a Cádiz?", "32 km")))
+
+        useCase(geminiRepository, memoryRepository = memory)(context, "¿y en coche?").toList()
+
+        assertTrue(geminiRepository.lastPrompt!!.contains("¿distancia a Cádiz?"))
+        assertTrue(geminiRepository.lastPrompt!!.contains("32 km"))
+    }
+
+    @Test
+    fun `shortcut answers are not written to memory`() = runTest {
+        val memory = FakeMemoryRepository()
+
+        useCase(memoryRepository = memory)(context, "cuéntame un chiste").toList()
+        useCase(memoryRepository = memory)(context, "abre Spotify").toList()
+
+        assertTrue(memory.recorded.isEmpty())
     }
 }
