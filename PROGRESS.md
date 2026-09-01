@@ -67,9 +67,10 @@ without reading the full git log.
   "esta es mi casa / aquí es mi trabajo" (HOME/WORK from the current
   location) and "X es mi hermano" (RELATIONSHIP) — after which "llama a mi
   hermano" resolves through memory. Preferences, frequent places and
-  home/work coords are folded into every Gemini prompt. Replaces the
-  vestigial `TravelContext.lastResponses`. Still to do: FTS free-text
-  recall, capture from the map's own nav button, an instrumented DAO test.
+  home/work coords are folded into every Gemini prompt. Also: keyword recall
+  of past exchanges ("¿qué te dije sobre…?"), PLACE capture from the map's
+  nav button too (with name normalisation), and an instrumented `MemoryDao`
+  test. Replaces the vestigial `TravelContext.lastResponses`.
 - **Location + weather context**: `LocationRepository` (FusedLocationProvider)
   feeds `TravelContext`; weather is the one optional network call, disclosed
   on first run. `refreshLocation()` times out via

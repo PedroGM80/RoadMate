@@ -33,15 +33,12 @@ commitment, just a starting point for the next session. See
 - **Adapt to the driver (continued).** Real weight-level learning isn't on
   the table — AICore is frozen, MediaPipe LLM Inference is inference-only,
   and anything server-side breaks the "nothing leaves the phone" stance.
-  Shipped so far: `RoadMateDatabase` (Room), conversation-history continuity,
+  Shipped: `RoadMateDatabase` (Room); conversation-history continuity;
   `PREFERENCE` / `PLACE` / `HOME` / `WORK` / `RELATIONSHIP` facts (the last
-  wired into call resolution) — all folded into the prompt. Still open:
-  - *FTS recall.* Room FTS4/5 over `trip_exchange` + `user_fact` so "¿qué te
-    dije sobre el hotel de Ronda?" works. No embeddings/vector DB needed at
-    this data scale — a phrase match covers it.
-  - *Capture from the map's own nav button*, not just voice "busca X".
-    Normalise place strings instead of storing raw queries.
-  - *Instrumented DAO test* — the Room layer is only exercised via fakes.
+  wired into call resolution); keyword recall of past exchanges ("¿qué te
+  dije sobre…?"); PLACE capture from both voice search and the map nav
+  button, with name normalisation; an instrumented `MemoryDao` test. All
+  facts fold into the prompt. Still open:
   - *STT vocabulary.* Vosk takes a phrase-list grammar at `Recognizer(...)`;
     feeding it contact names + frequent place names sharply improves
     recognition of exactly those.
