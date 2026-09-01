@@ -7,25 +7,31 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.RectF
 import android.net.Uri
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -39,8 +45,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.pgm.roadmate.ui.theme.Spacing
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -129,36 +135,53 @@ fun MapScreen(
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
 
-        OfflineStatusChip(
-            status = offlineStatus,
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
-        )
-
-        Row(
-            modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // The map stays full-bleed; only the controls inset past the system bars.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .windowInsetsPadding(WindowInsets.safeDrawing)
+                .padding(Spacing.sm),
         ) {
-            PoiKind.entries.forEach { kind ->
-                FilterChip(
-                    selected = poiFilter == kind,
-                    onClick = { viewModel.togglePoiFilter(kind) },
-                    label = { Text(stringResource(kind.labelRes)) },
-                )
-            }
-        }
+            OfflineStatusChip(
+                status = offlineStatus,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
 
-        ExtendedFloatingActionButton(
-            onClick = {
-                val map = mapLibreMap ?: return@ExtendedFloatingActionButton
-                viewModel.downloadVisibleRegion(
-                    bounds = map.projection.visibleRegion.latLngBounds,
-                    pixelRatio = context.resources.displayMetrics.density,
-                )
-            },
-            icon = { Icon(painterResource(R.drawable.lucide_ic_download), contentDescription = null) },
-            text = { Text(stringResource(R.string.map_download_area)) },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 20.dp),
-        )
+            Surface(
+                modifier = Modifier.align(Alignment.BottomStart),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shadowElevation = 2.dp,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .horizontalScroll(rememberScrollState())
+                        .padding(Spacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    PoiKind.entries.forEach { kind ->
+                        FilterChip(
+                            selected = poiFilter == kind,
+                            onClick = { viewModel.togglePoiFilter(kind) },
+                            label = { Text(stringResource(kind.labelRes)) },
+                        )
+                    }
+                }
+            }
+
+            ExtendedFloatingActionButton(
+                onClick = {
+                    val map = mapLibreMap ?: return@ExtendedFloatingActionButton
+                    viewModel.downloadVisibleRegion(
+                        bounds = map.projection.visibleRegion.latLngBounds,
+                        pixelRatio = context.resources.displayMetrics.density,
+                    )
+                },
+                icon = { Icon(painterResource(R.drawable.lucide_ic_download), contentDescription = null) },
+                text = { Text(stringResource(R.string.map_download_area)) },
+                modifier = Modifier.align(Alignment.BottomEnd),
+            )
+        }
 
         selectedPoi?.let { (name, latLng) ->
             PoiSheet(
@@ -169,7 +192,6 @@ fun MapScreen(
                     selectedPoi = null
                 },
                 onDismiss = { selectedPoi = null },
-                modifier = Modifier.align(Alignment.BottomCenter),
             )
         }
     }
@@ -187,12 +209,11 @@ private fun OfflineStatusChip(status: OfflineMapStatus, modifier: Modifier = Mod
     }
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 3.dp,
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
         shadowElevation = 2.dp,
     ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
+        Column(modifier = Modifier.padding(horizontal = Spacing.md - Spacing.xs, vertical = Spacing.sm)) {
             Text(
                 text = text,
                 style = MaterialTheme.typography.labelMedium,
@@ -205,32 +226,34 @@ private fun OfflineStatusChip(status: OfflineMapStatus, modifier: Modifier = Mod
             if (status is OfflineMapStatus.Downloading) {
                 LinearProgressIndicator(
                     progress = { status.progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.padding(top = 4.dp).fillMaxWidth(),
+                    modifier = Modifier.padding(top = Spacing.xs).fillMaxWidth(),
                 )
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PoiSheet(
     name: String,
     onNavigate: () -> Unit,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth().padding(12.dp),
-        shape = RoundedCornerShape(20.dp),
-        tonalElevation = 4.dp,
-        shadowElevation = 6.dp,
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(),
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
-            Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onNavigate) { Text(stringResource(R.string.map_navigate)) }
-                TextButton(onClick = onDismiss) { Text(stringResource(R.string.map_close)) }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.lg)
+                .padding(bottom = Spacing.xl),
+        ) {
+            Text(name, style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(Spacing.md))
+            Button(onClick = onNavigate, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.map_navigate))
             }
         }
     }
