@@ -1,8 +1,10 @@
 package dev.pgm.roadmate.data.repository
 
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.domain.repository.MapSearchRepository
 import javax.inject.Inject
@@ -18,7 +20,7 @@ class MapSearchRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context
 ) : MapSearchRepository {
 
-    override fun searchNearby(query: String, location: Pair<Double, Double>?) {
+    override fun searchNearby(query: String, location: Pair<Double, Double>?): Boolean {
         val encodedQuery = Uri.encode(query)
         val geoUri = if (location != null) {
             Uri.parse("geo:${location.first},${location.second}?q=$encodedQuery")
@@ -28,6 +30,16 @@ class MapSearchRepositoryImpl @Inject constructor(
         val intent = Intent(Intent.ACTION_VIEW, geoUri).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(intent)
+        return try {
+            context.startActivity(intent)
+            true
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "No app handles geo: intents", e)
+            false
+        }
+    }
+
+    private companion object {
+        const val TAG = "MapSearchRepository"
     }
 }

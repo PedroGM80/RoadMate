@@ -109,8 +109,9 @@ class FakePhoneCallRepository(
 
 class FakeMapSearchRepository : MapSearchRepository {
     var lastQuery: String? = null
-    override fun searchNearby(query: String, location: Pair<Double, Double>?) {
+    override fun searchNearby(query: String, location: Pair<Double, Double>?): Boolean {
         lastQuery = query
+        return true
     }
 }
 

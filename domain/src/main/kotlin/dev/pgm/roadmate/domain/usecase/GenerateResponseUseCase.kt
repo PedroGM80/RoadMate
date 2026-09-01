@@ -74,10 +74,12 @@ class GenerateResponseUseCase @Inject constructor(
         }
     }
 
-    private fun handleMapSearch(query: String, location: Pair<Double, Double>?): String {
-        mapSearchRepository.searchNearby(query, location)
-        return "Buscando $query en el mapa"
-    }
+    private fun handleMapSearch(query: String, location: Pair<Double, Double>?): String =
+        if (mapSearchRepository.searchNearby(query, location)) {
+            "Buscando $query en el mapa"
+        } else {
+            "No tengo una app de mapas instalada para buscar $query."
+        }
 
     private fun handleMediaRequest(app: MediaApp): String =
         if (mediaRepository.launchMediaApp(app)) {

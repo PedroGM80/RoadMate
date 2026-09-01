@@ -112,13 +112,14 @@ class FakePhoneCallRepository(
     }
 }
 
-class FakeMapSearchRepository : MapSearchRepository {
+class FakeMapSearchRepository(private val hasMapsApp: Boolean = true) : MapSearchRepository {
     var lastQuery: String? = null
     var lastLocation: Pair<Double, Double>? = null
 
-    override fun searchNearby(query: String, location: Pair<Double, Double>?) {
+    override fun searchNearby(query: String, location: Pair<Double, Double>?): Boolean {
         lastQuery = query
         lastLocation = location
+        return hasMapsApp
     }
 }
 

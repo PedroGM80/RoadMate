@@ -128,6 +128,16 @@ class GenerateResponseUseCaseTest {
     }
 
     @Test
+    fun `a map search with no maps app installed says so instead of pretending`() = runTest {
+        val mapSearchRepository = FakeMapSearchRepository(hasMapsApp = false)
+
+        val emitted = useCase(mapSearchRepository = mapSearchRepository)(context, "busca una gasolinera")
+            .toList()
+
+        assertTrue(emitted.first().contains("No tengo una app de mapas"))
+    }
+
+    @Test
     fun `media requests launch the app and bypass Gemini`() = runTest {
         val geminiRepository = FakeGeminiRepository(response = "no debería usarse")
         val mediaRepository = FakeMediaRepository()
