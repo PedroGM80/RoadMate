@@ -2,6 +2,7 @@ package dev.pgm.roadmate.domain.usecase
 
 import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ContactLookupResult
+import dev.pgm.roadmate.domain.model.ContactMatch
 import dev.pgm.roadmate.domain.model.FactType
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.TravelContext
@@ -13,6 +14,7 @@ import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
+import dev.pgm.roadmate.utils.CallFollowUpParser
 import dev.pgm.roadmate.utils.CallIntentParser
 import dev.pgm.roadmate.utils.JokeProvider
 import dev.pgm.roadmate.utils.MapSearchIntentParser
@@ -58,6 +60,10 @@ import javax.inject.Inject
  * from [MemoryRepository] for continuity, and the new question/answer pair
  * is written back to it. The shortcuts aren't remembered — they're actions,
  * not conversation.
+ *
+ * Holds one bit of state, [pendingCall]: when "llama a X" is ambiguous the
+ * candidate list is kept so the next utterance ("la segunda", "García") can
+ * finish the call. Per-instance, which is exactly the voice loop's scope.
  */
 class GenerateResponseUseCase @Inject constructor(
     private val geminiRepository: GeminiRepository,
@@ -68,7 +74,22 @@ class GenerateResponseUseCase @Inject constructor(
     private val assistantPreferencesRepository: AssistantPreferencesRepository,
     private val memoryRepository: MemoryRepository
 ) {
+    /** The candidates from an unresolved "llama a X" — awaiting "la segunda" etc. */
+    private var pendingCall: List<ContactMatch>? = null
+
     operator fun invoke(context: TravelContext, userInput: String): Flow<String> = flow {
+        pendingCall?.let { pending ->
+            val picked = CallFollowUpParser.resolve(userInput, pending)
+            pendingCall = null
+            if (picked != null) {
+                val followUp = placeResolvedCall(picked)
+                speechSynthesisRepository.speak(followUp)
+                emit(followUp)
+                return@flow
+            }
+            // not a follow-up — fall through to normal handling
+        }
+
         val contactName = CallIntentParser.extractContactName(userInput)
         val mapQuery = MapSearchIntentParser.extractSearchQuery(userInput)
         val mediaApp = MediaIntentParser.extractMediaApp(userInput)
@@ -170,9 +191,18 @@ class GenerateResponseUseCase @Inject constructor(
                 phoneCallRepository.placeCall(result.contact.phoneNumber)
                 SpokenText.calling(result.contact.name)
             }
-            is ContactLookupResult.Ambiguous -> SpokenText.CALL_AMBIGUOUS
+            is ContactLookupResult.Ambiguous -> {
+                pendingCall = result.matches // resolved by the next "la segunda" / "García"
+                SpokenText.CALL_AMBIGUOUS
+            }
             ContactLookupResult.NotFound -> SpokenText.contactNotFound(contactName)
         }
+    }
+
+    private fun placeResolvedCall(match: ContactMatch): String {
+        if (!phoneCallRepository.hasCallPermission()) return SpokenText.CALL_NO_PERMISSION
+        phoneCallRepository.placeCall(match.phoneNumber)
+        return SpokenText.calling(match.name)
     }
 
     private suspend fun handleMapSearch(query: String, location: Pair<Double, Double>?): String =

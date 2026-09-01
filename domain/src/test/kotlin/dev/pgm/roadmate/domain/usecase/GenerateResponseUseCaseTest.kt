@@ -103,6 +103,39 @@ class GenerateResponseUseCaseTest {
     }
 
     @Test
+    fun `a follow-up after an ambiguous call finishes it`() = runTest {
+        val phone = FakePhoneCallRepository(
+            lookupResult = ContactLookupResult.Ambiguous(
+                listOf(ContactMatch("Ana García", "600111222"), ContactMatch("Ana López", "600333444")),
+            ),
+        )
+        val uc = useCase(phoneCallRepository = phone)
+
+        uc(context, "llama a Ana").toList()
+        val emitted = uc(context, "la segunda").toList()
+
+        assertEquals("600333444", phone.placedCallTo)
+        assertEquals(listOf("Llamando a Ana López"), emitted)
+    }
+
+    @Test
+    fun `an unrelated utterance after an ambiguous call is handled normally`() = runTest {
+        val phone = FakePhoneCallRepository(
+            lookupResult = ContactLookupResult.Ambiguous(
+                listOf(ContactMatch("Ana García", "1"), ContactMatch("Ana López", "2")),
+            ),
+        )
+        val uc = useCase(phoneCallRepository = phone)
+
+        uc(context, "llama a Ana").toList()
+        val emitted = uc(context, "cuéntame un chiste").toList()
+
+        assertEquals(null, phone.placedCallTo)
+        assertTrue(JokeProvider.matchesJokeIntent("cuéntame un chiste"))
+        assertEquals(1, emitted.size)
+    }
+
+    @Test
     fun `call requests without permission explain instead of failing silently`() = runTest {
         val phoneCallRepository = FakePhoneCallRepository(hasPermission = false)
 
