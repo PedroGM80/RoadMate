@@ -143,6 +143,13 @@ without reading the full git log.
   `.onEach{}.launchIn()` coroutine in `RoadMateViewModel` that let
   `startListening()` return before the response actually arrived; fixed by
   switching to direct `.collect{}`.
+- **Per-ABI APK splits**: `splits.abi` on for `armeabi-v7a` / `arm64-v8a` /
+  `x86_64`, no universal APK. `assembleDebug` produces three ~115–125 MB
+  APKs instead of one ~250 MB all-ABI build; `installDebug` picks the match
+  for the connected device. R8 stays off (`optimization.enable = false`) but
+  `app/proguard-rules.pro` already holds the `-keep` set for the JNI-heavy
+  libs (MediaPipe, Vosk, MapLibre, AICore) plus Crashlytics, so enabling it
+  later is a one-line flip once a release build is checked on hardware.
 
 ## Explicitly unverified / open
 

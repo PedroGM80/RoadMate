@@ -79,9 +79,31 @@ android {
 
     buildTypes {
         release {
+            // R8 stays off until a release build has been verified on a real
+            // device — MediaPipe / Vosk / MapLibre are JNI-heavy and their
+            // reflection surface isn't fully covered by consumer rules yet.
+            // proguard-rules.pro below already carries the -keep set so the
+            // day this flips to `true` nothing has to be figured out again.
             optimization {
                 enable = false
             }
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+        }
+    }
+
+    // The all-ABI APK is ~250 MB (MediaPipe + Vosk + MapLibre native libs).
+    // Per-ABI splits cut each install to roughly a third. No universal APK —
+    // `installDebug` still picks the right split for the connected device,
+    // and CI only needs one to build. Not on Play, so no versionCode offset.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86_64")
+            isUniversalApk = false
         }
     }
     compileOptions {

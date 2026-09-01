@@ -77,11 +77,16 @@ commitment, just a starting point for the next session. See
   guard tested; consider a "borrar mapas descargados" action; Android Auto
   still has no map surface.
 
-- **APK size / ABI splits.** The all-ABI debug APK is now ~250 MB (MediaPipe
-  + Vosk + MapLibre native libs + the 39 MB Vosk model). A release build
-  needs per-ABI splits / an app bundle; consider moving the Vosk model to a
-  runtime download and swapping `vosk-model-small` for something smaller to
-  shrink the base install.
+- **APK size / ABI splits.** Per-ABI splits are now on (`armeabi-v7a`,
+  `arm64-v8a`, `x86_64`, no universal APK) — each install is ~115–125 MB
+  instead of one ~250 MB all-ABI build. Still large: the 39 MB Vosk model
+  ships in assets (same in every split) and MediaPipe's native libs are
+  bulky. Next steps to shrink the base install: move the Vosk model to a
+  runtime download, swap `vosk-model-small` for something smaller, and ship
+  an `.aab` if this ever goes to Play. `proguard-rules.pro` now carries the
+  native-lib `-keep` set, but R8 stays off
+  (`optimization.enable = false`) until a release build is verified on a
+  device.
 
 - **Verify on a real Android Auto head unit or working DHU.** Still the
   single biggest unverified risk — everything car-side is only checked by
@@ -103,9 +108,9 @@ commitment, just a starting point for the next session. See
   ~1.6 GB) for answer quality where the device can take it; GPU backend
   instead of CPU in `LocalLlmManager`; run the download in a `WorkManager`
   job / foreground service so it survives the app being swiped away;
-  `LlmInference` close/reload on `onTrimMemory`; R8 keep rules for
-  `com.google.mediapipe.**` once release minification is on; ABI splits to
-  trim the ~50–100 MB of `tasks-genai` native libs from the base APK.
+  `LlmInference` close/reload on `onTrimMemory`. (ABI splits and the
+  `com.google.mediapipe.**` keep rules are now in place — see "APK size"
+  below; R8 itself is still off pending a device check.)
 - **CI pipeline.** No automated build/test run exists outside manually
   invoking Gradle locally. Even a minimal `./gradlew test` on push would
   catch the kind of constructor-signature breakage this session ran into
