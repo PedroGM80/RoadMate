@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
+import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.presentation.map.OfflineMapController
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,10 +21,14 @@ class SettingsViewModel @Inject constructor(
     private val preferences: AssistantPreferencesRepository,
     private val memory: MemoryRepository,
     private val offlineMap: OfflineMapController,
+    location: LocationRepository,
 ) : ViewModel() {
 
     val theme: StateFlow<ThemePreference> = preferences.themePreference
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemePreference.DEFAULT)
+
+    /** Last known position, for the AUTO theme's sunrise/sunset check. Null until a fix lands. */
+    val lastLocation: StateFlow<Pair<Double, Double>?> = location.location
 
     val answerStyle: StateFlow<AnswerStyle> = preferences.answerStyle
         .stateIn(viewModelScope, SharingStarted.Eagerly, AnswerStyle.DEFAULT)

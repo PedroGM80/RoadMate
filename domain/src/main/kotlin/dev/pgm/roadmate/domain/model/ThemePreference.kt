@@ -1,5 +1,8 @@
 package dev.pgm.roadmate.domain.model
 
+import dev.pgm.roadmate.utils.SolarClock
+import java.time.ZonedDateTime
+
 /** How RoadMate picks light vs dark. Persisted, applied app-wide. */
 enum class ThemePreference {
     /** Follow the system setting. */
@@ -14,7 +17,16 @@ enum class ThemePreference {
     companion object {
         val DEFAULT = SYSTEM
 
-        /** [hour] 0–23. Dusk-to-dawn window used by [AUTO]. */
+        /** [hour] 0–23. Fixed dusk-to-dawn window — the fallback for [AUTO] when
+         *  there's no location fix to compute real sunrise/sunset from. */
         fun isNightHour(hour: Int): Boolean = hour < 7 || hour >= 20
+
+        /**
+         * Whether [AUTO] should be dark right now: real sunrise/sunset at
+         * [location] when it's known, otherwise the fixed [isNightHour] window.
+         */
+        fun isNight(now: ZonedDateTime, location: Pair<Double, Double>?): Boolean =
+            if (location == null) isNightHour(now.hour)
+            else SolarClock.isNight(now, location.first, location.second)
     }
 }

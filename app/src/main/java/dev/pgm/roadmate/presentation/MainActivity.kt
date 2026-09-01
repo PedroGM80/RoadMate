@@ -50,11 +50,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val themePreference by settingsViewModel.theme.collectAsState()
+            val location by settingsViewModel.lastLocation.collectAsState()
             val dark = when (themePreference) {
                 ThemePreference.SYSTEM -> isSystemInDarkTheme()
                 ThemePreference.LIGHT -> false
                 ThemePreference.DARK -> true
-                ThemePreference.AUTO -> ThemePreference.isNightHour(java.time.LocalTime.now().hour)
+                ThemePreference.AUTO -> ThemePreference.isNight(java.time.ZonedDateTime.now(), location)
             }
             RoadMateTheme(darkTheme = dark) {
                 val isOnboardingCompleted by onboardingRepository.isOnboardingCompleted

@@ -60,8 +60,12 @@ commitment, just a starting point for the next session. See
 - **Settings surface — extend it.** The `TopAppBar` overflow now covers
   theme (system / light / dark / auto-night), answer length, "borrar mapas
   descargados" and "borrar lo aprendido". If it grows further it wants a
-  real settings screen. `AUTO` uses a fixed 20:00–07:00 window — a real
-  sunset/sunrise calc from the known location would be nicer.
+  real settings screen. `AUTO` now flips on real sunrise/sunset
+  (`SolarClock`, standard low-precision equation, unit-tested incl. the
+  polar cases) using the last location fix, and only falls back to the
+  fixed 20:00–07:00 window when there's no fix yet. Open: the theme is
+  computed at composition time, so it won't switch mid-session exactly at
+  dusk without a recomposition.
 - **Real mic-reactive waveform.** `MicButton`'s bars still animate on a
   timer. A separate `AudioRecord` amplitude tap would make it honest, or
   drop it for a single breathing dot.
