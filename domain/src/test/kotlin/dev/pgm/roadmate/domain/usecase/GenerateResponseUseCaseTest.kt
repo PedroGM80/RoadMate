@@ -60,6 +60,39 @@ class GenerateResponseUseCaseTest {
     }
 
     @Test
+    fun `weather questions answer from context, not Gemini`() = runTest {
+        val gemini = FakeGeminiRepository(response = "no debería usarse")
+        val speech = FakeSpeechSynthesisRepository()
+        val withWeather = context.copy(weatherDescription = "cielo despejado, 18°C")
+
+        val emitted = useCase(gemini, speech)(withWeather, "¿qué tiempo hace?").toList()
+
+        assertEquals(0, gemini.responseCount)
+        assertEquals(listOf("Ahora mismo: cielo despejado, 18°C."), emitted)
+        assertEquals("Ahora mismo: cielo despejado, 18°C.", speech.lastSpoken)
+    }
+
+    @Test
+    fun `weather question with no data says so plainly instead of guessing`() = runTest {
+        val gemini = FakeGeminiRepository(response = "no debería usarse")
+
+        val emitted = useCase(gemini)(context, "¿va a llover?").toList()
+
+        assertEquals(0, gemini.responseCount)
+        assertEquals(listOf("No puedo consultar el tiempo ahora mismo."), emitted)
+    }
+
+    @Test
+    fun `"cuánto tiempo queda" is not treated as a weather question`() = runTest {
+        val gemini = FakeGeminiRepository(response = "quedan 20 minutos")
+
+        val emitted = useCase(gemini)(context, "¿cuánto tiempo queda?").toList()
+
+        assertEquals(1, gemini.responseCount)
+        assertEquals(listOf("quedan 20 minutos"), emitted)
+    }
+
+    @Test
     fun `joke requests are answered locally, bypassing Gemini entirely`() = runTest {
         val geminiRepository = FakeGeminiRepository(response = "no debería usarse")
         val speechSynthesisRepository = FakeSpeechSynthesisRepository()

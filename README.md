@@ -29,6 +29,10 @@ builds without a `google-services.json` have no crash reporting.
   API itself.
 - **"Cuéntame un chiste"** — answered from a small local bank of original
   road-themed jokes, no network, no AI call.
+- **"¿Qué tiempo hace?" / "¿va a llover?"** — answered straight from the
+  weather lookup, not the AI model, so it's reliable even in "modo básico".
+  Needs an `OPENWEATHER_API_KEY` in `local.properties`; without it RoadMate
+  says plainly it can't check rather than guessing.
 - **"Abre Spotify" / "pon música en YouTube Music"** — brings the music app
   to the foreground. Just opens it (no playback control) and says so; an
   app that isn't installed gets a spoken explanation.

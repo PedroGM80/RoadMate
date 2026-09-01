@@ -24,6 +24,10 @@ object SpokenText {
     fun searchingMap(query: String) = "Busco $query en el mapa."
     fun noMapsApp(query: String) = "No hay ninguna app de mapas para buscar $query."
 
+    // Weather
+    fun weatherNow(description: String) = "Ahora mismo: $description."
+    const val WEATHER_UNAVAILABLE = "No puedo consultar el tiempo ahora mismo."
+
     // Media
     fun openingApp(app: String) = "Abro $app."
     fun cantOpenApp(app: String) = "No puedo abrir $app. ¿La tienes instalada?"

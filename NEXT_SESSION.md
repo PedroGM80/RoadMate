@@ -55,6 +55,11 @@ Run each and note real-phrasing misses:
   back → `olvida lo de las autovías` drops it.
 - `Respuestas cortas` → confirm later answers are shorter and it sticks
   across a relaunch.
+- `¿Qué tiempo hace?` — now a shortcut (answers from the weather fetch, not
+  the model). **Set `OPENWEATHER_API_KEY` in `local.properties`** first or
+  it will (correctly) say "No puedo consultar el tiempo ahora mismo".
+- Speak a long answer, then tap the mic while it's still talking — it
+  should cut itself off and listen, not transcribe its own voice.
 
 **Likely code work:** intent regexes that miss how you actually phrase
 things out loud.

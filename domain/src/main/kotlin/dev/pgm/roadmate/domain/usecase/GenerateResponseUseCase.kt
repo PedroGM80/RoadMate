@@ -24,6 +24,7 @@ import dev.pgm.roadmate.utils.PlaceName
 import dev.pgm.roadmate.utils.PromptBuilder
 import dev.pgm.roadmate.utils.SpokenText
 import dev.pgm.roadmate.utils.StylePreferenceParser
+import dev.pgm.roadmate.utils.WeatherIntentParser
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -33,7 +34,7 @@ import javax.inject.Inject
  * Builds a prompt from [TravelContext], asks Gemini Nano for a response, speaks
  * it aloud, and emits the response text for the UI to display.
  *
- * Four local shortcuts are checked before ever touching Gemini, in this order:
+ * Local shortcuts are checked before ever touching Gemini, in this order:
  *  1. "llama a X" — placed directly (ACTION_CALL, no dial-pad confirmation,
  *     by design: hands-free while driving). Ambiguous/missing contacts get a
  *     spoken explanation instead of guessing who to call.
@@ -52,6 +53,10 @@ import javax.inject.Inject
  *     mi trabajo" (HOME/WORK, from the current location), "X es mi hermano"
  *     (RELATIONSHIP, so "llama a mi hermano" then resolves to X). Everything
  *     stored is fed into future Gemini prompts.
+ *  7. "¿qué tiempo hace?" / "¿va a llover?" — answered straight from the
+ *     weather already in [TravelContext], not by the model (which often
+ *     can't, and in "modo básico" there's no model). Plain "no puedo
+ *     consultar el tiempo" when there's no fix / network / API key.
  * All of these work identically whether or not this device has on-device AI,
  * unlike every other question, which falls back to GeminiNanoManager's
  * generic FALLBACK_RESPONSE in "modo básico".
@@ -102,6 +107,7 @@ class GenerateResponseUseCase @Inject constructor(
             JokeProvider.matchesJokeIntent(userInput) -> JokeProvider.randomJoke()
             styleChange != null -> handleStyleChange(styleChange)
             memoryCommand != null -> handleMemoryCommand(memoryCommand, context)
+            WeatherIntentParser.isWeatherQuestion(userInput) -> handleWeather(context)
             else -> askGemini(context, userInput)
         }
         speechSynthesisRepository.speak(response)
@@ -211,6 +217,17 @@ class GenerateResponseUseCase @Inject constructor(
         if (!phoneCallRepository.hasCallPermission()) return SpokenText.CALL_NO_PERMISSION
         phoneCallRepository.placeCall(match.phoneNumber)
         return SpokenText.calling(match.name)
+    }
+
+    /**
+     * Answers straight from the weather already fetched into [TravelContext]
+     * — no model call. Null when there's no fix, no network, or no
+     * `OPENWEATHER_API_KEY` configured; say so plainly rather than guess.
+     */
+    private fun handleWeather(context: TravelContext): String {
+        val description = context.weatherDescription
+        return if (!description.isNullOrBlank()) SpokenText.weatherNow(description)
+        else SpokenText.WEATHER_UNAVAILABLE
     }
 
     private suspend fun handleMapSearch(query: String, location: Pair<Double, Double>?): String =
