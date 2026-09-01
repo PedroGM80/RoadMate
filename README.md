@@ -19,8 +19,9 @@ builds without a `google-services.json` have no crash reporting.
   MediaPipe. It only drops to an honest "modo básico" canned reply while
   that download hasn't finished (or can't happen at all).
 - **"Llama a X"** — places a call directly, no dial-pad confirmation, by
-  design: hands-free while driving. Ambiguous or missing contacts get a
-  spoken explanation instead of a guess.
+  design: hands-free while driving. Several people with that name? It asks,
+  and you finish with "la segunda" or a surname. Missing contact → a spoken
+  explanation, not a guess.
 - **"Busca gasolineras", "hoteles cerca", "dónde hay un restaurante"** —
   hands the query straight to whatever Maps app is installed via a `geo:`
   intent, biased to the current location. RoadMate never queries a places

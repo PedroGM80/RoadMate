@@ -7,18 +7,13 @@ commitment, just a starting point for the next session. See
 
 ## Quick wins (small effort, real impact)
 
-- **Custom branded earcon.** The mic start/stop sound currently uses
-  `ToneGenerator`'s built-in `TONE_PROP_BEEP`/`BEEP2` — free, no asset, but
-  generic. Swapping in a short custom two-note sound (via `SoundPool`) would
-  read as more "designed" for not much more work.
 - **Wider `MapSearchIntentParser` coverage.** The obvious false positive
   ("busca información sobre…" → Maps) is now guarded and there's a test
   file, but it's still hand-written regex; revisit against real phrasing.
-- **Contact call follow-ups.** Ambiguous matches currently just say "sé más
-  específico" and stop. A natural next step — without adding a full
-  multi-turn dialogue system — is accepting a same-session disambiguating
-  follow-up ("la de trabajo", "el segundo") instead of making the driver
-  restart the whole request.
+- **Contact follow-up: label-aware.** The same-session follow-up handles
+  ordinals ("la segunda") and name words ("García"), but not "la de
+  trabajo" / "la del móvil" — `ContactMatch` carries no label/type. Add the
+  phone-type (work/mobile/home) to the lookup and match on it.
 
 ## Medium effort
 

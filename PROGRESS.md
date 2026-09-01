@@ -88,6 +88,10 @@ without reading the full git log.
   feeds `TravelContext`; weather is the one optional network call, disclosed
   on first run. `refreshLocation()` times out via
   `withTimeoutOrNull(Constants.LOCATION_TIMEOUT_MS)` instead of hanging.
+- **Voice UX polish** (build-verified): a synthesised two-note earcon
+  (`Earcon`, no bundled asset) on mic start/stop instead of the generic
+  `ToneGenerator` beep; a same-session follow-up for an ambiguous "llama a
+  X" ("la segunda" / a surname), state kept in `GenerateResponseUseCase`.
 - **Rest reminders**: `SilenceDetectionForegroundService` +
   `AudioLevelDetector` detect long silences and speak a reminder in the
   background. Verified live via logcat/dumpsys — clean foreground-service
