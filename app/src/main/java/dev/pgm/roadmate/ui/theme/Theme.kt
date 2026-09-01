@@ -1,67 +1,79 @@
 package dev.pgm.roadmate.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
 
-private val DarkColorScheme = darkColorScheme(
-    primary = RoadBlue80,
-    onPrimary = RoadBlueOnLight,
-    secondary = SignalAmber80,
-    onSecondary = SignalAmberOnLight,
-    tertiary = ReplyGreen80,
-    onTertiary = ReplyGreenOnLight,
-    background = NeutralBackgroundDark,
-    onBackground = NeutralOnSurfaceDark,
-    surface = NeutralSurfaceDark,
-    onSurface = NeutralOnSurfaceDark,
-    surfaceVariant = NeutralSurfaceVariantDark,
-    onSurfaceVariant = NeutralOnSurfaceDark
-)
-
-private val LightColorScheme = lightColorScheme(
+private val LightColors = lightColorScheme(
     primary = RoadBlue40,
-    onPrimary = NeutralSurfaceLight,
-    secondary = SignalAmber40,
-    onSecondary = NeutralSurfaceLight,
-    tertiary = ReplyGreen40,
-    onTertiary = NeutralSurfaceLight,
-    background = NeutralBackgroundLight,
-    onBackground = NeutralOnSurfaceLight,
-    surface = NeutralSurfaceLight,
-    onSurface = NeutralOnSurfaceLight,
-    surfaceVariant = NeutralSurfaceVariantLight,
-    onSurfaceVariant = NeutralOnSurfaceLight
+    onPrimary = GreyLightSurface,
+    primaryContainer = RoadBlue90,
+    onPrimaryContainer = RoadBlue20,
+    secondary = Amber40,
+    onSecondary = GreyLightSurface,
+    secondaryContainer = Amber90,
+    onSecondaryContainer = Amber20,
+    tertiary = Green40,
+    onTertiary = GreyLightSurface,
+    tertiaryContainer = Green90,
+    onTertiaryContainer = Green20,
+    background = GreyLightBackground,
+    onBackground = GreyLightOnSurface,
+    surface = GreyLightSurface,
+    onSurface = GreyLightOnSurface,
+    surfaceVariant = GreyLightSurfaceVariant,
+    onSurfaceVariant = GreyLightOnSurfaceVariant,
+    surfaceContainer = GreyLightContainer,
+    surfaceContainerHigh = GreyLightContainerHigh,
+    outline = GreyLightOutline,
+    outlineVariant = GreyLightSurfaceVariant,
 )
 
+private val DarkColors = darkColorScheme(
+    primary = RoadBlue80,
+    onPrimary = RoadBlue20,
+    primaryContainer = RoadBlue30,
+    onPrimaryContainer = RoadBlue90,
+    secondary = Amber80,
+    onSecondary = Amber20,
+    secondaryContainer = Amber30,
+    onSecondaryContainer = Amber90,
+    tertiary = Green80,
+    onTertiary = Green20,
+    tertiaryContainer = Green30,
+    onTertiaryContainer = Green90,
+    background = GreyDarkBackground,
+    onBackground = GreyDarkOnSurface,
+    surface = GreyDarkSurface,
+    onSurface = GreyDarkOnSurface,
+    surfaceVariant = GreyDarkSurfaceVariant,
+    onSurfaceVariant = GreyDarkOnSurfaceVariant,
+    surfaceContainer = GreyDarkContainer,
+    surfaceContainerHigh = GreyDarkContainerHigh,
+    outline = GreyDarkOutline,
+    outlineVariant = GreyDarkSurfaceVariant,
+)
+
+/**
+ * A fixed brand palette — no dynamic/Material You colour. The scheme is tuned
+ * for night-driving glare and a legible mic CTA; inheriting wallpaper colours
+ * would undo that.
+ */
 @Composable
 fun RoadMateTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Off by default: a deliberate brand palette (tuned for night-driving
-    // glare and a legible mic-CTA accent) beats inheriting whatever colors
-    // happen to come from the user's wallpaper. Still available to flip on.
-    dynamicColor: Boolean = false,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
-
     MaterialTheme(
-        colorScheme = colorScheme,
+        colorScheme = if (darkTheme) DarkColors else LightColors,
         typography = Typography,
-        content = content
+        shapes = Shapes,
+        content = content,
     )
 }
+
+/** White that works on both the amber and the (red) error mic-button fills. */
+val OnSignal = Color.White
