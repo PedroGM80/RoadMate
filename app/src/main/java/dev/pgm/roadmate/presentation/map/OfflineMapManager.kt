@@ -1,0 +1,136 @@
+package dev.pgm.roadmate.presentation.map
+
+import android.content.Context
+import android.util.Log
+import androidx.annotation.UiThread
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.offline.OfflineManager
+import org.maplibre.android.offline.OfflineRegion
+import org.maplibre.android.offline.OfflineRegionError
+import org.maplibre.android.offline.OfflineRegionStatus
+import org.maplibre.android.offline.OfflineTilePyramidRegionDefinition
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Read/command surface the map screen needs for offline regions. An
+ * interface so [MapViewModel] can be unit-tested without MapLibre.
+ */
+interface OfflineMapController {
+    val status: StateFlow<OfflineMapStatus>
+    fun refresh()
+    fun download(styleUrl: String, bounds: LatLngBounds, pixelRatio: Float)
+}
+
+/**
+ * Wraps MapLibre's [OfflineManager] so [MapScreen] / [MapViewModel] can
+ * download the visible area for offline use and observe progress. MapLibre
+ * serves tiles from these regions (and its ambient cache) automatically when
+ * the device is offline — no wiring needed on the read side.
+ *
+ * `OfflineManager` is `@UiThread`; every method here must be called from the
+ * main thread (they are, via `viewModelScope`).
+ */
+@Singleton
+class OfflineMapManager @Inject constructor(
+    @ApplicationContext private val context: Context,
+) : OfflineMapController {
+
+    private val offlineManager: OfflineManager by lazy {
+        OfflineManager.getInstance(context).apply {
+            setOfflineMapboxTileCountLimit(TILE_LIMIT)
+        }
+    }
+
+    private val _status = MutableStateFlow<OfflineMapStatus>(OfflineMapStatus.Unknown)
+    override val status: StateFlow<OfflineMapStatus> = _status.asStateFlow()
+
+    /** Keeps observers alive for the duration of a download. */
+    private var activeRegion: OfflineRegion? = null
+
+    @UiThread
+    override fun refresh() {
+        offlineManager.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
+            override fun onList(offlineRegions: Array<OfflineRegion>?) {
+                if (_status.value is OfflineMapStatus.Downloading) return
+                val count = offlineRegions?.size ?: 0
+                _status.value =
+                    if (count > 0) OfflineMapStatus.Ready(count) else OfflineMapStatus.Idle
+            }
+
+            override fun onError(error: String) {
+                Log.w(TAG, "listOfflineRegions: $error")
+                if (_status.value !is OfflineMapStatus.Downloading) {
+                    _status.value = OfflineMapStatus.Idle
+                }
+            }
+        })
+    }
+
+    @UiThread
+    override fun download(styleUrl: String, bounds: LatLngBounds, pixelRatio: Float) {
+        if (_status.value is OfflineMapStatus.Downloading) return
+        _status.value = OfflineMapStatus.Downloading(0f)
+
+        val definition = OfflineTilePyramidRegionDefinition(
+            styleUrl, bounds, MIN_ZOOM, MAX_ZOOM, pixelRatio,
+        )
+        val metadata = """{"name":"roadmate-${System.currentTimeMillis()}"}""".toByteArray()
+
+        offlineManager.createOfflineRegion(
+            definition,
+            metadata,
+            object : OfflineManager.CreateOfflineRegionCallback {
+                override fun onCreate(offlineRegion: OfflineRegion) {
+                    activeRegion = offlineRegion
+                    offlineRegion.setObserver(regionObserver(offlineRegion))
+                    offlineRegion.setDownloadState(OfflineRegion.STATE_ACTIVE)
+                }
+
+                override fun onError(error: String) {
+                    Log.w(TAG, "createOfflineRegion: $error")
+                    _status.value = OfflineMapStatus.Failed("No se pudo iniciar la descarga.")
+                }
+            },
+        )
+    }
+
+    private fun regionObserver(region: OfflineRegion) =
+        object : OfflineRegion.OfflineRegionObserver {
+            override fun onStatusChanged(status: OfflineRegionStatus) {
+                _status.value = offlineMapProgress(
+                    completedResources = status.completedResourceCount,
+                    requiredResources = status.requiredResourceCount,
+                    isComplete = status.isComplete,
+                )
+                if (status.isComplete) {
+                    region.setDownloadState(OfflineRegion.STATE_INACTIVE)
+                    activeRegion = null
+                    refresh()
+                }
+            }
+
+            override fun onError(error: OfflineRegionError) {
+                Log.w(TAG, "offline region error: ${error.reason} ${error.message}")
+                _status.value = OfflineMapStatus.Failed("Fallo al descargar la zona.")
+            }
+
+            override fun mapboxTileCountLimitExceeded(limit: Long) {
+                region.setDownloadState(OfflineRegion.STATE_INACTIVE)
+                activeRegion = null
+                _status.value =
+                    OfflineMapStatus.Failed("La zona es demasiado grande. Aleja el mapa e inténtalo otra vez.")
+            }
+        }
+
+    private companion object {
+        const val MIN_ZOOM = 0.0
+        const val MAX_ZOOM = 14.0
+        const val TILE_LIMIT = 60_000L
+        const val TAG = "OfflineMapManager"
+    }
+}

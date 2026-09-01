@@ -1,4 +1,5 @@
 import java.net.URI
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -6,6 +7,12 @@ plugins {
     alias(libs.plugins.google.devtools.ksp)
     alias(libs.plugins.jetbrains.kotlin.plugin.serialization)
     alias(libs.plugins.hilt.android)
+}
+
+// Per-machine overrides (gitignored). Only MAP_STYLE_URL is read here today.
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
 }
 
 // The Vosk offline Spanish speech model (~39 MB, Apache-2.0). Fetched into
@@ -49,6 +56,15 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // In-app map (MapLibre) tile + style source. OpenFreeMap is free,
+        // keyless and no-account; override in local.properties to point at
+        // MapTiler / a self-host without touching code.
+        val mapStyleUrl = localProperties.getProperty(
+            "MAP_STYLE_URL",
+            "https://tiles.openfreemap.org/styles/liberty",
+        )
+        buildConfigField("String", "MAP_STYLE_URL", "\"$mapStyleUrl\"")
     }
 
     buildTypes {
@@ -64,6 +80,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
@@ -89,6 +106,8 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.car.app)
+    implementation(libs.maplibre.android.sdk)
+    implementation(libs.maplibre.annotation)
     implementation(libs.hilt.android)
     "ksp"(libs.hilt.compiler)
     implementation(libs.androidx.lifecycle.runtime.compose)

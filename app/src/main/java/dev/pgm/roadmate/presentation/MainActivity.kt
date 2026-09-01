@@ -5,16 +5,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
-import dev.pgm.roadmate.presentation.screen.HomeScreen
+import dev.pgm.roadmate.presentation.map.MapViewModel
 import dev.pgm.roadmate.presentation.screen.OnboardingScreen
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 import dev.pgm.roadmate.service.SilenceDetectionForegroundService
@@ -27,6 +28,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     private val viewModel: RoadMateViewModel by viewModels()
+    private val mapViewModel: MapViewModel by viewModels()
 
     @Inject
     lateinit var permissionManager: PermissionManager
@@ -39,21 +41,22 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             RoadMateTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    val isOnboardingCompleted by onboardingRepository.isOnboardingCompleted
-                        .collectAsState(initial = null)
+                val isOnboardingCompleted by onboardingRepository.isOnboardingCompleted
+                    .collectAsState(initial = null)
 
-                    when (isOnboardingCompleted) {
-                        null -> Unit // still reading DataStore — render nothing rather than flash a screen
-                        false -> OnboardingScreen(
-                            onContinue = { lifecycleScope.launch { onboardingRepository.setOnboardingCompleted() } },
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                        true -> HomeScreen(
-                            viewModel = viewModel,
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                    }
+                when (isOnboardingCompleted) {
+                    null -> Unit // still reading DataStore — render nothing rather than flash a screen
+                    false -> OnboardingScreen(
+                        onContinue = { lifecycleScope.launch { onboardingRepository.setOnboardingCompleted() } },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .windowInsetsPadding(WindowInsets.systemBars)
+                    )
+                    true -> RootScreen(
+                        roadMateViewModel = viewModel,
+                        mapViewModel = mapViewModel,
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
         }
