@@ -43,6 +43,12 @@ interface MemoryDao {
     @Query("DELETE FROM user_fact WHERE type = :type AND factKey = :key")
     suspend fun deleteFactByKey(type: String, key: String)
 
+    @Query("DELETE FROM trip_exchange")
+    suspend fun clearExchanges()
+
+    @Query("DELETE FROM user_fact")
+    suspend fun clearFacts()
+
     @Query("DELETE FROM user_fact WHERE type = :type AND value LIKE '%' || :match || '%'")
     suspend fun deleteFactsMatching(type: String, match: String): Int
 }

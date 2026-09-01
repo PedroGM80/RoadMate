@@ -5,47 +5,62 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import dev.pgm.roadmate.R
+import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.presentation.map.MapScreen
 import dev.pgm.roadmate.presentation.map.MapViewModel
 import dev.pgm.roadmate.presentation.screen.HomeScreen
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
+import dev.pgm.roadmate.presentation.viewmodel.SettingsViewModel
 
 /**
- * Two destinations: the voice assistant ("Voz") and the offline map ("Mapa").
- *
- * On a phone-width window they're tabs behind a bottom bar (a rail once
- * there's room for one — [NavigationSuiteScaffold] makes that switch on its
- * own). From ~840dp wide (tablet, unfolded foldable, desktop) both show at
- * once, side by side, and the nav chrome disappears since there's nothing
- * left to switch between. Still no navigation library — one saved [tab] int.
+ * Two destinations: the voice assistant ("Voz") and the offline map ("Mapa"),
+ * under one [TopAppBar] that carries the settings overflow (theme, clear
+ * memory). Phone width = tabs behind a bottom bar; from ~840dp both panes
+ * show side by side and the nav chrome drops. One saved [tab] int, no nav
+ * library.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RootScreen(
     roadMateViewModel: RoadMateViewModel,
     mapViewModel: MapViewModel,
+    settingsViewModel: SettingsViewModel,
     modifier: Modifier = Modifier,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    val theme by settingsViewModel.theme.collectAsState()
 
-    // The 1-arg overload is deprecated in favour of a V2 that adds L/XL width
-    // classes; the EXPANDED lower bound already covers those, and V2 isn't in
-    // adaptive 1.3.x. Revisit when that dependency bumps.
     @Suppress("DEPRECATION")
     val dualPane = currentWindowAdaptiveInfo().windowSizeClass
         .isWidthAtLeastBreakpoint(WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND)
@@ -68,30 +83,96 @@ fun RootScreen(
             )
         },
     ) {
-        // Inner Scaffold only for its window-inset padding — HomeScreen and
-        // MapScreen don't inset themselves, they relied on the shell for it.
-        Scaffold { innerPadding ->
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(stringResource(R.string.app_name), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    actions = {
+                        SettingsMenu(
+                            theme = theme,
+                            onThemeChange = settingsViewModel::setTheme,
+                            onClearMemory = settingsViewModel::clearMemory,
+                        )
+                    },
+                )
+            },
+        ) { innerPadding ->
             val paneModifier = Modifier.padding(innerPadding)
             if (dualPane) {
                 Row(paneModifier.fillMaxSize()) {
-                    HomeScreen(
-                        viewModel = roadMateViewModel,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
+                    HomeScreen(roadMateViewModel, Modifier.weight(1f).fillMaxHeight())
                     VerticalDivider()
-                    MapScreen(
-                        viewModel = mapViewModel,
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                    )
+                    MapScreen(mapViewModel, Modifier.weight(1f).fillMaxHeight())
                 }
             } else {
                 Crossfade(targetState = tab, label = "voz-mapa") { current ->
                     when (current) {
-                        0 -> HomeScreen(viewModel = roadMateViewModel, modifier = paneModifier.fillMaxSize())
-                        else -> MapScreen(viewModel = mapViewModel, modifier = paneModifier.fillMaxSize())
+                        0 -> HomeScreen(roadMateViewModel, paneModifier.fillMaxSize())
+                        else -> MapScreen(mapViewModel, paneModifier.fillMaxSize())
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun SettingsMenu(
+    theme: ThemePreference,
+    onThemeChange: (ThemePreference) -> Unit,
+    onClearMemory: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
+
+    IconButton(onClick = { open = true }) {
+        Icon(painterResource(R.drawable.lucide_ic_settings), contentDescription = stringResource(R.string.settings))
+    }
+    DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        Text(
+            stringResource(R.string.settings_theme_header),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        ThemeItem(ThemePreference.SYSTEM, R.string.theme_system, theme, onThemeChange) { open = false }
+        ThemeItem(ThemePreference.LIGHT, R.string.theme_light, theme, onThemeChange) { open = false }
+        ThemeItem(ThemePreference.DARK, R.string.theme_dark, theme, onThemeChange) { open = false }
+        HorizontalDivider()
+        DropdownMenuItem(
+            text = { Text(stringResource(R.string.clear_memory), color = MaterialTheme.colorScheme.error) },
+            onClick = { open = false; confirmClear = true },
+        )
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text(stringResource(R.string.clear_memory_confirm_title)) },
+            text = { Text(stringResource(R.string.clear_memory_confirm_body)) },
+            confirmButton = {
+                TextButton(onClick = { confirmClear = false; onClearMemory() }) {
+                    Text(stringResource(R.string.clear_memory_confirm_action), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+}
+
+@Composable
+private fun ThemeItem(
+    value: ThemePreference,
+    labelRes: Int,
+    current: ThemePreference,
+    onChange: (ThemePreference) -> Unit,
+    close: () -> Unit,
+) {
+    DropdownMenuItem(
+        leadingIcon = { RadioButton(selected = current == value, onClick = null) },
+        text = { Text(stringResource(labelRes)) },
+        onClick = { onChange(value); close() },
+    )
 }

@@ -89,19 +89,12 @@ fun HomeScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .padding(horizontal = Spacing.lg, vertical = Spacing.xl),
+            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = stringResource(R.string.app_name),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
-
         LocalAiStatusLabel(
             status = uiState.localAiStatus,
             onRetry = viewModel::downloadLocalAiModel,
-            modifier = Modifier.padding(top = Spacing.xs),
         )
 
         LocationRow(

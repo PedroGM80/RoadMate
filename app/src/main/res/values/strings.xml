@@ -5,6 +5,18 @@
     <string name="tab_voice">Voz</string>
     <string name="tab_map">Mapa</string>
 
+    <!-- Settings menu -->
+    <string name="settings">Ajustes</string>
+    <string name="settings_theme_header">Tema</string>
+    <string name="theme_system">Según el sistema</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_dark">Oscuro</string>
+    <string name="clear_memory">Borrar lo aprendido</string>
+    <string name="clear_memory_confirm_title">¿Borrar lo aprendido?</string>
+    <string name="clear_memory_confirm_body">RoadMate olvidará el historial de conversación y todo lo que le has enseñado (preferencias, casa, trabajo, contactos). No se puede deshacer.</string>
+    <string name="clear_memory_confirm_action">Borrar</string>
+    <string name="action_cancel">Cancelar</string>
+
     <!-- Home -->
     <string name="home_tagline">Tu copiloto de viaje, 100% en tu móvil.</string>
     <string name="home_prompt_idle">Pulsa el micrófono y pregunta.</string>

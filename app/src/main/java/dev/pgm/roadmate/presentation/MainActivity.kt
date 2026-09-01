@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBars
@@ -14,10 +15,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
+import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
 import dev.pgm.roadmate.presentation.map.MapViewModel
 import dev.pgm.roadmate.presentation.screen.OnboardingScreen
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
+import dev.pgm.roadmate.presentation.viewmodel.SettingsViewModel
 import dev.pgm.roadmate.service.SilenceDetectionForegroundService
 import dev.pgm.roadmate.ui.theme.RoadMateTheme
 import dev.pgm.roadmate.utils.PermissionManager
@@ -29,6 +32,7 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: RoadMateViewModel by viewModels()
     private val mapViewModel: MapViewModel by viewModels()
+    private val settingsViewModel: SettingsViewModel by viewModels()
 
     @Inject
     lateinit var permissionManager: PermissionManager
@@ -40,7 +44,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            RoadMateTheme {
+            val themePreference by settingsViewModel.theme.collectAsState()
+            val dark = when (themePreference) {
+                ThemePreference.SYSTEM -> isSystemInDarkTheme()
+                ThemePreference.LIGHT -> false
+                ThemePreference.DARK -> true
+            }
+            RoadMateTheme(darkTheme = dark) {
                 val isOnboardingCompleted by onboardingRepository.isOnboardingCompleted
                     .collectAsState(initial = null)
 
@@ -55,6 +65,7 @@ class MainActivity : ComponentActivity() {
                     true -> RootScreen(
                         roadMateViewModel = viewModel,
                         mapViewModel = mapViewModel,
+                        settingsViewModel = settingsViewModel,
                         modifier = Modifier.fillMaxSize()
                     )
                 }

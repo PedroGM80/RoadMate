@@ -8,6 +8,7 @@ import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.SilenceEvent
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
+import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.domain.model.UserFact
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
@@ -147,6 +148,12 @@ class FakeAssistantPreferencesRepository(
     override suspend fun setAnswerStyle(style: AnswerStyle) {
         styleFlow.value = style
     }
+
+    val themeFlow = MutableStateFlow(ThemePreference.DEFAULT)
+    override val themePreference: StateFlow<ThemePreference> = themeFlow
+    override suspend fun setThemePreference(preference: ThemePreference) {
+        themeFlow.value = preference
+    }
 }
 
 class FakeMemoryRepository(
@@ -194,5 +201,11 @@ class FakeMemoryRepository(
         }
         storedFacts.removeAll(gone)
         return gone.size
+    }
+
+    override suspend fun clearAll() {
+        recorded.clear()
+        storedFacts.clear()
+        placeHits.clear()
     }
 }

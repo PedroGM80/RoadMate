@@ -40,6 +40,9 @@ interface MemoryRepository {
     /** The [limit] places the driver goes to most, most-visited first. */
     suspend fun frequentPlaces(limit: Int = 3): List<UserFact>
 
+    /** Wipes everything — conversation history and every learned fact. */
+    suspend fun clearAll()
+
     /**
      * Drops facts of [type] whose value contains [valueContains]
      * (case-insensitive); pass null to drop them all. Returns how many went.

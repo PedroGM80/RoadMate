@@ -80,6 +80,11 @@ class MemoryRepositoryImpl @Inject constructor(
         if (valueContains.isNullOrBlank()) dao.deleteFactsByType(type.name)
         else dao.deleteFactsMatching(type.name, valueContains)
 
+    override suspend fun clearAll() {
+        dao.clearExchanges()
+        dao.clearFacts()
+    }
+
     private companion object {
         /** How far back still counts as "this conversation". */
         const val CONVERSATION_WINDOW_MS = 2 * 60 * 60 * 1000L
