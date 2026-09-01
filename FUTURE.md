@@ -30,6 +30,25 @@ commitment, just a starting point for the next session. See
   filler". Worth revisiting once it's heard on a device — TTS cadence can
   make a written line land differently — and the joke bank still has its
   own separate voice.
+- **Adapt to the driver (continued).** Real weight-level learning isn't on
+  the table — AICore is frozen, MediaPipe LLM Inference is inference-only,
+  and anything server-side breaks the "nothing leaves the phone" stance.
+  What fits, roughly in order of value:
+  - *On-device memory.* `Room` is a dependency and sits unused. A local
+    store of durable facts (home/work, frequent destinations, stated
+    likes/dislikes, names/relationships from past chats) fed into
+    `PromptBuilder`. Also: `TravelContext.lastResponses` is currently just
+    the single last response — real in-trip continuity needs it to
+    accumulate.
+  - *STT vocabulary.* Vosk takes a phrase-list grammar at `Recognizer(...)`
+    construction; feeding it contact names + frequent place names sharply
+    improves recognition of exactly those.
+  - *Feedback → few-shot.* Let the driver react ("más corto", "no era eso");
+    store corrections locally and prepend a couple as guidance. The
+    answer-length preference (already shipped) is the first slice of this.
+  - *Better base model (build-time).* `LOCAL_AI_MODEL_URL` is overridable —
+    LoRA-finetune Qwen2.5-0.5B on a driving-assistant set offline, merge,
+    convert to `.task`, ship that URL.
 - **Quick Settings Tile / home screen widget.** A one-tap "ask RoadMate"
   entry point without opening the app first. Real effort (new Android
   surface, its own lifecycle), but a plausible retention lever.

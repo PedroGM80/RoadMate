@@ -55,6 +55,11 @@ without reading the full git log.
   on a phone, rail when wider; past ~840dp both Voz and Mapa render side by
   side and the nav items drop. Phone behaviour unchanged (two tabs, one
   saved int). Not checked on a real tablet/foldable.
+- **Answer-length preference** (build- & unit-verified): "respuestas cortas /
+  con más detalle / normales" persists an `AnswerStyle` in DataStore, and
+  `PromptBuilder` folds it into every Gemini prompt. First step of "adapt to
+  this driver" — see FUTURE.md for where that goes (on-device memory, STT
+  vocab from contacts, feedback → few-shot).
 - **Location + weather context**: `LocationRepository` (FusedLocationProvider)
   feeds `TravelContext`; weather is the one optional network call, disclosed
   on first run. `refreshLocation()` times out via
