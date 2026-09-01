@@ -13,6 +13,7 @@ import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.DetectSilenceUseCase
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
+import dev.pgm.roadmate.utils.SpokenText
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
 import dev.pgm.roadmate.utils.Constants
 import kotlinx.coroutines.Job
@@ -169,7 +170,7 @@ class RoadMateViewModel @Inject constructor(
             var finalText = ""
             var failure: String? = null
             recordAudioUseCase()
-                .catch { failure = "No te he oído. Prueba otra vez." }
+                .catch { failure = SpokenText.SPEECH_FLOW_ERROR }
                 .collect { event ->
                     when (event) {
                         // Live transcription so the user sees what's being heard.

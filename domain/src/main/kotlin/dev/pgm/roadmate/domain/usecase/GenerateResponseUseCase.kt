@@ -20,6 +20,7 @@ import dev.pgm.roadmate.utils.MediaIntentParser
 import dev.pgm.roadmate.utils.MemoryCommandParser
 import dev.pgm.roadmate.utils.PlaceName
 import dev.pgm.roadmate.utils.PromptBuilder
+import dev.pgm.roadmate.utils.SpokenText
 import dev.pgm.roadmate.utils.StylePreferenceParser
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -92,24 +93,24 @@ class GenerateResponseUseCase @Inject constructor(
     ): String = when (command) {
         is MemoryCommandParser.Command.Remember -> {
             memoryRepository.remember(UserFact(FactType.PREFERENCE, value = command.value))
-            "Anotado."
+            SpokenText.NOTED
         }
 
         is MemoryCommandParser.Command.Forget -> {
             val dropped = memoryRepository.forget(FactType.PREFERENCE, command.match)
-            if (dropped > 0) "Vale, lo olvido." else "No tenía nada apuntado sobre eso."
+            if (dropped > 0) SpokenText.FORGOTTEN else SpokenText.NOTHING_TO_FORGET
         }
 
         MemoryCommandParser.Command.Recall -> {
             val prefs = memoryRepository.facts(FactType.PREFERENCE)
-            if (prefs.isEmpty()) "Aún no he aprendido nada sobre ti."
-            else "Recuerdo esto: " + prefs.joinToString("; ") { it.value } + "."
+            if (prefs.isEmpty()) SpokenText.NOTHING_LEARNED
+            else SpokenText.known(prefs.joinToString("; ") { it.value })
         }
 
         is MemoryCommandParser.Command.Search -> {
             val hit = memoryRepository.searchExchanges(command.term).firstOrNull()
-            if (hit == null) "No encuentro que hayamos hablado de eso."
-            else "Me preguntaste \"${hit.question}\" y te dije: ${hit.answer}"
+            if (hit == null) SpokenText.NOTHING_ON_RECORD
+            else SpokenText.recalled(hit.question, hit.answer)
         }
 
         MemoryCommandParser.Command.SetHome -> saveNamedLocation(FactType.HOME, "casa", context)
@@ -119,16 +120,15 @@ class GenerateResponseUseCase @Inject constructor(
             memoryRepository.remember(
                 UserFact(FactType.RELATIONSHIP, key = command.relation, value = command.name)
             )
-            "Vale, ${command.name} es tu ${command.relation}."
+            SpokenText.relationSaved(command.name, command.relation)
         }
     }
 
     private suspend fun saveNamedLocation(type: FactType, label: String, context: TravelContext): String {
-        val here = context.currentLocation
-            ?: return "No tengo tu ubicación ahora mismo. Dímelo cuando tenga señal."
+        val here = context.currentLocation ?: return SpokenText.NO_LOCATION_YET
         memoryRepository.forget(type)
         memoryRepository.remember(UserFact(type, value = "${here.first},${here.second}"))
-        return "Guardado. Esta es tu $label."
+        return SpokenText.locationSaved(label)
     }
 
     private suspend fun askGemini(context: TravelContext, userInput: String): String {
@@ -154,41 +154,39 @@ class GenerateResponseUseCase @Inject constructor(
 
     private suspend fun handleCallRequest(rawName: String): String {
         if (!phoneCallRepository.hasCallPermission()) {
-            return "No puedo llamar sin permiso. Actívalo en ajustes: contactos y teléfono."
+            return SpokenText.CALL_NO_PERMISSION
         }
         // "llama a mi hermano" → resolve the relationship to a real name first.
         val relation = Regex("""^mi\s+(\p{L}+)$""", RegexOption.IGNORE_CASE)
             .find(rawName.trim())?.groupValues?.get(1)?.lowercase()
         val contactName = if (relation != null && relation in MemoryCommandParser.RELATIONS) {
             memoryRepository.facts(FactType.RELATIONSHIP).firstOrNull { it.key == relation }?.value
-                ?: return "No sé quién es tu $relation. Dime antes \"nombre es mi $relation\"."
+                ?: return SpokenText.unknownRelation(relation)
         } else {
             rawName
         }
         return when (val result = phoneCallRepository.findContactByName(contactName)) {
             is ContactLookupResult.Found -> {
                 phoneCallRepository.placeCall(result.contact.phoneNumber)
-                "Llamando a ${result.contact.name}"
+                SpokenText.calling(result.contact.name)
             }
-            is ContactLookupResult.Ambiguous ->
-                "Tienes varios contactos con ese nombre. Dime cuál."
-            ContactLookupResult.NotFound ->
-                "No encuentro a $contactName en tus contactos."
+            is ContactLookupResult.Ambiguous -> SpokenText.CALL_AMBIGUOUS
+            ContactLookupResult.NotFound -> SpokenText.contactNotFound(contactName)
         }
     }
 
     private suspend fun handleMapSearch(query: String, location: Pair<Double, Double>?): String =
         if (mapSearchRepository.searchNearby(query, location)) {
             memoryRepository.rememberPlace(PlaceName.normalize(query))
-            "Busco $query en el mapa."
+            SpokenText.searchingMap(query)
         } else {
-            "No hay ninguna app de mapas para buscar $query."
+            SpokenText.noMapsApp(query)
         }
 
     private fun handleMediaRequest(app: MediaApp): String =
         if (mediaRepository.launchMediaApp(app)) {
-            "Abro ${app.displayName}."
+            SpokenText.openingApp(app.displayName)
         } else {
-            "No puedo abrir ${app.displayName}. ¿La tienes instalada?"
+            SpokenText.cantOpenApp(app.displayName)
         }
 }

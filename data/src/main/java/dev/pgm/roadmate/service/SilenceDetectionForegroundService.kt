@@ -17,6 +17,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.usecase.DetectSilenceUseCase
+import dev.pgm.roadmate.utils.SpokenText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -94,7 +95,7 @@ class SilenceDetectionForegroundService : Service() {
 
     private suspend fun onSilenceDetected() {
         val manager = getSystemService(NotificationManager::class.java)
-        manager?.notify(NOTIFICATION_ID, buildNotification("Llevas un buen rato al volante. ¿Paramos a descansar?"))
+        manager?.notify(NOTIFICATION_ID, buildNotification(SpokenText.REST_NUDGE))
 
         val travelContext = buildTravelContext()
         detectSilenceUseCase.triggerRestPrompt(travelContext).collect { response ->
@@ -116,7 +117,7 @@ class SilenceDetectionForegroundService : Service() {
         )
     }
 
-    private fun buildNotification(text: String = "Atento por si necesitas un descanso."): Notification {
+    private fun buildNotification(text: String = SpokenText.REST_MONITOR): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("RoadMate")
             .setContentText(text)

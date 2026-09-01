@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
+import dev.pgm.roadmate.utils.SpokenText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -55,7 +56,7 @@ class VoskSpeechRecognizer @Inject constructor(
     fun recognize(): Flow<SpeechRecognitionEvent> = callbackFlow {
         val loadedModel = runCatching { loadModel() }.getOrNull()
         if (loadedModel == null) {
-            trySend(SpeechRecognitionEvent.Failed("La voz aún se está preparando. Prueba en unos segundos."))
+            trySend(SpeechRecognitionEvent.Failed(SpokenText.SPEECH_NOT_READY))
             close()
             return@callbackFlow
         }
@@ -81,7 +82,7 @@ class VoskSpeechRecognizer @Inject constructor(
 
             override fun onError(exception: Exception?) {
                 Log.w(TAG, "recognition error", exception)
-                trySend(SpeechRecognitionEvent.Failed("No te he oído. Prueba otra vez."))
+                trySend(SpeechRecognitionEvent.Failed(SpokenText.SPEECH_FLOW_ERROR))
                 close()
             }
 
@@ -95,7 +96,7 @@ class VoskSpeechRecognizer @Inject constructor(
             SpeechService(recognizer, SAMPLE_RATE)
         } catch (e: IOException) {
             Log.w(TAG, "could not open microphone", e)
-            trySend(SpeechRecognitionEvent.Failed("No tengo acceso al micrófono. Revisa el permiso."))
+            trySend(SpeechRecognitionEvent.Failed(SpokenText.SPEECH_MIC_DENIED))
             recognizer.close()
             carMicrophonePreference.clearPreference()
             close()
