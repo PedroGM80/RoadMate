@@ -14,6 +14,7 @@ import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
+import dev.pgm.roadmate.utils.ArithmeticParser
 import dev.pgm.roadmate.utils.CallFollowUpParser
 import dev.pgm.roadmate.utils.CallIntentParser
 import dev.pgm.roadmate.utils.JokeProvider
@@ -100,6 +101,7 @@ class GenerateResponseUseCase @Inject constructor(
         val mediaApp = MediaIntentParser.extractMediaApp(userInput)
         val styleChange = StylePreferenceParser.parse(userInput)
         val memoryCommand = MemoryCommandParser.parse(userInput)
+        val arithmetic = ArithmeticParser.evaluate(userInput)
         val response = when {
             contactName != null -> handleCallRequest(contactName)
             mapQuery != null -> handleMapSearch(mapQuery, context.currentLocation)
@@ -108,6 +110,7 @@ class GenerateResponseUseCase @Inject constructor(
             styleChange != null -> handleStyleChange(styleChange)
             memoryCommand != null -> handleMemoryCommand(memoryCommand, context)
             WeatherIntentParser.isWeatherQuestion(userInput) -> handleWeather(context)
+            arithmetic != null -> arithmetic
             else -> askGemini(context, userInput)
         }
         speechSynthesisRepository.speak(response)
@@ -163,7 +166,7 @@ class GenerateResponseUseCase @Inject constructor(
             context = context,
             userInput = userInput,
             style = assistantPreferencesRepository.answerStyle.first(),
-            recentExchanges = memoryRepository.recentExchanges(),
+            recentExchanges = memoryRepository.recentExchanges(limit = 1),
             driverPreferences = memoryRepository.facts(FactType.PREFERENCE).map { it.value },
             frequentPlaces = memoryRepository.frequentPlaces().map { it.value },
             home = memoryRepository.facts(FactType.HOME).firstOrNull()?.value,

@@ -114,8 +114,8 @@ class RoadMateViewModelTest {
         viewModel.startListening()
         advanceUntilIdle()
 
-        // The final Result wins, but partials drove the field while listening.
-        assertEquals("cuánto queda para llegar", viewModel.uiState.value.lastRecognizedInput)
+        // The final Result wins (and an obvious question gets punctuated).
+        assertEquals("¿cuánto queda para llegar?", viewModel.uiState.value.lastRecognizedInput)
     }
 
     @Test

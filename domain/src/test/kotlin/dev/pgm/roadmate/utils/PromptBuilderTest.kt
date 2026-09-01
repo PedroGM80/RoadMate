@@ -95,46 +95,29 @@ class PromptBuilderTest {
     }
 
     @Test
-    fun `omits the conversation section when there are no recent exchanges`() {
-        assertFalse(PromptBuilder.buildPrompt(context(), "¿y eso?").contains("Conversación reciente"))
+    fun `omits the previous-turn section when there are no recent exchanges`() {
+        assertFalse(PromptBuilder.buildPrompt(context(), "hola").contains("Turno anterior"))
     }
 
     @Test
-    fun `includes history only for a follow-up question`() {
+    fun `includes only the single most recent exchange`() {
         val exchanges = listOf("uno", "dos", "tres").map { Exchange("p-$it", "r-$it") }
 
-        val standalone = PromptBuilder.buildPrompt(
-            context(input = "¿cuál es la capital de Francia?"), "¿cuál es la capital de Francia?",
-            recentExchanges = exchanges,
-        )
-        val followUp = PromptBuilder.buildPrompt(
-            context(input = "¿y por qué?"), "¿y por qué?",
-            recentExchanges = exchanges,
-        )
+        val prompt = PromptBuilder.buildPrompt(context(), "hola", recentExchanges = exchanges)
 
-        assertFalse(standalone.contains("Conversación reciente"))
-        assertTrue(followUp.contains("Conversación reciente"))
-    }
-
-    @Test
-    fun `includes only the last two exchanges, and only on a follow-up`() {
-        val exchanges = listOf("uno", "dos", "tres").map { Exchange("p-$it", "r-$it") }
-
-        val prompt = PromptBuilder.buildPrompt(
-            context(input = "¿y eso?"), "¿y eso?", recentExchanges = exchanges,
-        )
-
+        assertTrue(prompt.contains("Turno anterior"))
         assertFalse(prompt.contains("p-uno"))
-        assertTrue(prompt.contains("p-dos"))
+        assertFalse(prompt.contains("p-dos"))
+        assertTrue(prompt.contains("p-tres"))
         assertTrue(prompt.contains("r-tres"))
     }
 
     @Test
-    fun `caps the length of each rendered exchange line`() {
+    fun `caps the length of the rendered exchange line`() {
         val long = "x".repeat(400)
 
         val prompt = PromptBuilder.buildPrompt(
-            context(input = "¿y eso?"), "¿y eso?",
+            context(), "hola",
             recentExchanges = listOf(Exchange(long, long)),
         )
 

@@ -93,8 +93,10 @@ class MemoryRepositoryImpl @Inject constructor(
     }
 
     private companion object {
-        /** How far back still counts as "this conversation". */
-        const val CONVERSATION_WINDOW_MS = 2 * 60 * 60 * 1000L
+        /** How far back still counts as "still talking about the same thing".
+         *  Short on purpose — a stale exchange fed back in makes a small model
+         *  answer the old question. */
+        const val CONVERSATION_WINDOW_MS = 5 * 60 * 1000L
 
         /** Older rows are dropped — the history is for continuity, not a log. */
         const val RETENTION_MS = 7 * 24 * 60 * 60 * 1000L

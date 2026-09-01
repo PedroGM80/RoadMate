@@ -7,7 +7,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.RectF
 import android.net.Uri
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +27,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -45,6 +49,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.pgm.roadmate.ui.theme.Spacing
 import androidx.compose.ui.viewinterop.AndroidView
@@ -113,18 +119,19 @@ fun MapScreen(
 
     LaunchedEffect(locationPermission.status.isGranted, mapLibreMap) {
         val map = mapLibreMap ?: return@LaunchedEffect
-        if (locationPermission.status.isGranted) {
-            map.style?.let { maybeEnableLocation(map, it, context, true) }
-            if (!centeredOnUser) {
-                @SuppressLint("MissingPermission")
-                val last = map.locationComponent.takeIf { it.isLocationComponentActivated }?.lastKnownLocation
-                if (last != null) {
-                    map.animateCamera(
-                        CameraUpdateFactory.newLatLngZoom(LatLng(last.latitude, last.longitude), 13.0),
-                    )
-                    centeredOnUser = true
-                }
+        if (!locationPermission.status.isGranted) return@LaunchedEffect
+        map.style?.let { maybeEnableLocation(map, it, context, true) }
+
+        // The first GPS fix can take a few seconds after the component
+        // activates; poll for it instead of centering once and giving up
+        // (which left the map on the style's zoomed-out default).
+        repeat(20) {
+            if (centeredOnUser) return@LaunchedEffect
+            if (centerOnUser(map)) {
+                centeredOnUser = true
+                return@LaunchedEffect
             }
+            delay(500)
         }
     }
 
@@ -169,18 +176,31 @@ fun MapScreen(
                 }
             }
 
-            ExtendedFloatingActionButton(
-                onClick = {
-                    val map = mapLibreMap ?: return@ExtendedFloatingActionButton
-                    viewModel.downloadVisibleRegion(
-                        bounds = map.projection.visibleRegion.latLngBounds,
-                        pixelRatio = context.resources.displayMetrics.density,
-                    )
-                },
-                icon = { Icon(painterResource(R.drawable.lucide_ic_download), contentDescription = null) },
-                text = { Text(stringResource(R.string.map_download_area)) },
-                modifier = Modifier.align(Alignment.BottomEnd),
+            MapControls(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                onZoomIn = { mapLibreMap?.animateCamera(CameraUpdateFactory.zoomBy(1.0), 200) },
+                onZoomOut = { mapLibreMap?.animateCamera(CameraUpdateFactory.zoomBy(-1.0), 200) },
+                onRecenter = { mapLibreMap?.let { centerOnUser(it) } },
             )
+
+            // Hidden once a region is saved — nothing to do until the driver
+            // pans somewhere new, at which point Ready flips back to Idle.
+            if (offlineStatus !is OfflineMapStatus.Ready &&
+                offlineStatus !is OfflineMapStatus.Downloading
+            ) {
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        val map = mapLibreMap ?: return@ExtendedFloatingActionButton
+                        viewModel.downloadVisibleRegion(
+                            bounds = map.projection.visibleRegion.latLngBounds,
+                            pixelRatio = context.resources.displayMetrics.density,
+                        )
+                    },
+                    icon = { Icon(painterResource(R.drawable.lucide_ic_download), contentDescription = null) },
+                    text = { Text(stringResource(R.string.map_download_area)) },
+                    modifier = Modifier.align(Alignment.BottomEnd),
+                )
+            }
         }
 
         selectedPoi?.let { (name, latLng) ->
@@ -299,6 +319,69 @@ private fun maybeEnableLocation(map: MapLibreMap, style: Style, context: Context
         component.isLocationComponentEnabled = true
         component.cameraMode = CameraMode.TRACKING
         component.renderMode = RenderMode.COMPASS
+        // TRACKING keeps the camera on the dot but never sets a zoom; without
+        // this the map follows the user at whatever far-out zoom it loaded at.
+        runCatching { component.zoomWhileTracking(DRIVING_ZOOM) }
+    }
+}
+
+/** Recenter on the last known position at driving zoom. Returns false if there's no fix yet. */
+@SuppressLint("MissingPermission")
+private fun centerOnUser(map: MapLibreMap): Boolean {
+    val last = map.locationComponent
+        .takeIf { it.isLocationComponentActivated }?.lastKnownLocation ?: return false
+    map.animateCamera(
+        CameraUpdateFactory.newLatLngZoom(LatLng(last.latitude, last.longitude), DRIVING_ZOOM),
+    )
+    return true
+}
+
+/** Street-level zoom for a moving driver — city-wide (~13) is too far out. */
+private const val DRIVING_ZOOM = 15.5
+
+@Composable
+private fun MapControls(
+    modifier: Modifier = Modifier,
+    onZoomIn: () -> Unit,
+    onZoomOut: () -> Unit,
+    onRecenter: () -> Unit,
+) {
+    val zoomInLabel = stringResource(R.string.map_zoom_in)
+    val zoomOutLabel = stringResource(R.string.map_zoom_out)
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = 2.dp,
+        ) {
+            Column {
+                IconButton(
+                    onClick = onZoomIn,
+                    modifier = Modifier.semantics { contentDescription = zoomInLabel },
+                ) { Text("+", style = MaterialTheme.typography.headlineSmall) }
+                HorizontalDivider()
+                IconButton(
+                    onClick = onZoomOut,
+                    modifier = Modifier.semantics { contentDescription = zoomOutLabel },
+                ) { Text("−", style = MaterialTheme.typography.headlineSmall) }
+            }
+        }
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shadowElevation = 2.dp,
+        ) {
+            IconButton(onClick = onRecenter) {
+                Icon(
+                    painterResource(R.drawable.lucide_ic_map_pin),
+                    contentDescription = stringResource(R.string.map_recenter),
+                )
+            }
+        }
     }
 }
 
@@ -310,9 +393,14 @@ private fun refreshPois(map: MapLibreMap, mapView: MapView, manager: SymbolManag
         val features = map.queryRenderedFeatures(
             RectF(0f, 0f, mapView.width.toFloat(), mapView.height.toFloat()),
         )
+        val points = features.filter { it.geometry() is Point }
+        dev.pgm.roadmate.ml.DebugTrace.log(
+            "POI ${kind.name}: ${features.size} features, ${points.size} points; " +
+                "classes seen = " + points.mapNotNull { it.getStringProperty("class") }
+                    .groupingBy { it }.eachCount().toString(),
+        )
         val seen = HashSet<String>()
-        val options = features.asSequence()
-            .filter { it.geometry() is Point }
+        val options = points.asSequence()
             .filter { it.getStringProperty("class") in kind.classes }
             .mapNotNull { f ->
                 val name = f.getStringProperty("name")?.trim().orEmpty()

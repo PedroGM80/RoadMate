@@ -13,6 +13,7 @@ import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.DetectSilenceUseCase
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
+import dev.pgm.roadmate.utils.QuestionPunctuation
 import dev.pgm.roadmate.utils.SpokenText
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
 import dev.pgm.roadmate.utils.Constants
@@ -208,11 +209,14 @@ class RoadMateViewModel @Inject constructor(
                 return@launch
             }
 
+            // Vosk returns bare lowercase text; punctuate an obvious question
+            // so it reads right and the model gets a clearer signal.
+            val recognized = QuestionPunctuation.normalize(finalText)
             _uiState.value = _uiState.value.copy(
                 status = RoadMateStatus.PROCESSING,
-                lastRecognizedInput = finalText
+                lastRecognizedInput = recognized
             )
-            respondTo(finalText)
+            respondTo(recognized)
         }
     }
 
