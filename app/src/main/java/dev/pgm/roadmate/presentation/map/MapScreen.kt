@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.RectF
 import android.net.Uri
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.horizontalScroll
@@ -17,7 +16,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -64,6 +65,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 import dev.pgm.roadmate.R
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.modes.CameraMode
 import org.maplibre.android.location.modes.RenderMode
@@ -72,6 +74,7 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
 import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
+import org.maplibre.android.style.sources.VectorSource
 import org.maplibre.geojson.Point
 
 private const val PIN_PREFIX = "roadmate-pin-"
@@ -103,7 +106,8 @@ fun MapScreen(
                     iconAllowOverlap = true
                     textAllowOverlap = false
                     addClickListener { symbol ->
-                        selectedPoi = symbol.textField.orEmpty() to symbol.latLng
+                        val name = symbol.data?.takeIf { it.isJsonPrimitive }?.asString.orEmpty()
+                        selectedPoi = name to symbol.latLng
                         true
                     }
                 }
@@ -136,7 +140,20 @@ fun MapScreen(
     }
 
     LaunchedEffect(poiFilter, symbolManager) {
-        mapLibreMap?.let { map -> symbolManager?.let { refreshPois(map, mapView, it, poiFilter) } }
+        val map = mapLibreMap ?: return@LaunchedEffect
+        val manager = symbolManager ?: return@LaunchedEffect
+        val pins = refreshPois(map, mapView, manager, poiFilter)
+        // Turning a filter on: frame the pins so they're actually visible
+        // (they sit across the loaded tiles, not just the ~500 m in view).
+        // Keep enough zoom that the POI vector layer still has data (>=14).
+        if (poiFilter != null && pins.size >= 2) {
+            val b = LatLngBounds.Builder().includes(pins).build()
+            runCatching {
+                map.animateCamera(CameraUpdateFactory.newLatLngBounds(b, 120), 400)
+            }
+        } else if (poiFilter != null && pins.size == 1) {
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(pins.first(), 15.0), 400)
+        }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -149,31 +166,21 @@ fun MapScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(Spacing.sm),
         ) {
-            OfflineStatusChip(
-                status = offlineStatus,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
-
-            Surface(
-                modifier = Modifier.align(Alignment.BottomStart),
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shadowElevation = 2.dp,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .horizontalScroll(rememberScrollState())
-                        .padding(Spacing.xs),
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                ) {
-                    PoiKind.entries.forEach { kind ->
-                        FilterChip(
-                            selected = poiFilter == kind,
-                            onClick = { viewModel.togglePoiFilter(kind) },
-                            label = { Text(stringResource(kind.labelRes)) },
-                        )
-                    }
+            // "Listo" is a confirmation, not a permanent state — let it fade
+            // after a few seconds. Everything else stays put.
+            var showReady by remember { mutableStateOf(true) }
+            LaunchedEffect(offlineStatus) {
+                if (offlineStatus is OfflineMapStatus.Ready) {
+                    showReady = true
+                    delay(4000)
+                    showReady = false
                 }
+            }
+            if (offlineStatus !is OfflineMapStatus.Ready || showReady) {
+                OfflineStatusChip(
+                    status = offlineStatus,
+                    modifier = Modifier.align(Alignment.TopCenter),
+                )
             }
 
             MapControls(
@@ -183,23 +190,52 @@ fun MapScreen(
                 onRecenter = { mapLibreMap?.let { centerOnUser(it) } },
             )
 
-            // Hidden once a region is saved — nothing to do until the driver
-            // pans somewhere new, at which point Ready flips back to Idle.
-            if (offlineStatus !is OfflineMapStatus.Ready &&
-                offlineStatus !is OfflineMapStatus.Downloading
+            // Bottom row: filter chips + (when there's nothing saved yet) the
+            // download action, both clear of the app's navigation bar.
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm),
             ) {
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        val map = mapLibreMap ?: return@ExtendedFloatingActionButton
-                        viewModel.downloadVisibleRegion(
-                            bounds = map.projection.visibleRegion.latLngBounds,
-                            pixelRatio = context.resources.displayMetrics.density,
-                        )
-                    },
-                    icon = { Icon(painterResource(R.drawable.lucide_ic_download), contentDescription = null) },
-                    text = { Text(stringResource(R.string.map_download_area)) },
-                    modifier = Modifier.align(Alignment.BottomEnd),
-                )
+                if (offlineStatus !is OfflineMapStatus.Ready &&
+                    offlineStatus !is OfflineMapStatus.Downloading
+                ) {
+                    ExtendedFloatingActionButton(
+                        onClick = {
+                            val map = mapLibreMap ?: return@ExtendedFloatingActionButton
+                            viewModel.downloadVisibleRegion(
+                                bounds = map.projection.visibleRegion.latLngBounds,
+                                pixelRatio = context.resources.displayMetrics.density,
+                            )
+                        },
+                        icon = { Icon(painterResource(R.drawable.lucide_ic_download), contentDescription = null) },
+                        text = { Text(stringResource(R.string.map_download_area)) },
+                        modifier = Modifier.align(Alignment.End),
+                    )
+                }
+
+                Surface(
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shadowElevation = 2.dp,
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .horizontalScroll(rememberScrollState())
+                            .padding(Spacing.xs),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    ) {
+                        PoiKind.entries.forEach { kind ->
+                            FilterChip(
+                                selected = poiFilter == kind,
+                                onClick = { viewModel.togglePoiFilter(kind) },
+                                label = { Text(stringResource(kind.labelRes)) },
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -339,6 +375,7 @@ private fun centerOnUser(map: MapLibreMap): Boolean {
 /** Street-level zoom for a moving driver — city-wide (~13) is too far out. */
 private const val DRIVING_ZOOM = 15.5
 
+
 @Composable
 private fun MapControls(
     modifier: Modifier = Modifier,
@@ -349,7 +386,7 @@ private fun MapControls(
     val zoomInLabel = stringResource(R.string.map_zoom_in)
     val zoomOutLabel = stringResource(R.string.map_zoom_out)
     Column(
-        modifier = modifier,
+        modifier = modifier.width(IntrinsicSize.Min),
         verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -358,16 +395,16 @@ private fun MapControls(
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             shadowElevation = 2.dp,
         ) {
-            Column {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 IconButton(
                     onClick = onZoomIn,
                     modifier = Modifier.semantics { contentDescription = zoomInLabel },
-                ) { Text("+", style = MaterialTheme.typography.headlineSmall) }
-                HorizontalDivider()
+                ) { Text("+", style = MaterialTheme.typography.titleLarge) }
+                HorizontalDivider(modifier = Modifier.width(24.dp))
                 IconButton(
                     onClick = onZoomOut,
                     modifier = Modifier.semantics { contentDescription = zoomOutLabel },
-                ) { Text("−", style = MaterialTheme.typography.headlineSmall) }
+                ) { Text("−", style = MaterialTheme.typography.titleLarge) }
             }
         }
         Surface(
@@ -385,40 +422,74 @@ private fun MapControls(
     }
 }
 
-/** OpenMapTiles-schema POI features carry `class` + `name`; pin the matches. */
-private fun refreshPois(map: MapLibreMap, mapView: MapView, manager: SymbolManager, kind: PoiKind?) {
-    runCatching {
-        manager.deleteAll()
-        if (kind == null) return
-        val features = map.queryRenderedFeatures(
-            RectF(0f, 0f, mapView.width.toFloat(), mapView.height.toFloat()),
-        )
-        val points = features.filter { it.geometry() is Point }
+/**
+ * OpenMapTiles-schema POI features carry `class` + `name`. Query the vector
+ * *source* (the "poi" layer of the tiles), not `queryRenderedFeatures` — at
+ * driving zoom the style only draws a handful of POI icons, so the rendered
+ * query finds almost nothing. Source features come from every loaded tile
+ * regardless of what's drawn; we clip to the visible region ourselves.
+ */
+private fun refreshPois(
+    map: MapLibreMap,
+    mapView: MapView,
+    manager: SymbolManager,
+    kind: PoiKind?,
+): List<LatLng> {
+    return runCatching {
+        if (kind == null) {
+            manager.deleteAll()
+            return emptyList()
+        }
+
+        val vectorSource = map.style?.sources?.firstOrNull { it is VectorSource } as? VectorSource
+        val points = vectorSource
+            ?.querySourceFeatures(arrayOf("poi", "poi_label"), null)
+            .orEmpty()
+            .filter { it.geometry() is Point }
+
+        val fallbackLabel = fallbackLabelFor(mapView.context, kind)
+        val matches = points.filter { it.getStringProperty("class") in kind.classes }
+
         dev.pgm.roadmate.ml.DebugTrace.log(
-            "POI ${kind.name}: ${features.size} features, ${points.size} points; " +
-                "classes seen = " + points.mapNotNull { it.getStringProperty("class") }
-                    .groupingBy { it }.eachCount().toString(),
+            "POI ${kind.name}: source=${vectorSource?.id} pois=${points.size} " +
+                "matching=${matches.size}; classes = " +
+                points.mapNotNull { it.getStringProperty("class") }.groupingBy { it }.eachCount(),
         )
+
         val seen = HashSet<String>()
-        val options = points.asSequence()
-            .filter { it.getStringProperty("class") in kind.classes }
+        val pins = matches.asSequence()
             .mapNotNull { f ->
-                val name = f.getStringProperty("name")?.trim().orEmpty()
-                if (name.isEmpty()) return@mapNotNull null
                 val p = f.geometry() as Point
-                if (!seen.add("$name@${p.latitude()},${p.longitude()}")) return@mapNotNull null
-                SymbolOptions()
-                    .withLatLng(LatLng(p.latitude(), p.longitude()))
+                val at = LatLng(p.latitude(), p.longitude())
+                if (!seen.add("${p.latitude()},${p.longitude()}")) return@mapNotNull null
+                val name = f.getStringProperty("name")?.trim().takeUnless { it.isNullOrEmpty() }
+                    ?: fallbackLabel
+                // Icon only on the map — a text field needs a glyph font the
+                // OpenFreeMap style may not serve, which silently drops the
+                // whole symbol. The name rides along in `data` for the sheet.
+                at to SymbolOptions()
+                    .withLatLng(at)
                     .withIconImage(PIN_PREFIX + kind.name)
-                    .withIconSize(1.0f)
-                    .withTextField(name)
-                    .withTextSize(11f)
-                    .withTextOffset(arrayOf(0f, 1.4f))
+                    .withIconSize(1.2f)
+                    .withData(com.google.gson.JsonPrimitive(name))
             }
-            .take(80)
+            .take(120)
             .toList()
-        if (options.isNotEmpty()) manager.create(options)
-    }
+        // Only swap the pins when this query actually found some — zooming out
+        // past the POI vector layer's min zoom (~14) returns nothing, and we
+        // don't want that to wipe the pins already on screen.
+        if (pins.isNotEmpty()) {
+            manager.deleteAll()
+            manager.create(pins.map { it.second })
+        }
+        pins.map { it.first }
+    }.getOrDefault(emptyList())
+}
+
+private fun fallbackLabelFor(context: Context, kind: PoiKind): String = when (kind) {
+    PoiKind.FUEL -> context.getString(R.string.map_poi_fuel_one)
+    PoiKind.HOTEL -> context.getString(R.string.map_poi_hotel_one)
+    PoiKind.FOOD -> context.getString(R.string.map_poi_food_one)
 }
 
 private fun registerPinIcons(style: Style, context: Context) {

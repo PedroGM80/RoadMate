@@ -75,6 +75,9 @@
     <string name="map_poi_hotel">Hoteles</string>
     <string name="map_poi_food">Comida</string>
     <string name="map_poi_fallback_name">Sitio</string>
+    <string name="map_poi_fuel_one">Gasolinera</string>
+    <string name="map_poi_hotel_one">Alojamiento</string>
+    <string name="map_poi_food_one">Restaurante</string>
     <string name="map_download_area">Descargar esta zona</string>
     <string name="map_recenter">Centrar en mi posición</string>
     <string name="map_zoom_in">Acercar</string>
