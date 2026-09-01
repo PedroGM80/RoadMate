@@ -30,6 +30,22 @@ commitment, just a starting point for the next session. See
 
 ## Medium effort
 
+- **Q&A latency — stream the answer to TTS.** Measured on-device (Xiaomi,
+  no AICore, Qwen2.5-1.5B on CPU): ~7 s from "stop talking" to "hear the
+  answer" warm, ~12 s cold. Startup warm-up already removed the cold
+  penalty. Biggest remaining win: `LlmInferenceSession.generateResponseAsync`
+  + a progress listener, buffer to sentence boundaries, feed
+  `TextToSpeechManager` incrementally so it starts speaking at ~1.5 s
+  instead of waiting ~6 s for the whole reply. Smaller: drop lat/lon +
+  weather lines from the prompt when the question doesn't need them;
+  tighten Vosk end-of-speech. GPU backend is a dead end on MediaTek
+  (silent hang).
+- **Bigger Vosk model.** The bundled `vosk-model-small-es-0.42` mis-hears
+  roughly 1 utterance in 3 on device (drops accents, "que este" for
+  "quince"). `vosk-model-es-0.42` (~1.4 GB) is much better — needs a
+  runtime download path like the LLM has (the small one is bundled in
+  assets). Improves accuracy, not latency.
+
 - **Voice personality — done, but keep tuning.** One tone now runs through
   `GEMINI_SYSTEM_PROMPT` and every fixed spoken line (calls, map, media,
   rest reminders, greeting, errors): "calm co-driver, short sentences, no

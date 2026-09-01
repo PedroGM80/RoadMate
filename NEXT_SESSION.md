@@ -1,161 +1,68 @@
-# Next session — on-device bring-up (2026-09-02)
+# Next session (2026-09-03)
 
-Everything code-only in the backlog is done (see `FUTURE.md`). What's left
-needs a real phone. This session is the **first hardware run** of RoadMate:
-get the voice loop working, then triage what breaks.
+The first on-device session happened (Xiaomi Redmi Note 14, HyperOS,
+Android 16, arm64, **no AICore**). Lots fixed and committed to `develop`.
+This file is now the running state, not the original bring-up plan.
 
-Bring: the Xiaomi (non-AICore → exercises the model-download fallback). A
-Pixel 8+ / Galaxy S24+ too if you have one (AICore / Gemini Nano path).
+## Device / tooling notes
 
----
+- Xiaomi serial `8TOZG675AI4PJFHI` (USB). `adb` at
+  `~/Library/Android/sdk/platform-tools`.
+- HyperOS needs **Developer options → USB debugging (Security settings)** ON
+  for `adb shell input` / `pm grant` to work. It's currently on but can
+  time out — re-enable if taps/grants start failing.
+- **MIUI suppresses logcat for third-party apps** (`log.tag=M`). The whole
+  voice pipeline is traced to a file instead: `DebugTrace` →
+  `/data/data/dev.pgm.roadmate/files/aicore_debug.log`. Pull with
+  `adb exec-out run-as dev.pgm.roadmate cat files/aicore_debug.log`.
+- `local.properties` (untracked) has: the Xiaomi doesn't matter here, but it
+  now points `LOCAL_AI_MODEL_URL` at **Qwen2.5-1.5B-Instruct q8**
+  (`~1.5 GB`, Apache-2.0, ungated) and has `OPENWEATHER_API_KEY` set (the
+  key was still returning 401 — new keys take ~1-2 h to activate; retry).
 
-## Pre-flight (~10 min)
+## What works on device now
 
-1. `git pull` on `develop`; confirm CI is green.
-2. `./gradlew :app:installDebug` — note **which ABI split** installs and its
-   **size** (should be ~115–125 MB, not ~250).
-3. Grant all permissions up front: mic, location (fine), contacts,
-   notifications, phone.
-4. Decision: drop `app/google-services.json` in now to test Crashlytics
-   this session, or skip it and leave crash reporting for later.
-5. `adb logcat -s RoadMate LocalAiModelManager LocalLlmManager VoskSpeechRecognizer PhoneCallRepository OfflineMapManager` in a side terminal.
+- Vosk STT (Spanish) — transcribes, though the *small* model mis-hears
+  ~1 in 3 ("que este" for "quince", "le guernica", drops accents).
+- TTS speaks.
+- Local model: AICore absent → Qwen2.5-1.5B via MediaPipe. After the
+  Qwen-0.5B→1.5B swap + prompt rework it **answers properly** (was echoing
+  the question). Identity, "don't invent trip data", question-mark
+  punctuation, arithmetic shortcut, weather shortcut all verified.
+- Model **warm-up at startup** — first question ~4 s instead of ~11 s.
+- Map: renders, street zoom, blue dot, GPS-fix poll, +/- and recenter
+  buttons, "Descargar" hides when a region is saved, "Mapa offline listo"
+  auto-dismisses, **POI filter pins work** (querySourceFeatures on the
+  `poi` layer; icon-only circular markers).
 
----
+## Open — priority order
 
-## Phase 1 — Voice loop (do this first, it's the whole point)
+1. **Streaming answer → TTS per sentence** (the big latency win).
+   `LlmInferenceSession.generateResponseAsync` with a progress listener,
+   buffer to sentence boundaries, feed `TextToSpeechManager` incrementally.
+   Target: start speaking at ~1.5 s instead of ~6 s. See the latency audit
+   in the session log / commit `perf: warm the local model at startup`.
+2. **Strip the debug tracing** before this branch merges: `DebugTrace.kt`,
+   all `dbg(...)` / `DebugTrace.log(...)` calls in `LocalLlmManager`,
+   `GeminiNanoManager`, `GeminiRepositoryImpl`, `VoskSpeechRecognizer`,
+   `MapScreen.refreshPois`. Grep `DebugTrace`.
+3. **Bigger Vosk model** for accuracy — `vosk-model-es-0.42` (~1.4 GB) as a
+   runtime download (the small one is bundled in assets; this needs a
+   download-manager path like the LLM has). Improves recognition, not
+   latency.
+4. Smaller latency wins: drop lat/lon + clima lines from the prompt when
+   the question doesn't need them; tighten Vosk end-of-speech.
+5. Map polish: markers slightly big / overlap when clustered; MapLibre
+   attribution overlaps the chip row's corner; consider a "N cerca" count.
+6. Verify the OpenWeather key once it activates ("¿qué tiempo hace?").
+7. Voice-search → offline-map routing (design already in git history under
+   "docs: plan voice-search -> offline map routing") — now unblocked since
+   the POI query works.
+8. GPU backend for MediaPipe: dead end on this MediaTek (silent hang);
+   could be made opt-in for devices where it works.
 
-- Onboarding → continue. Confirm it doesn't re-show on next launch.
-- Tap mic. Check in order: earcon fires, breathing dot appears, Vosk
-  **partial** text updates as you speak.
-- Ask something simple ("¿qué hora es?"). Confirm: final transcription
-  lands → prompt built → a spoken answer comes back.
-  - Non-AICore device: expect the honest **"modo básico"** canned reply
-    first. The ~547 MB model download should start on Wi-Fi — watch
-    `LocalAiModelManager` in logcat.
-- Error paths: revoke mic permission mid-use; trigger the no-speech
-  timeout (tap mic, stay silent).
+## Not for a device — still open from before
 
-**Likely code work coming out of this:** end-pointing / silence-timeout
-constants, partial-result rendering, the mic-denied message path.
-
-## Phase 2 — Intents (no network needed, fast to run)
-
-Run each and note real-phrasing misses:
-
-- `Llama a <contacto>` — single match calls directly; a name shared by
-  several people asks; finish with "la segunda" / a surname.
-- One contact with a mobile **and** a work number → "¿el móvil o el del
-  trabajo?" → answer "la del trabajo".
-- `Busca gasolineras` / `llévame a <sitio>` / `¿dónde hay una farmacia?`
-  → Maps opens with the query.
-- `Abre Spotify` → app comes to the foreground; try one that isn't
-  installed → spoken explanation.
-- `Cuéntame un chiste` → local joke, no network.
-- `Recuerda que no me gustan las autovías` → `¿qué sabes de mí?` reads it
-  back → `olvida lo de las autovías` drops it.
-- `Respuestas cortas` → confirm later answers are shorter and it sticks
-  across a relaunch.
-- `¿Qué tiempo hace?` — now a shortcut (answers from the weather fetch, not
-  the model). **Set `OPENWEATHER_API_KEY` in `local.properties`** first or
-  it will (correctly) say "No puedo consultar el tiempo ahora mismo".
-- Speak a long answer, then tap the mic while it's still talking — it
-  should cut itself off and listen, not transcribe its own voice.
-
-**Likely code work:** intent regexes that miss how you actually phrase
-things out loud.
-
-## Phase 3 — Map tab
-
-- Map renders (OpenFreeMap "liberty" style, not a blank grid).
-- Blue location dot appears. **If it doesn't:** MapLibre's default engine
-  may need `play-services-location` wired as the location engine — that's a
-  known likely fix, stage it before the session.
-- `Descargar esta zona` completes → turn on airplane mode → pan around,
-  map still works.
-- Filter chips (gasolineras / hoteles / comida) drop pins. **Verify the
-  POI layer names** — `queryRenderedFeatures(... "class")` assumes the
-  OpenFreeMap schema; if no pins appear, the layer/property names are
-  wrong and need fixing against the real style JSON.
-- Tap a pin → Google Maps turn-by-turn launches.
-
-### Then build: voice search → offline map, not the `geo:` intent
-
-Right now "busca gasolineras" always fires a `geo:` intent (external Maps).
-It should prefer the in-app offline map for the categories that map has.
-**Only start this once the filter chips above are confirmed to actually
-drop pins** — otherwise this routes the user to an empty map.
-
-Design (hybrid, with fallback):
-
-1. New `:domain` enum `PlaceCategory { FUEL, HOTEL, FOOD }` + a
-   `PlaceCategoryParser` mapping query text → category
-   ("gasolinera(s)", "combustible", "repostar" → FUEL; "hotel(es)",
-   "alojamiento", "dónde dormir" → HOTEL; "restaurante", "comer",
-   "bar", "cafetería" → FOOD). `PoiKind` in `:app` keeps its
-   tile-`class` sets; add a `PoiKind.from(PlaceCategory)` bridge.
-2. In `GenerateResponseUseCase.handleMapSearch`: if
-   `PlaceCategoryParser` matches → don't call `mapSearchRepository`;
-   instead emit a signal (a `MutableSharedFlow<PlaceCategory>` on a new
-   `MapSearchCoordinator` interface, impl in `:app` / a shared VM) and
-   speak "Te lo enseño en el mapa".
-3. `RootScreen` observes it → switch to the Mapa tab; `MapViewModel`
-   observes it → `_poiFilter.value = PoiKind.from(category)` and recenter
-   on the user's location.
-4. Fallback: if the map has no downloaded region OR
-   `queryRenderedFeatures` returns nothing for that category within ~1 s,
-   fall back to the current `geo:` intent and say "No tengo esa zona
-   descargada, lo abro en Maps".
-5. Non-category queries ("hotel Perico", an address) keep going straight
-   to `geo:` — the offline map has no geocoder.
-
-## Phase 4 — Model download + inference (Wi-Fi, ~547 MB, slow)
-
-- Fetch completes; kill the app mid-download → relaunch → it resumes.
-- On mobile data it should wait; on Wi-Fi it proceeds.
-- Qwen2.5-0.5B loads through MediaPipe and gives a *useful* answer, not
-  word salad. If quality is poor → note it for the "better base model"
-  track (try Qwen2.5-1.5B q8 via `LOCAL_AI_MODEL_URL`).
-
-## Phase 5 — Surfaces
-
-- QS tile: add "Preguntar a RoadMate" to Quick Settings → tap → opens
-  straight into listening.
-- Widget: add to home screen, resize it, tap anywhere on it → same.
-- Greeting: fresh install, first open of the day → one spoken time-of-day
-  greeting, not on every open.
-
-## Phase 5b — Android Auto discovery
-
-`automotive_app_desc.xml` was fixed (`androidx.car.app`, was `template`) so
-the app can be recognised at all. To actually see it on a sideloaded build:
-Android Auto → tap the version 10× to unlock **Developer settings** → enable
-**Unknown sources**, then RoadMate shows in the car launcher (POI category).
-If it still doesn't: check `adb logcat -s CAR.APP` while connecting.
-
-## Phase 6 — AICore device (only if you have one)
-
-- On a Pixel 8+ / Galaxy S24+: "IA local activa" should show **immediately**
-  — no download — and answers route through Gemini Nano.
-
----
-
-## After the device pass — decisions to close
-
-- **R8:** once a clean `assembleRelease` runs on device, flip
-  `app/build.gradle.kts` → `buildTypes.release.optimization.enable = true`
-  and re-test the intent paths (the `-keep` set in `proguard-rules.pro` is
-  already there).
-- **Crashlytics:** `google-services.json` + `firebase-crashlytics-ndk` for
-  native crashes; add an explicit opt-out toggle.
-- **Privacy policy:** publish `PRIVACY.md` to a URL (GitHub Pages).
-- **Play Store:** Android Auto service category — talk to Google's Android
-  for Cars team before submitting.
-
-## Stage before the session (so device time isn't blocked)
-
-- [ ] `play-services-location` as the MapLibre location engine (patch ready,
-      not merged — only needed if the blue dot is dead).
-- [x] `google.navigation:` intent guard — already done: `launchNavigation`
-      in `MapScreen.kt` wraps it in `runCatching` and falls back to `geo:`,
-      itself guarded. No unit test (private Composable helper); verify by
-      running it on a device with no Google Maps installed.
+ABI splits done, CI green. R8 still off pending a verified release build.
+`firebase-crashlytics-ndk` needs `google-services.json`. Privacy-policy
+URL + Play Store Android Auto category are decisions, not code.

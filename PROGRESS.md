@@ -152,6 +152,20 @@ without reading the full git log.
   `app/proguard-rules.pro` already holds the `-keep` set for the JNI-heavy
   libs (MediaPipe, Vosk, MapLibre, AICore) plus Crashlytics, so enabling it
   later is a one-line flip once a release build is checked on hardware.
+- **First on-device run** (Xiaomi Redmi Note 14, HyperOS/Android 16, arm64,
+  **no AICore**): the local-AI path was producing garbage (echoing the
+  question). Root causes found and fixed — Qwen-0.5B is too weak and was
+  getting a raw non-ChatML prompt; the prompt fed conversation history back
+  recursively; MediaPipe returns UTF-8 as Latin-1. Now: model swapped to
+  Qwen2.5-**1.5B** (via `local.properties`), prompt restructured
+  (instruction first, question last before a "Respuesta:" cue, one recent
+  turn max), mojibake round-tripped, model **warmed at startup** (first
+  question ~4 s vs ~11 s cold). Arithmetic + question-mark + weather
+  shortcuts added. Vosk small ES model mis-hears ~1 in 3 — bigger model is
+  the open item. Map: POI filter pins now work (`querySourceFeatures` on the
+  `poi` layer, not `queryRenderedFeatures`), +/- and recenter controls,
+  street-level default zoom. Debug tracing to a file (`DebugTrace`) is in
+  place on `develop` and must be stripped before merge. See `NEXT_SESSION.md`.
 
 ## Explicitly unverified / open
 
