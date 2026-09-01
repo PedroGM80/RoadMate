@@ -119,6 +119,7 @@ class HomeCarScreen(
             val travelContext = TravelContext(
                 currentLocation = location,
                 hour = calendar.get(Calendar.HOUR_OF_DAY),
+                minute = calendar.get(Calendar.MINUTE),
                 date = calendar.time,
                 userInput = userInput
             )

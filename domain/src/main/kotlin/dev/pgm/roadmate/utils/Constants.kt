@@ -36,9 +36,11 @@ object Constants {
     const val LOCATION_TIMEOUT_MS = 10_000L
 
     const val GEMINI_SYSTEM_PROMPT =
-        "Eres el copiloto de RoadMate. Hablas a un conductor: frases cortas y " +
-            "claras, tono tranquilo, nada que distraiga. Ve al grano, sin " +
-            "saludos ni rodeos. Usa su ubicación y el contexto del viaje."
+        "Eres el copiloto de RoadMate y hablas a un conductor. Contesta " +
+            "directamente a su pregunta, en español, con frases cortas y " +
+            "claras y tono tranquilo. Nada de saludos, disculpas ni repetir " +
+            "la pregunta. Si no sabes algo, dilo en una frase. Usa el " +
+            "contexto del viaje solo si ayuda a responder."
 
     val REST_REMINDER_PROMPTS = listOf(
         "¿Debería parar a descansar?",

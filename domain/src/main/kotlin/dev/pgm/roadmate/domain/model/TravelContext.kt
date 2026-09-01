@@ -11,5 +11,6 @@ data class TravelContext(
     val hour: Int,
     val date: Date,
     val userInput: String,
-    val weatherDescription: String? = null
+    val weatherDescription: String? = null,
+    val minute: Int = 0,
 )

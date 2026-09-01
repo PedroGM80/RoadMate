@@ -10,12 +10,25 @@ import java.util.Date
 
 class PromptBuilderTest {
 
+    private fun context(
+        location: Pair<Double, Double>? = null,
+        destination: String? = null,
+        hour: Int = 9,
+        minute: Int = 0,
+        input: String = "hola",
+    ) = TravelContext(
+        currentLocation = location,
+        destination = destination,
+        hour = hour,
+        date = Date(),
+        userInput = input,
+        minute = minute,
+    )
+
     @Test
     fun `applies the requested answer style, defaulting to normal length`() {
-        val context = TravelContext(null, null, 9, Date(), "hola")
-
-        val normal = PromptBuilder.buildPrompt(context, "hola")
-        val brief = PromptBuilder.buildPrompt(context, "hola", AnswerStyle.BRIEF)
+        val normal = PromptBuilder.buildPrompt(context(), "hola")
+        val brief = PromptBuilder.buildPrompt(context(), "hola", AnswerStyle.BRIEF)
 
         assertTrue(normal.contains(AnswerStyle.NORMAL.promptInstruction))
         assertTrue(brief.contains(AnswerStyle.BRIEF.promptInstruction))
@@ -23,15 +36,26 @@ class PromptBuilderTest {
     }
 
     @Test
-    fun `includes coordinates when location is known`() {
-        val context = TravelContext(
-            currentLocation = 36.4614 to -6.1998,
-            hour = 14,
-            date = Date(),
-            userInput = "¿cuánto queda?"
-        )
+    fun `ends with the question then an answer cue so the model answers, not rephrases`() {
+        val prompt = PromptBuilder.buildPrompt(context(input = "¿cuánto queda?"), "¿cuánto queda?")
 
-        val prompt = PromptBuilder.buildPrompt(context, context.userInput)
+        assertTrue(prompt.contains("Pregunta del conductor: ¿cuánto queda?"))
+        assertTrue(prompt.trimEnd().endsWith("Respuesta:"))
+    }
+
+    @Test
+    fun `renders the real time, not a rounded hour`() {
+        val prompt = PromptBuilder.buildPrompt(context(hour = 14, minute = 37), "hola")
+
+        assertTrue(prompt.contains("Hora: 14:37"))
+    }
+
+    @Test
+    fun `includes coordinates when location is known`() {
+        val prompt = PromptBuilder.buildPrompt(
+            context(location = 36.4614 to -6.1998, input = "¿cuánto queda?"),
+            "¿cuánto queda?",
+        )
 
         assertTrue(prompt.contains("36.4614"))
         assertTrue(prompt.contains("-6.1998"))
@@ -39,62 +63,63 @@ class PromptBuilderTest {
 
     @Test
     fun `falls back to unknown location text when null`() {
-        val context = TravelContext(
-            currentLocation = null,
-            hour = 9,
-            date = Date(),
-            userInput = "hola"
-        )
-
-        val prompt = PromptBuilder.buildPrompt(context, context.userInput)
-
-        assertTrue(prompt.contains("desconocida"))
+        assertTrue(PromptBuilder.buildPrompt(context(), "hola").contains("desconocida"))
     }
 
     @Test
     fun `includes destination only when present`() {
-        val withDestination = PromptBuilder.buildPrompt(
-            TravelContext(null, "San Fernando", 10, Date(), "hola"),
-            "hola"
-        )
-        val withoutDestination = PromptBuilder.buildPrompt(
-            TravelContext(null, null, 10, Date(), "hola"),
-            "hola"
-        )
+        val with = PromptBuilder.buildPrompt(context(destination = "San Fernando"), "hola")
+        val without = PromptBuilder.buildPrompt(context(destination = null), "hola")
 
-        assertTrue(withDestination.contains("San Fernando"))
-        assertTrue(withoutDestination.contains("sin destino definido"))
+        assertTrue(with.contains("Destino: San Fernando"))
+        assertFalse(without.contains("Destino:"))
     }
 
     @Test
     fun `truncates to MAX_CONTEXT_LENGTH`() {
         val hugeInput = "a".repeat(Constants.MAX_CONTEXT_LENGTH * 2)
-        val context = TravelContext(null, null, 0, Date(), hugeInput)
 
-        val prompt = PromptBuilder.buildPrompt(context, hugeInput)
+        val prompt = PromptBuilder.buildPrompt(context(input = hugeInput), hugeInput)
 
         assertTrue(prompt.length <= Constants.MAX_CONTEXT_LENGTH)
     }
 
     @Test
+    fun `flattens newlines in interpolated values to keep one field per line`() {
+        val prompt = PromptBuilder.buildPrompt(
+            context(input = "línea uno\nlínea dos\nlínea tres"),
+            "línea uno\nlínea dos\nlínea tres",
+        )
+
+        assertTrue(prompt.contains("Pregunta del conductor: línea uno línea dos línea tres"))
+    }
+
+    @Test
     fun `omits the conversation section when there are no recent exchanges`() {
-        val context = TravelContext(null, null, 0, Date(), "hola")
-
-        val prompt = PromptBuilder.buildPrompt(context, "hola")
-
-        assertFalse(prompt.contains("Antes en esta conversación"))
+        assertFalse(PromptBuilder.buildPrompt(context(), "hola").contains("Conversación reciente"))
     }
 
     @Test
     fun `includes only the last three exchanges`() {
-        val context = TravelContext(null, null, 0, Date(), "hola")
         val exchanges = listOf("uno", "dos", "tres", "cuatro").map { Exchange("p-$it", "r-$it") }
 
-        val prompt = PromptBuilder.buildPrompt(context, "hola", recentExchanges = exchanges)
+        val prompt = PromptBuilder.buildPrompt(context(), "hola", recentExchanges = exchanges)
 
         assertFalse(prompt.contains("p-uno"))
         assertTrue(prompt.contains("p-dos"))
         assertTrue(prompt.contains("r-tres"))
         assertTrue(prompt.contains("p-cuatro"))
+    }
+
+    @Test
+    fun `caps the length of each rendered exchange line`() {
+        val long = "x".repeat(400)
+
+        val prompt = PromptBuilder.buildPrompt(
+            context(), "hola",
+            recentExchanges = listOf(Exchange(long, long)),
+        )
+
+        assertFalse(prompt.contains("x".repeat(200)))
     }
 }

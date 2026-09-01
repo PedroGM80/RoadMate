@@ -3,16 +3,27 @@ package dev.pgm.roadmate.utils
 import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.Exchange
 import dev.pgm.roadmate.domain.model.TravelContext
+import java.util.Locale
 
 /**
- * Assembles the text prompt sent to Gemini Nano from the current
+ * Assembles the text prompt for the local model from the current
  * [TravelContext], the driver's [AnswerStyle] preference, and any
  * [recentExchanges] from on-device memory. Pure Kotlin, no Android
  * dependency — safe to unit test directly.
+ *
+ * Shape matters for small on-device models: the instruction comes first,
+ * context in the middle as short labelled lines, and the driver's question
+ * last immediately before an explicit "Respuesta:" cue — a weak model given
+ * the question mid-blob tends to rephrase it instead of answering. Every
+ * interpolated value is flattened to a single line and length-capped so a
+ * stray long string can't blow past the model's context or crash the
+ * native tokenizer.
  */
 object PromptBuilder {
 
     private const val MAX_EXCHANGES = 3
+    private const val MAX_FIELD_CHARS = 200
+    private const val MAX_EXCHANGE_CHARS = 160
 
     fun buildPrompt(
         context: TravelContext,
@@ -25,43 +36,55 @@ object PromptBuilder {
         work: String? = null,
     ): String {
         val location = context.currentLocation
-            ?.let { "${it.first}, ${it.second}" }
+            ?.let { (lat, lon) -> "%.4f, %.4f".format(Locale.US, lat, lon) }
             ?: "desconocida"
-        val destination = context.destination ?: "sin destino definido"
-        val hour = "%02d:00".format(context.hour)
+        val time = "%02d:%02d".format(Locale.US, context.hour, context.minute)
+        val question = userInput.oneLine(MAX_FIELD_CHARS).ifBlank { "(sin pregunta)" }
 
         val prompt = buildString {
             appendLine(Constants.GEMINI_SYSTEM_PROMPT)
-            appendLine(
-                "Usuario está en [$location], va a [$destination], son las [$hour]. " +
-                    "Pregunta: [$userInput]. ${style.promptInstruction}"
-            )
+            appendLine(style.promptInstruction)
+            appendLine()
 
-            if (!context.weatherDescription.isNullOrBlank()) {
-                appendLine("Clima actual: ${context.weatherDescription}")
-            }
+            appendLine("Contexto:")
+            appendLine("- Hora: $time")
+            appendLine("- Ubicación (lat,lon): $location")
+            context.destination?.oneLine(MAX_FIELD_CHARS)?.takeIf { it.isNotBlank() }
+                ?.let { appendLine("- Destino: $it") }
+            context.weatherDescription?.oneLine(MAX_FIELD_CHARS)?.takeIf { it.isNotBlank() }
+                ?.let { appendLine("- Clima: $it") }
+            home?.oneLine(MAX_FIELD_CHARS)?.takeIf { it.isNotBlank() }
+                ?.let { appendLine("- Casa (lat,lon): $it") }
+            work?.oneLine(MAX_FIELD_CHARS)?.takeIf { it.isNotBlank() }
+                ?.let { appendLine("- Trabajo (lat,lon): $it") }
 
-            if (driverPreferences.isNotEmpty()) {
-                appendLine("Lo que sabes del conductor (tenlo en cuenta):")
-                driverPreferences.forEach { appendLine("- $it") }
-            }
+            driverPreferences.map { it.oneLine(MAX_FIELD_CHARS) }.filter { it.isNotBlank() }
+                .takeIf { it.isNotEmpty() }
+                ?.let { appendLine("- Sabes del conductor: ${it.joinToString("; ")}") }
+            frequentPlaces.map { it.oneLine(MAX_FIELD_CHARS) }.filter { it.isNotBlank() }
+                .takeIf { it.isNotEmpty() }
+                ?.let { appendLine("- Suele ir a: ${it.joinToString(", ")}") }
 
-            if (frequentPlaces.isNotEmpty()) {
-                appendLine("Sitios a los que suele ir: ${frequentPlaces.joinToString(", ")}.")
-            }
-
-            if (home != null) appendLine("Casa del conductor (lat,lon): [$home]")
-            if (work != null) appendLine("Trabajo del conductor (lat,lon): [$work]")
-
-            if (recentExchanges.isNotEmpty()) {
-                appendLine("Antes en esta conversación (para dar continuidad):")
-                recentExchanges.takeLast(MAX_EXCHANGES).forEach {
-                    appendLine("- Él/ella: ${it.question}")
-                    appendLine("  Tú respondiste: ${it.answer}")
+            val exchanges = recentExchanges.takeLast(MAX_EXCHANGES)
+                .filter { it.question.isNotBlank() || it.answer.isNotBlank() }
+            if (exchanges.isNotEmpty()) {
+                appendLine()
+                appendLine("Conversación reciente:")
+                exchanges.forEach {
+                    appendLine("- Conductor: ${it.question.oneLine(MAX_EXCHANGE_CHARS)}")
+                    appendLine("- Tú: ${it.answer.oneLine(MAX_EXCHANGE_CHARS)}")
                 }
             }
-        }.trim()
+
+            appendLine()
+            appendLine("Pregunta del conductor: $question")
+            append("Respuesta:")
+        }
 
         return prompt.take(Constants.MAX_CONTEXT_LENGTH)
     }
+
+    /** Collapse whitespace/newlines to a single line and hard-cap the length. */
+    private fun String.oneLine(max: Int): String =
+        replace(Regex("\\s+"), " ").trim().take(max)
 }

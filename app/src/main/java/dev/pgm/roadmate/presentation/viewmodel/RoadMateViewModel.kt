@@ -266,6 +266,7 @@ class RoadMateViewModel @Inject constructor(
             currentLocation = location,
             destination = null,
             hour = calendar.get(Calendar.HOUR_OF_DAY),
+            minute = calendar.get(Calendar.MINUTE),
             date = calendar.time,
             userInput = userInput,
             weatherDescription = weatherDescription

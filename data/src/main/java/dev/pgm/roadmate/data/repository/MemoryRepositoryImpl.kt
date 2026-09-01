@@ -15,7 +15,14 @@ class MemoryRepositoryImpl @Inject constructor(
 
     override suspend fun recordExchange(question: String, answer: String) {
         val now = System.currentTimeMillis()
-        dao.insertExchange(TripExchangeEntity(question = question, answer = answer, at = now))
+        val q = question.trim().take(MAX_EXCHANGE_CHARS)
+        val a = answer.trim().take(MAX_EXCHANGE_CHARS)
+        // Never feed obviously-broken output back into future prompts: an
+        // "answer" carrying our own prompt scaffolding would compound every
+        // turn (seen on-device — a weak model echoing the context block, then
+        // that echo re-entering the next prompt).
+        if (a.isBlank() || a.contains("Antes en esta conversación") || a.contains("<|im_")) return
+        dao.insertExchange(TripExchangeEntity(question = q, answer = a, at = now))
         dao.pruneExchangesBefore(now - RETENTION_MS)
     }
 
@@ -94,5 +101,8 @@ class MemoryRepositoryImpl @Inject constructor(
 
         /** How many recent rows a keyword search scans (weekly prune keeps this small). */
         const val SEARCH_SCAN = 200
+
+        /** Hard cap per stored side of an exchange — continuity needs a gist, not a transcript. */
+        const val MAX_EXCHANGE_CHARS = 240
     }
 }
