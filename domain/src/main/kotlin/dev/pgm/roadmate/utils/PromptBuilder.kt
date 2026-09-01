@@ -19,6 +19,7 @@ object PromptBuilder {
         userInput: String,
         style: AnswerStyle = AnswerStyle.DEFAULT,
         recentExchanges: List<Exchange> = emptyList(),
+        driverPreferences: List<String> = emptyList(),
     ): String {
         val location = context.currentLocation
             ?.let { "${it.first}, ${it.second}" }
@@ -35,6 +36,11 @@ object PromptBuilder {
 
             if (!context.weatherDescription.isNullOrBlank()) {
                 appendLine("Clima actual: ${context.weatherDescription}")
+            }
+
+            if (driverPreferences.isNotEmpty()) {
+                appendLine("Lo que sabes del conductor (tenlo en cuenta):")
+                driverPreferences.forEach { appendLine("- $it") }
             }
 
             if (recentExchanges.isNotEmpty()) {

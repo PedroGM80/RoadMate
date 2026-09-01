@@ -2,8 +2,10 @@ package dev.pgm.roadmate.domain.usecase
 
 import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ContactLookupResult
+import dev.pgm.roadmate.domain.model.FactType
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.TravelContext
+import dev.pgm.roadmate.domain.model.UserFact
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.MapSearchRepository
@@ -15,6 +17,7 @@ import dev.pgm.roadmate.utils.CallIntentParser
 import dev.pgm.roadmate.utils.JokeProvider
 import dev.pgm.roadmate.utils.MapSearchIntentParser
 import dev.pgm.roadmate.utils.MediaIntentParser
+import dev.pgm.roadmate.utils.MemoryCommandParser
 import dev.pgm.roadmate.utils.PromptBuilder
 import dev.pgm.roadmate.utils.StylePreferenceParser
 import kotlinx.coroutines.flow.Flow
@@ -40,6 +43,9 @@ import javax.inject.Inject
  *  5. "respuestas cortas / normales / con más detalle" — persists an
  *     [AssistantPreferencesRepository] setting and acknowledges it; that
  *     setting then shapes every future Gemini answer's length.
+ *  6. "recuerda que…" / "prefiero…" / "olvida lo de…" / "¿qué sabes de mí?"
+ *     — writes, drops, or reads back PREFERENCE facts in [MemoryRepository];
+ *     stored preferences are fed into every future Gemini prompt.
  * All of these work identically whether or not this device has on-device AI,
  * unlike every other question, which falls back to GeminiNanoManager's
  * generic FALLBACK_RESPONSE in "modo básico".
@@ -63,17 +69,38 @@ class GenerateResponseUseCase @Inject constructor(
         val mapQuery = MapSearchIntentParser.extractSearchQuery(userInput)
         val mediaApp = MediaIntentParser.extractMediaApp(userInput)
         val styleChange = StylePreferenceParser.parse(userInput)
+        val memoryCommand = MemoryCommandParser.parse(userInput)
         val response = when {
             contactName != null -> handleCallRequest(contactName)
             mapQuery != null -> handleMapSearch(mapQuery, context.currentLocation)
             mediaApp != null -> handleMediaRequest(mediaApp)
             JokeProvider.matchesJokeIntent(userInput) -> JokeProvider.randomJoke()
             styleChange != null -> handleStyleChange(styleChange)
+            memoryCommand != null -> handleMemoryCommand(memoryCommand)
             else -> askGemini(context, userInput)
         }
         speechSynthesisRepository.speak(response)
         emit(response)
     }
+
+    private suspend fun handleMemoryCommand(command: MemoryCommandParser.Command): String =
+        when (command) {
+            is MemoryCommandParser.Command.Remember -> {
+                memoryRepository.remember(UserFact(FactType.PREFERENCE, value = command.value))
+                "Anotado."
+            }
+
+            is MemoryCommandParser.Command.Forget -> {
+                val dropped = memoryRepository.forget(FactType.PREFERENCE, command.match)
+                if (dropped > 0) "Vale, lo olvido." else "No tenía nada apuntado sobre eso."
+            }
+
+            MemoryCommandParser.Command.Recall -> {
+                val prefs = memoryRepository.facts(FactType.PREFERENCE)
+                if (prefs.isEmpty()) "Aún no he aprendido nada sobre ti."
+                else "Recuerdo esto: " + prefs.joinToString("; ") { it.value } + "."
+            }
+        }
 
     private suspend fun askGemini(context: TravelContext, userInput: String): String {
         val prompt = PromptBuilder.buildPrompt(
@@ -81,6 +108,7 @@ class GenerateResponseUseCase @Inject constructor(
             userInput = userInput,
             style = assistantPreferencesRepository.answerStyle.first(),
             recentExchanges = memoryRepository.recentExchanges(),
+            driverPreferences = memoryRepository.facts(FactType.PREFERENCE).map { it.value },
         )
         val answer = geminiRepository.getResponse(prompt)
         memoryRepository.recordExchange(userInput, answer)

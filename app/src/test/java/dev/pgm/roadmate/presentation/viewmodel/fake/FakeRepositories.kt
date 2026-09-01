@@ -3,10 +3,12 @@ package dev.pgm.roadmate.presentation.viewmodel.fake
 import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.Exchange
+import dev.pgm.roadmate.domain.model.FactType
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.SilenceEvent
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
+import dev.pgm.roadmate.domain.model.UserFact
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
@@ -137,10 +139,18 @@ class FakeAssistantPreferencesRepository : AssistantPreferencesRepository {
 
 class FakeMemoryRepository : MemoryRepository {
     val recorded = mutableListOf<Exchange>()
+    private val facts = mutableListOf<UserFact>()
     override suspend fun recordExchange(question: String, answer: String) {
         recorded += Exchange(question, answer)
     }
     override suspend fun recentExchanges(limit: Int): List<Exchange> = recorded.takeLast(limit)
+    override suspend fun remember(fact: UserFact) { facts += fact }
+    override suspend fun facts(type: FactType): List<UserFact> = facts.filter { it.type == type }
+    override suspend fun forget(type: FactType, valueContains: String?): Int {
+        val gone = facts.filter { it.type == type }
+        facts.removeAll(gone)
+        return gone.size
+    }
 }
 
 class FakeGreetingRepository(private val shouldGreet: Boolean = false) : GreetingRepository {

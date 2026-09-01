@@ -2,6 +2,7 @@ package dev.pgm.roadmate.data.db
 
 import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 
 @Dao
@@ -16,4 +17,19 @@ interface MemoryDao {
 
     @Query("DELETE FROM trip_exchange WHERE at < :before")
     suspend fun pruneExchangesBefore(before: Long)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertFact(fact: UserFactEntity): Long
+
+    @Query("SELECT * FROM user_fact WHERE type = :type AND value = :value LIMIT 1")
+    suspend fun findFact(type: String, value: String): UserFactEntity?
+
+    @Query("SELECT * FROM user_fact WHERE type = :type ORDER BY updatedAt DESC")
+    suspend fun factsByType(type: String): List<UserFactEntity>
+
+    @Query("DELETE FROM user_fact WHERE type = :type")
+    suspend fun deleteFactsByType(type: String): Int
+
+    @Query("DELETE FROM user_fact WHERE type = :type AND value LIKE '%' || :match || '%'")
+    suspend fun deleteFactsMatching(type: String, match: String): Int
 }

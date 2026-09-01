@@ -10,6 +10,8 @@ import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
 import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.Exchange
+import dev.pgm.roadmate.domain.model.FactType
+import dev.pgm.roadmate.domain.model.UserFact
 import dev.pgm.roadmate.domain.model.ContactMatch
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.TravelContext
@@ -225,5 +227,46 @@ class GenerateResponseUseCaseTest {
         useCase(memoryRepository = memory)(context, "abre Spotify").toList()
 
         assertTrue(memory.recorded.isEmpty())
+    }
+
+    @Test
+    fun `recuerda que stores a preference and skips Gemini`() = runTest {
+        val geminiRepository = FakeGeminiRepository(response = "no debería usarse")
+        val memory = FakeMemoryRepository()
+
+        val emitted = useCase(geminiRepository, memoryRepository = memory)(
+            context,
+            "recuerda que no me gustan las autovías",
+        ).toList()
+
+        assertEquals(0, geminiRepository.responseCount)
+        assertEquals(
+            listOf(UserFact(FactType.PREFERENCE, value = "no me gustan las autovías")),
+            memory.facts(FactType.PREFERENCE),
+        )
+        assertEquals(listOf("Anotado."), emitted)
+    }
+
+    @Test
+    fun `stored preferences are folded into the Gemini prompt`() = runTest {
+        val geminiRepository = FakeGeminiRepository(response = "vale")
+        val memory = FakeMemoryRepository(
+            initialFacts = listOf(UserFact(FactType.PREFERENCE, value = "no me gustan las autovías")),
+        )
+
+        useCase(geminiRepository, memoryRepository = memory)(context, "¿por dónde voy?").toList()
+
+        assertTrue(geminiRepository.lastPrompt!!.contains("no me gustan las autovías"))
+    }
+
+    @Test
+    fun `que sabes de mi reads the stored preferences back`() = runTest {
+        val memory = FakeMemoryRepository(
+            initialFacts = listOf(UserFact(FactType.PREFERENCE, value = "prefiere las nacionales")),
+        )
+
+        val emitted = useCase(memoryRepository = memory)(context, "¿qué sabes de mí?").toList()
+
+        assertTrue(emitted.first().contains("prefiere las nacionales"))
     }
 }
