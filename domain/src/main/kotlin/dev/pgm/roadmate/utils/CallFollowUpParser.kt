@@ -1,12 +1,14 @@
 package dev.pgm.roadmate.utils
 
 import dev.pgm.roadmate.domain.model.ContactMatch
+import dev.pgm.roadmate.domain.model.PhoneLabel
 
 /**
- * After "llama a Ana" turned up several people, RoadMate asks "dime cuál".
- * This resolves the driver's next utterance against that list — an ordinal
- * ("la segunda", "el último") or a distinguishing word from the name
- * ("García", "Ana López") — to a single contact, or null if it can't.
+ * After "llama a Ana" turned up several people — or one person with several
+ * numbers — RoadMate asks "dime cuál". This resolves the driver's next
+ * utterance against that list — an ordinal ("la segunda", "el último"), a
+ * number label ("la de trabajo", "el móvil") or a distinguishing word from
+ * the name ("García", "Ana López") — to a single contact, or null if it can't.
  */
 object CallFollowUpParser {
 
@@ -19,8 +21,18 @@ object CallFollowUpParser {
     )
     private val LAST = Regex("""\b[uú]ltim[oa]\b""", RegexOption.IGNORE_CASE)
 
+    private val LABEL_PHRASES: List<Pair<Regex, PhoneLabel>> = listOf(
+        labelPhrase("m[oó]vil|celular", PhoneLabel.MOBILE),
+        labelPhrase("trabajo|oficina|curro|curre", PhoneLabel.WORK),
+        labelPhrase("casa|fij[oa]|domicilio", PhoneLabel.HOME),
+        labelPhrase("principal", PhoneLabel.MAIN),
+    )
+
     private fun ordinal(word: String, index: Int) =
         Regex("""\b$word\b""", RegexOption.IGNORE_CASE) to index
+
+    private fun labelPhrase(words: String, label: PhoneLabel) =
+        Regex("""\b(?:$words)\b""", RegexOption.IGNORE_CASE) to label
 
     fun resolve(userInput: String, candidates: List<ContactMatch>): ContactMatch? {
         if (candidates.isEmpty()) return null
@@ -29,6 +41,10 @@ object CallFollowUpParser {
         if (LAST.containsMatchIn(text)) return candidates.last()
         ORDINALS.firstOrNull { it.first.containsMatchIn(text) }
             ?.let { return candidates.getOrNull(it.second) }
+
+        LABEL_PHRASES.firstOrNull { it.first.containsMatchIn(text) }?.let { (_, label) ->
+            candidates.singleOrNull { it.label == label }?.let { return it }
+        }
 
         val names = candidates.map { it.name.lowercase() }
         val words = text.lowercase()

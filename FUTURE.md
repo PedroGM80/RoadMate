@@ -13,10 +13,13 @@ commitment, just a starting point for the next session. See
   more proximity filler ("por aquí", "en la zona", bare "cercana"), and the
   fact-lookup guard covers "quién/cuánto/cuándo/qué significa". Still
   hand-written regex — revisit against real spoken phrasing on a device.
-- **Contact follow-up: label-aware.** The same-session follow-up handles
-  ordinals ("la segunda") and name words ("García"), but not "la de
-  trabajo" / "la del móvil" — `ContactMatch` carries no label/type. Add the
-  phone-type (work/mobile/home) to the lookup and match on it.
+- **Contact follow-up: label-aware — done.** `ContactMatch` now carries a
+  `PhoneLabel` (mobile / work / home / main / other) read from
+  `Phone.TYPE`. One contact with two labelled numbers is treated as
+  ambiguous ("Ana tiene varios números: el móvil o el del trabajo. ¿Cuál?")
+  and `CallFollowUpParser` resolves "el móvil" / "la del trabajo" / "la de
+  casa". Open: custom labels (`Phone.LABEL` free text) aren't matched, only
+  the standard types.
 
 ## Medium effort
 

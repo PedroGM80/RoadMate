@@ -192,8 +192,16 @@ class GenerateResponseUseCase @Inject constructor(
                 SpokenText.calling(result.contact.name)
             }
             is ContactLookupResult.Ambiguous -> {
-                pendingCall = result.matches // resolved by the next "la segunda" / "García"
-                SpokenText.CALL_AMBIGUOUS
+                pendingCall = result.matches // resolved by the next "la segunda" / "la de trabajo"
+                val oneContact = result.matches.map { it.name }.distinct().size == 1
+                if (oneContact) {
+                    SpokenText.callWhichNumber(
+                        result.matches.first().name,
+                        result.matches.map { it.label.spoken },
+                    )
+                } else {
+                    SpokenText.CALL_AMBIGUOUS
+                }
             }
             ContactLookupResult.NotFound -> SpokenText.contactNotFound(contactName)
         }

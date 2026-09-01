@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.ContactMatch
+import dev.pgm.roadmate.domain.model.PhoneLabel
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -31,7 +32,8 @@ class PhoneCallRepositoryImpl @Inject constructor(
             val seenNumbers = mutableSetOf<String>()
             val projection = arrayOf(
                 ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                ContactsContract.CommonDataKinds.Phone.NUMBER
+                ContactsContract.CommonDataKinds.Phone.NUMBER,
+                ContactsContract.CommonDataKinds.Phone.TYPE,
             )
 
             context.contentResolver.query(
@@ -43,20 +45,27 @@ class PhoneCallRepositoryImpl @Inject constructor(
             )?.use { cursor ->
                 val nameIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
                 val numberIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                val typeIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE)
                 while (cursor.moveToNext()) {
                     val contactName = cursor.getString(nameIndex) ?: continue
                     val number = cursor.getString(numberIndex) ?: continue
                     if (seenNumbers.add(number)) {
-                        matches.add(ContactMatch(contactName, number))
+                        matches.add(ContactMatch(contactName, number, phoneLabel(cursor.getInt(typeIndex))))
                     }
                 }
             }
 
+            val distinctNames = matches.map { it.name }.distinct()
             when {
                 matches.isEmpty() -> ContactLookupResult.NotFound
-                // Multiple numbers for the same person isn't really ambiguous —
-                // only different people sharing a matched name is.
-                matches.map { it.name }.distinct().size == 1 -> ContactLookupResult.Found(matches.first())
+                matches.size == 1 -> ContactLookupResult.Found(matches.first())
+                // One person, several numbers: only ambiguous if the labels
+                // actually differ enough to name ("el móvil o el del trabajo").
+                distinctNames.size == 1 -> {
+                    val namable = matches.map { it.label }.filter { it != PhoneLabel.OTHER }.distinct()
+                    if (namable.size >= 2) ContactLookupResult.Ambiguous(matches)
+                    else ContactLookupResult.Found(matches.first())
+                }
                 else -> ContactLookupResult.Ambiguous(matches)
             }
         }
@@ -72,6 +81,15 @@ class PhoneCallRepositoryImpl @Inject constructor(
 
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+    private fun phoneLabel(type: Int): PhoneLabel = when (type) {
+        ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE -> PhoneLabel.MOBILE
+        ContactsContract.CommonDataKinds.Phone.TYPE_WORK,
+        ContactsContract.CommonDataKinds.Phone.TYPE_WORK_MOBILE -> PhoneLabel.WORK
+        ContactsContract.CommonDataKinds.Phone.TYPE_HOME -> PhoneLabel.HOME
+        ContactsContract.CommonDataKinds.Phone.TYPE_MAIN -> PhoneLabel.MAIN
+        else -> PhoneLabel.OTHER
+    }
 
     private companion object {
         const val TAG = "PhoneCallRepository"

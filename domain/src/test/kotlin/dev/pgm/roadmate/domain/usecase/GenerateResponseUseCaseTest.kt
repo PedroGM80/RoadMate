@@ -14,6 +14,7 @@ import dev.pgm.roadmate.domain.model.FactType
 import dev.pgm.roadmate.domain.model.UserFact
 import dev.pgm.roadmate.domain.model.ContactMatch
 import dev.pgm.roadmate.domain.model.MediaApp
+import dev.pgm.roadmate.domain.model.PhoneLabel
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.utils.JokeProvider
 import kotlinx.coroutines.flow.toList
@@ -100,6 +101,27 @@ class GenerateResponseUseCaseTest {
 
         assertEquals(null, phoneCallRepository.placedCallTo)
         assertTrue(emitted.first().contains("varios contactos"))
+    }
+
+    @Test
+    fun `one contact with two numbers asks which number, then a label finishes it`() = runTest {
+        val phone = FakePhoneCallRepository(
+            lookupResult = ContactLookupResult.Ambiguous(
+                listOf(
+                    ContactMatch("Ana", "600111222", PhoneLabel.MOBILE),
+                    ContactMatch("Ana", "955000000", PhoneLabel.WORK),
+                ),
+            ),
+        )
+        val uc = useCase(phoneCallRepository = phone)
+
+        val ask = uc(context, "llama a Ana").toList()
+        assertEquals(null, phone.placedCallTo)
+        assertTrue(ask.first().contains("varios números"))
+
+        val emitted = uc(context, "la del trabajo").toList()
+        assertEquals("955000000", phone.placedCallTo)
+        assertEquals(listOf("Llamando a Ana"), emitted)
     }
 
     @Test

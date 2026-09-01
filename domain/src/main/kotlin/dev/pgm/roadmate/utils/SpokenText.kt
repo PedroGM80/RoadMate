@@ -14,6 +14,8 @@ object SpokenText {
         "No puedo llamar sin permiso. Actívalo en ajustes: contactos y teléfono."
     fun calling(name: String) = "Llamando a $name"
     const val CALL_AMBIGUOUS = "Tienes varios contactos con ese nombre. Dime cuál."
+    fun callWhichNumber(name: String, options: List<String>) =
+        "$name tiene varios números: ${options.joinToString(" o ")}. ¿Cuál?"
     fun contactNotFound(name: String) = "No encuentro a $name en tus contactos."
     fun unknownRelation(relation: String) =
         "No sé quién es tu $relation. Dime antes \"nombre es mi $relation\"."
