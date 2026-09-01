@@ -19,6 +19,12 @@ object MapSearchIntentParser {
         RegexOption.IGNORE_CASE
     )
 
+    /** "busca información sobre…", "busca en internet…" — a fact lookup, not a place. */
+    private val NOT_A_PLACE = Regex(
+        """^(?:informaci[oó]n|datos?|la\s+respuesta|c[oó]mo|qu[eé]|cu[aá]l|por\s+qu[eé]|en\s+(?:internet|la\s+web|google))\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
     fun extractSearchQuery(userInput: String): String? {
         val trimmedInput = userInput.trim()
         for (pattern in PATTERNS) {
@@ -28,7 +34,7 @@ object MapSearchIntentParser {
                 .trimEnd('.', '?', '!', ' ')
                 .replace(TRAILING_FILLER, "")
                 .trim()
-            if (query.isNotBlank()) return query
+            if (query.isNotBlank() && !NOT_A_PLACE.containsMatchIn(query)) return query
         }
         return null
     }
