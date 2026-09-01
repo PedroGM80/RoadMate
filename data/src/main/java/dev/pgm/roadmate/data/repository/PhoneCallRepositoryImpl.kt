@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.ContactsContract
+import android.util.Log
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.domain.model.ContactLookupResult
@@ -64,9 +65,15 @@ class PhoneCallRepositoryImpl @Inject constructor(
         val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:$phoneNumber")).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(callIntent)
+        // A phone with no dialer is exotic but possible — don't crash the loop.
+        runCatching { context.startActivity(callIntent) }
+            .onFailure { Log.w(TAG, "No activity to place the call", it) }
     }
 
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+    private companion object {
+        const val TAG = "PhoneCallRepository"
+    }
 }
