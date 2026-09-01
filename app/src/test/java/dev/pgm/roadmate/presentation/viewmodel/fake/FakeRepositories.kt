@@ -68,6 +68,7 @@ class FakeGeminiRepository(
         private set
 
     override suspend fun getResponse(prompt: String): String = response
+    override suspend fun warmUp() = Unit
     override fun clearCache() = Unit
     override fun localAiStatus(): Flow<LocalAiStatus> = localAiStatusFlow
     override suspend fun requestLocalAiModelDownload() {

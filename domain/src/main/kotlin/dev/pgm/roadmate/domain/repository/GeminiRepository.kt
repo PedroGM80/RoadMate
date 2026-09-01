@@ -14,6 +14,13 @@ interface GeminiRepository {
 
     suspend fun getResponse(prompt: String): String
 
+    /**
+     * Pre-loads the downloaded model so the first real question doesn't pay
+     * the ~10 s cold-start cost. No-op when AICore is available or no model
+     * is present. Safe to call from a background scope at startup.
+     */
+    suspend fun warmUp()
+
     /** Clears any cached responses — call when a new trip starts. */
     fun clearCache()
 

@@ -83,6 +83,11 @@ class RoadMateViewModel @Inject constructor(
             .onEach { status ->
                 _uiState.value = _uiState.value.copy(localAiStatus = status)
                 if (status == LocalAiStatus.ModelDownloadable) downloadLocalAiModel()
+                // Model on disk but no AICore → pre-load it now so the first
+                // question isn't a ~10 s cold start.
+                if (status == LocalAiStatus.ReadyLocalModel) {
+                    viewModelScope.launch { geminiRepository.warmUp() }
+                }
             }
             .launchIn(viewModelScope)
     }

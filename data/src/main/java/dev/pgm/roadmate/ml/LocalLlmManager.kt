@@ -46,20 +46,37 @@ class LocalLlmManager @Inject constructor(
     private fun obtainEngine(): LlmInference? {
         engine?.let { return it }
         val modelPath = modelManager.modelFile()?.absolutePath ?: return null
-        return synchronized(this) {
-            engine ?: runCatching {
-                val options = LlmInference.LlmInferenceOptions.builder()
-                    .setModelPath(modelPath)
-                    .setMaxTokens(MAX_TOKENS)
-                    .build()
-                LlmInference.createFromOptions(context, options)
-            }.onFailure { Log.w(TAG, "Failed to create LlmInference", it) }
-                .getOrNull()
-                ?.also { engine = it }
-        }
+        return synchronized(this) { engine ?: buildEngine(modelPath) }
     }
 
+    private fun buildEngine(modelPath: String): LlmInference? = runCatching {
+        val t0 = System.currentTimeMillis()
+        // CPU only. GPU backend init on arbitrary Android GPUs via MediaPipe
+        // is unreliable (silent hangs) and this path already isn't fast-path.
+        val options = LlmInference.LlmInferenceOptions.builder()
+            .setModelPath(modelPath)
+            .setMaxTokens(MAX_TOKENS)
+            .build()
+        LlmInference.createFromOptions(context, options).also {
+            dbg("engine ready (${System.currentTimeMillis() - t0} ms)")
+        }
+    }.onFailure { dbg("engine build failed: ${it.message}") }
+        .getOrNull()
+        ?.also { engine = it }
+
     suspend fun isReady(): Boolean = withContext(Dispatchers.Default) { obtainEngine() != null }
+
+    /** Build the engine and run one throwaway generation so the first real
+     *  question doesn't eat the ~10 s cold XNNPACK/prefill cost. */
+    suspend fun warmUp() = withContext(Dispatchers.Default) {
+        if (engine != null) return@withContext
+        runCatching {
+            val t0 = System.currentTimeMillis()
+            generateResponse("Di \"listo\".")
+            dbg("warm-up done (${System.currentTimeMillis() - t0} ms)")
+        }
+        Unit
+    }
 
     /** Generated text, or null if the model isn't usable / timed out / failed. */
     suspend fun generateResponse(prompt: String): String? = withContext(Dispatchers.Default) {

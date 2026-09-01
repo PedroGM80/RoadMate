@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Paint
 import android.net.Uri
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.horizontalScroll
@@ -142,10 +143,21 @@ fun MapScreen(
     LaunchedEffect(poiFilter, symbolManager) {
         val map = mapLibreMap ?: return@LaunchedEffect
         val manager = symbolManager ?: return@LaunchedEffect
-        val pins = refreshPois(map, mapView, manager, poiFilter)
+
+        // Right after a chip tap the current tiles' source features aren't
+        // queryable yet, so a single pass finds nothing until the map next
+        // idles (e.g. after "recenter"). Retry briefly.
+        var pins = refreshPois(map, mapView, manager, poiFilter)
+        if (poiFilter != null) {
+            repeat(6) {
+                if (pins.isNotEmpty()) return@repeat
+                delay(350)
+                pins = refreshPois(map, mapView, manager, poiFilter)
+            }
+        }
+
         // Turning a filter on: frame the pins so they're actually visible
         // (they sit across the loaded tiles, not just the ~500 m in view).
-        // Keep enough zoom that the POI vector layer still has data (>=14).
         if (poiFilter != null && pins.size >= 2) {
             val b = LatLngBounds.Builder().includes(pins).build()
             runCatching {
@@ -493,15 +505,26 @@ private fun fallbackLabelFor(context: Context, kind: PoiKind): String = when (ki
 }
 
 private fun registerPinIcons(style: Style, context: Context) {
-    val base = ContextCompat.getDrawable(context, R.drawable.ic_map_pin) ?: return
+    val density = context.resources.displayMetrics.density
+    val size = (26f * density).toInt()
+    val cx = size / 2f
+    val ring = 2.5f * density
+
     PoiKind.entries.forEach { kind ->
-        val drawable = base.constantState?.newDrawable()?.mutate() ?: return@forEach
-        drawable.setTint(kind.tint)
-        val w = drawable.intrinsicWidth.coerceAtLeast(48)
-        val h = drawable.intrinsicHeight.coerceAtLeast(48)
-        val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        drawable.setBounds(0, 0, w, h)
-        drawable.draw(Canvas(bitmap))
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // soft drop shadow
+        paint.color = 0x33000000
+        canvas.drawCircle(cx, cx + 1f * density, cx - ring, paint)
+        // white ring
+        paint.color = 0xFFFFFFFF.toInt()
+        canvas.drawCircle(cx, cx, cx - ring, paint)
+        // category fill
+        paint.color = kind.tint
+        canvas.drawCircle(cx, cx, cx - ring * 2.2f, paint)
+
         style.addImage(PIN_PREFIX + kind.name, bitmap)
     }
 }

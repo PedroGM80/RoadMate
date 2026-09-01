@@ -40,6 +40,8 @@ class FakeGeminiRepository(private val response: String = "respuesta de prueba")
         return response
     }
 
+    override suspend fun warmUp() = Unit
+
     override fun clearCache() {
         cacheClearedCount++
     }

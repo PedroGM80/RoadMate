@@ -56,6 +56,11 @@ class GeminiRepositoryImpl @Inject constructor(
         return GeminiNanoManager.FALLBACK_RESPONSE
     }
 
+    override suspend fun warmUp() {
+        if (geminiNanoManager.checkAvailability()) return
+        localLlmManager.warmUp()
+    }
+
     override fun clearCache() {
         responseCache.clear()
     }
