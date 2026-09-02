@@ -173,38 +173,38 @@ class LocalLlmManager @Inject constructor(
         val llm = obtainEngine() ?: return@withContext null
         inFlight.incrementAndGet()
         try {
-        withTimeoutOrNull(Constants.LOCAL_LLM_TIMEOUT_MS) {
-            runCatching {
-                val session = LlmInferenceSession.createFromOptions(
-                    llm,
-                    LlmInferenceSession.LlmInferenceSessionOptions.builder()
-                        .setTopK(TOP_K)
-                        .setTemperature(TEMPERATURE)
-                        .build()
-                )
-                try {
-                    // Keep MediaPipe's native tokenizer away from control
-                    // chars and pathological lengths — a garbage/huge prompt
-                    // has crashed nativePredictSync with a JNI abort on-device.
-                    // The .task bundle applies its own chat template, so send
-                    // clean plain text, not hand-rolled ChatML markers.
-                    val safe = prompt
-                        .replace(Regex("[\\p{Cntrl}&&[^\n]]"), " ")
-                        .take(MAX_PROMPT_CHARS)
-                    dbg("PROMPT (${safe.length} chars) >>>\n$safe")
-                    session.addQueryChunk(safe)
-                    val t0 = System.currentTimeMillis()
-                    session.generateResponse().fixMojibake().also {
-                        dbg("RESPONSE (${System.currentTimeMillis() - t0} ms) <<< \"$it\"")
+            withTimeoutOrNull(Constants.LOCAL_LLM_TIMEOUT_MS) {
+                runCatching {
+                    val session = LlmInferenceSession.createFromOptions(
+                        llm,
+                        LlmInferenceSession.LlmInferenceSessionOptions.builder()
+                            .setTopK(TOP_K)
+                            .setTemperature(TEMPERATURE)
+                            .build()
+                    )
+                    try {
+                        // Keep MediaPipe's native tokenizer away from control
+                        // chars and pathological lengths — a garbage/huge prompt
+                        // has crashed nativePredictSync with a JNI abort on-device.
+                        // The .task bundle applies its own chat template, so send
+                        // clean plain text, not hand-rolled ChatML markers.
+                        val safe = prompt
+                            .replace(Regex("[\\p{Cntrl}&&[^\n]]"), " ")
+                            .take(MAX_PROMPT_CHARS)
+                        dbg("PROMPT (${safe.length} chars) >>>\n$safe")
+                        session.addQueryChunk(safe)
+                        val t0 = System.currentTimeMillis()
+                        session.generateResponse().fixMojibake().also {
+                            dbg("RESPONSE (${System.currentTimeMillis() - t0} ms) <<< \"$it\"")
+                        }
+                    } finally {
+                        session.close()
                     }
-                } finally {
-                    session.close()
-                }
-            }.onFailure {
-                Log.w(TAG, "generateResponse failed", it)
-                dbg("generateResponse FAILED: ${it.stackTraceToString()}")
-            }.getOrNull()
-        }?.takeIf { it.isNotBlank() }
+                }.onFailure {
+                    Log.w(TAG, "generateResponse failed", it)
+                    dbg("generateResponse FAILED: ${it.stackTraceToString()}")
+                }.getOrNull()
+            }?.takeIf { it.isNotBlank() }
         } finally {
             inFlight.decrementAndGet()
         }

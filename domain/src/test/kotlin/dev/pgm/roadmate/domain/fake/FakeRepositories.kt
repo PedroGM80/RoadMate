@@ -164,13 +164,20 @@ class FakeMapSearchCoordinator(private val offlineMapReady: Boolean = true) : Ma
     }
 }
 
-class FakeMediaRepository(private val canLaunch: Boolean = true) : MediaRepository {
+class FakeMediaRepository(
+    private val canLaunch: Boolean = true,
+    /** What a bare "pon música" finds installed; null = nothing to open. */
+    private val anyApp: MediaApp? = MediaApp.SPOTIFY,
+) : MediaRepository {
     var lastLaunchedApp: MediaApp? = null
 
     override fun launchMediaApp(app: MediaApp): Boolean {
         lastLaunchedApp = app
         return canLaunch
     }
+
+    override fun launchAnyMusicApp(): MediaApp? =
+        anyApp?.takeIf { canLaunch }?.also { lastLaunchedApp = it }
 }
 
 class FakeAssistantPreferencesRepository(
