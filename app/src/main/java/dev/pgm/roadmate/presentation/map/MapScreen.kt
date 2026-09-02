@@ -1,7 +1,9 @@
 package dev.pgm.roadmate.presentation.map
 
 import android.annotation.SuppressLint
+import android.content.ComponentCallbacks2
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -638,8 +640,30 @@ fun rememberMapPaneState(): MapPaneState {
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
+
+        // MapLibre keeps a tile cache and GL resources it can give back on
+        // request. RoadMate also holds a multi-hundred-MB language model, so
+        // it is exactly the kind of app the system asks to make room — and
+        // this was the one component never told about it.
+        val trimCallback = object : ComponentCallbacks2 {
+            override fun onTrimMemory(level: Int) {
+                if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+                    runCatching { mapView.onLowMemory() }
+                }
+            }
+
+            override fun onConfigurationChanged(newConfig: Configuration) = Unit
+
+            @Deprecated("Deprecated in Java")
+            override fun onLowMemory() {
+                runCatching { mapView.onLowMemory() }
+            }
+        }
+        context.registerComponentCallbacks(trimCallback)
+
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            runCatching { context.unregisterComponentCallbacks(trimCallback) }
             (mapView.parent as? android.view.ViewGroup)?.removeView(mapView)
             destroyOnce()
         }

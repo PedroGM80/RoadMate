@@ -42,6 +42,13 @@ object CallFollowUpParser {
         ORDINALS.firstOrNull { it.first.containsMatchIn(text) }
             ?.let { return candidates.getOrNull(it.second) }
 
+        // A label the contact typed themselves ("Coche") is matched before the
+        // standard ones — it's the word RoadMate just offered them.
+        candidates.singleOrNull { c ->
+            c.customLabel?.takeIf { it.isNotBlank() }
+                ?.let { spanishRegex("""\b${Regex.escape(it)}\b""").containsMatchIn(text) } == true
+        }?.let { return it }
+
         LABEL_PHRASES.firstOrNull { it.first.containsMatchIn(text) }?.let { (_, label) ->
             candidates.singleOrNull { it.label == label }?.let { return it }
         }

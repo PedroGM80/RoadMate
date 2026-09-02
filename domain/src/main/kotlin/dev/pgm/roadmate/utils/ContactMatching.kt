@@ -74,7 +74,10 @@ object ContactMatching {
         val onePerson = best.map { fold(it.name) }.distinct().size == 1
         if (!onePerson) return ContactLookupResult.Ambiguous(best)
 
-        val namable = best.map { it.label }.filter { it != PhoneLabel.OTHER }.distinct()
+        // "Nameable" now includes a custom label the contact typed themselves,
+        // so "Ana: el móvil o el coche?" is askable where it used to collapse
+        // into two indistinguishable "otro"s and dial the first.
+        val namable = best.map { it.spokenLabel }.filter { it != PhoneLabel.OTHER.spoken }.distinct()
         return if (namable.size >= 2) ContactLookupResult.Ambiguous(best)
         else ContactLookupResult.Found(best.first())
     }

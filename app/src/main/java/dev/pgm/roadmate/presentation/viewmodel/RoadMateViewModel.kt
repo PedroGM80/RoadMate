@@ -439,7 +439,17 @@ class RoadMateViewModel @Inject constructor(
         val travelContext = buildTravelContext(userInput)
         generateResponseUseCase(travelContext, userInput)
             .catch {
-                _uiState.value = _uiState.value.copy(status = RoadMateStatus.IDLE, isListening = false)
+                // Silence is the worst possible answer at 120 km/h: the driver
+                // has no idea whether it heard them, is thinking, or died, and
+                // the only way to find out is to look at the phone. Say
+                // something.
+                _uiState.value = _uiState.value.copy(
+                    status = RoadMateStatus.IDLE,
+                    isListening = false,
+                    currentResponse = SpokenText.ANSWER_FAILED,
+                    isError = true,
+                )
+                speechSynthesisRepository.speak(SpokenText.ANSWER_FAILED)
             }
             .collect { response ->
                 _uiState.value = _uiState.value.copy(

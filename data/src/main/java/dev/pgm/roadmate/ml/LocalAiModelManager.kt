@@ -72,6 +72,15 @@ class LocalAiModelManager @Inject constructor(
     @Volatile
     private var awaitingUnmetered = false
 
+    /**
+     * The registered "tell me when Wi-Fi appears" callback, kept so it can be
+     * taken down again. Without the reference the app went on listening for a
+     * network it no longer needed — after the model finished by another route,
+     * or after the download path was disabled.
+     */
+    @Volatile
+    private var unmeteredCallback: ConnectivityManager.NetworkCallback? = null
+
     /** Cheap re-evaluation of resting state; safe to call repeatedly. */
     fun refreshStatus() {
         _status.value = when {
@@ -97,10 +106,12 @@ class LocalAiModelManager @Inject constructor(
      */
     fun fetch() {
         if (BuildConfig.LOCAL_AI_MODEL_URL.isBlank()) {
+            stopWaitingForUnmetered()
             _status.value = LocalAiStatus.Unavailable
             return
         }
         if (isModelComplete()) {
+            stopWaitingForUnmetered()
             _status.value = LocalAiStatus.ReadyLocalModel
             return
         }
@@ -210,6 +221,7 @@ class LocalAiModelManager @Inject constructor(
             _status.value = LocalAiStatus.DownloadFailed("no se pudo guardar el modelo")
             return
         }
+        stopWaitingForUnmetered()
         _status.value = LocalAiStatus.ReadyLocalModel
     }
 
@@ -229,17 +241,26 @@ class LocalAiModelManager @Inject constructor(
             .build()
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                awaitingUnmetered = false
-                runCatching { cm.unregisterNetworkCallback(this) }
+                stopWaitingForUnmetered()
                 fetch()
             }
         }
         awaitingUnmetered = true
+        unmeteredCallback = callback
         runCatching { cm.registerNetworkCallback(request, callback) }
             .onFailure {
                 awaitingUnmetered = false
+                unmeteredCallback = null
                 Log.w(TAG, "could not watch for Wi-Fi", it)
             }
+    }
+
+    private fun stopWaitingForUnmetered() {
+        val callback = unmeteredCallback ?: run { awaitingUnmetered = false; return }
+        unmeteredCallback = null
+        awaitingUnmetered = false
+        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return
+        runCatching { cm.unregisterNetworkCallback(callback) }
     }
 
     private companion object {

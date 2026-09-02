@@ -95,6 +95,21 @@ class ContactMatchingTest {
     }
 
     @Test
+    fun `a number the contact named themselves can be offered and picked`() {
+        val mobile = contact("Ana", "600000001", PhoneLabel.MOBILE)
+        val car = ContactMatch("Ana", "600000002", PhoneLabel.OTHER, customLabel = "Coche")
+
+        // Before, "Coche" came back as an unnameable "otro", so RoadMate
+        // couldn't offer the choice and just dialled the first number.
+        val result = ContactMatching.resolve(listOf(mobile, car), "Ana")
+        assertTrue(result is ContactLookupResult.Ambiguous)
+        assertEquals("el de coche", car.spokenLabel)
+
+        assertEquals(car, CallFollowUpParser.resolve("el coche", listOf(mobile, car)))
+        assertEquals(mobile, CallFollowUpParser.resolve("el móvil", listOf(mobile, car)))
+    }
+
+    @Test
     fun `the same line stored twice is one number`() {
         assertEquals(
             ContactMatching.normalizeNumber("+34 600 11 22 33"),

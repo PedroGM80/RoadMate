@@ -54,6 +54,7 @@ class PhoneCallRepositoryImpl @Inject constructor(
                 ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
                 ContactsContract.CommonDataKinds.Phone.NUMBER,
                 ContactsContract.CommonDataKinds.Phone.TYPE,
+                ContactsContract.CommonDataKinds.Phone.LABEL,
             )
             val uri = Uri.withAppendedPath(
                 ContactsContract.CommonDataKinds.Phone.CONTENT_FILTER_URI,
@@ -66,6 +67,7 @@ class PhoneCallRepositoryImpl @Inject constructor(
                 val nameIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
                 val numberIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
                 val typeIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE)
+                val labelIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.LABEL)
                 if (nameIndex < 0 || numberIndex < 0) return@use
                 while (cursor.moveToNext()) {
                     val contactName = cursor.getString(nameIndex) ?: continue
@@ -73,8 +75,12 @@ class PhoneCallRepositoryImpl @Inject constructor(
                     // Same person, same line, stored twice (SIM + account) is
                     // common; compare digits so "+34 600..." and "600..." are one.
                     val type = if (typeIndex >= 0) cursor.getInt(typeIndex) else -1
+                    // TYPE_CUSTOM carries the contact's own word for this
+                    // number ("Coche"). Without it every custom number was an
+                    // unnameable "otro".
+                    val custom = if (labelIndex >= 0) cursor.getString(labelIndex) else null
                     if (seenNumbers.add(ContactMatching.normalizeNumber(number))) {
-                        matches.add(ContactMatch(contactName, number, phoneLabel(type)))
+                        matches.add(ContactMatch(contactName, number, phoneLabel(type), custom))
                     }
                 }
             }

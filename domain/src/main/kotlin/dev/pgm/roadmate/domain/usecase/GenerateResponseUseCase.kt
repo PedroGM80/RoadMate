@@ -264,7 +264,7 @@ class GenerateResponseUseCase @Inject constructor(
                 if (oneContact) {
                     SpokenText.callWhichNumber(
                         result.matches.first().name,
-                        result.matches.map { it.label.spoken },
+                        result.matches.map { it.spokenLabel },
                     )
                 } else {
                     SpokenText.CALL_AMBIGUOUS

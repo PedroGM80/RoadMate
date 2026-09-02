@@ -13,7 +13,20 @@ data class ContactMatch(
     val name: String,
     val phoneNumber: String,
     val label: PhoneLabel = PhoneLabel.OTHER,
-)
+    /**
+     * The contact's own name for this number when they typed one ("Coche",
+     * "Casa de mis padres"). Android stores those as a free-text label
+     * alongside TYPE_CUSTOM, and ignoring it meant every custom number came
+     * back as an unnameable "otro" — so RoadMate could neither offer it
+     * ("¿el móvil o el coche?") nor understand the answer.
+     */
+    val customLabel: String? = null,
+) {
+    /** How to say this number out loud: the contact's own word for it wins. */
+    val spokenLabel: String
+        get() = customLabel?.takeIf { it.isNotBlank() }?.let { "el de ${it.lowercase()}" }
+            ?: label.spoken
+}
 
 sealed interface ContactLookupResult {
     data class Found(val contact: ContactMatch) : ContactLookupResult

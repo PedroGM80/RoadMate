@@ -68,6 +68,9 @@ object SpokenText {
     fun recalled(question: String, answer: String) = "Me preguntaste \"$question\" y te dije: $answer"
     const val NOTHING_ON_RECORD = "No encuentro que hayamos hablado de eso."
 
+    /** The answer pipeline itself failed — say so rather than going quiet. */
+    const val ANSWER_FAILED = "Se me ha cruzado algo. Pregúntamelo otra vez."
+
     // Speech recognition
     const val SPEECH_FLOW_ERROR = "No te he oído. Prueba otra vez."
     const val SPEECH_NOT_READY = "La voz aún se está preparando. Prueba en unos segundos."
