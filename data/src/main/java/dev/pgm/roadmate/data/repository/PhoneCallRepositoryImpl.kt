@@ -22,8 +22,20 @@ class PhoneCallRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context
 ) : PhoneCallRepository {
 
+    private fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
     override fun hasCallPermission(): Boolean =
         hasPermission(Manifest.permission.CALL_PHONE) && hasPermission(Manifest.permission.READ_CONTACTS)
+
+    override fun placeCall(phoneNumber: String) {
+        val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:$phoneNumber")).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        // A phone with no dialer is exotic but possible — don't crash the loop.
+        runCatching { context.startActivity(callIntent) }
+            .onFailure { Log.w(TAG, "No activity to place the call", it) }
+    }
 
     /**
      * Looks the name up through [ContactsContract.CommonDataKinds.Phone.CONTENT_FILTER_URI]
@@ -89,18 +101,6 @@ class PhoneCallRepositoryImpl @Inject constructor(
             // its own, is ContactMatching's call — see there for the rule.
             ContactMatching.resolve(matches, query)
         }
-
-    override fun placeCall(phoneNumber: String) {
-        val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:$phoneNumber")).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-        // A phone with no dialer is exotic but possible — don't crash the loop.
-        runCatching { context.startActivity(callIntent) }
-            .onFailure { Log.w(TAG, "No activity to place the call", it) }
-    }
-
-    private fun hasPermission(permission: String): Boolean =
-        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
 
     private fun phoneLabel(type: Int): PhoneLabel = when (type) {
         ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE -> PhoneLabel.MOBILE
