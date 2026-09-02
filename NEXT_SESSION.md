@@ -4,6 +4,30 @@ The first on-device session happened (Xiaomi Redmi Note 14, HyperOS,
 Android 16, arm64, **no AICore**). Lots fixed and committed to `develop`.
 This file is now the running state, not the original bring-up plan.
 
+## Device session 2 — 2026-09-03 (Cádiz / San Fernando, ~36.47,-6.19)
+
+Verified on the Xiaomi:
+- **Offline POI search** — the fuel chip pins 15 gas stations from the
+  downloaded tiles; the filter chips are now Material Symbols icons and the
+  pins carry the category icon. Fixed: stale pins of the wrong category
+  stayed when switching filters zoomed-out.
+- **Offline routing (BRouter)** — works. Route from the GPS fix to a fuel
+  POI: engine **495 ms**, 52 pts, 1031 m, blue line follows roads, chip
+  "1,0 km · 4 min". The `.rd5` tile (`W10_N35`, 46 MB) downloads from
+  brouter.de over Wi-Fi with a live % in the chip; `car.brf` + `lookups.dat`
+  unpack from assets. **The one bug:** `ProfileCache.parseProfile` returns
+  false on a fresh parse (true = cache hit) — we were reading it as failure.
+- **Wake word** — `wake: listening for "oye copiloto"` starts on launch and
+  the mic-button ↔ wake-recognizer handoff works. Actual "oye copiloto"
+  trigger not tested (needs a voice).
+- **MapLibre attribution** lifted clear of the chip row.
+- The POI-sheet button said "Ir con Google Maps" (string only — behaviour
+  was already offline); now "Trazar ruta".
+
+Still needs a voice on the device: wake-word trigger, streaming/prompt
+latency, name search ("busca el Mercadona"). DebugTrace now covers the
+routing path (`route:` lines).
+
 ## Device / tooling notes
 
 - Xiaomi serial `8TOZG675AI4PJFHI` (USB). `adb` at
