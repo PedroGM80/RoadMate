@@ -10,8 +10,8 @@ import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
+import dev.pgm.roadmate.domain.repository.CurrentPlaceRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
-import dev.pgm.roadmate.domain.repository.ReverseGeocodeRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WakeWordRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
@@ -78,7 +78,7 @@ class RoadMateViewModel @Inject constructor(
     private val greetingRepository: GreetingRepository,
     private val wakeWordRepository: WakeWordRepository,
     private val assistantPreferencesRepository: AssistantPreferencesRepository,
-    private val reverseGeocodeRepository: ReverseGeocodeRepository
+    private val currentPlaceRepository: CurrentPlaceRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RoadMateUiState())
@@ -102,9 +102,6 @@ class RoadMateViewModel @Inject constructor(
     val handsFreeEnabled: StateFlow<Boolean> = assistantPreferencesRepository.handsFreeEnabled
         .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
-    /** The last coordinate we reverse-geocoded, to avoid re-querying on tiny drift. */
-    private var geocodedFrom: Pair<Double, Double>? = null
-
     init {
         viewModelScope.launch {
             locationRepository.location.collect { location ->
@@ -112,15 +109,14 @@ class RoadMateViewModel @Inject constructor(
                     location = location,
                     locationUnavailable = if (location != null) false else _uiState.value.locationUnavailable,
                 )
-                if (location != null && location.movedFrom(geocodedFrom)) {
-                    geocodedFrom = location
-                    launch {
-                        val label = runCatching {
-                            reverseGeocodeRepository.describe(location.first, location.second)
-                        }.getOrNull()
-                        _uiState.value = _uiState.value.copy(locationLabel = label)
-                    }
-                }
+            }
+        }
+
+        // Street/locality label — resolved from the offline map tiles by the
+        // map layer, never a network geocoder.
+        viewModelScope.launch {
+            currentPlaceRepository.label.collect { label ->
+                _uiState.value = _uiState.value.copy(locationLabel = label)
             }
         }
 
@@ -452,12 +448,6 @@ class RoadMateViewModel @Inject constructor(
         stopWakeWordListening()
         runCatching { wakeEarcon.release() }
     }
-
-    /** ~45 m — enough drift to be worth re-geocoding the location chip. */
-    private fun Pair<Double, Double>.movedFrom(other: Pair<Double, Double>?): Boolean =
-        other == null ||
-            kotlin.math.abs(first - other.first) > 0.0004 ||
-            kotlin.math.abs(second - other.second) > 0.0004
 
     private companion object {
         /** Give up waiting for the first question this long after "Sí, dime.". */

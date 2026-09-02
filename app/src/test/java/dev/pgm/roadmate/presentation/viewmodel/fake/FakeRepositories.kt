@@ -17,9 +17,9 @@ import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
+import dev.pgm.roadmate.domain.repository.CurrentPlaceRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MediaRepository
-import dev.pgm.roadmate.domain.repository.ReverseGeocodeRepository
 import dev.pgm.roadmate.domain.repository.RoutingRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
@@ -142,8 +142,10 @@ class FakePhoneCallRepository(
     }
 }
 
-class FakeReverseGeocodeRepository(private val label: String? = null) : ReverseGeocodeRepository {
-    override suspend fun describe(lat: Double, lon: Double): String? = label
+class FakeCurrentPlaceRepository(initial: String? = null) : CurrentPlaceRepository {
+    private val _label = MutableStateFlow(initial)
+    override val label: StateFlow<String?> = _label
+    override fun update(label: String?) { _label.value = label }
 }
 
 class FakeRoutingRepository(

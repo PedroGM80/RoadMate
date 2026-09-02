@@ -35,7 +35,13 @@ private fun mapViewModel(
     offlineMap: OfflineMapController,
     coordinator: FakeMapSearchCoordinator = FakeMapSearchCoordinator(),
     routing: FakeRoutingRepository = FakeRoutingRepository(),
-) = MapViewModel(offlineMap, FakeMemoryRepository(), routing, coordinator)
+) = MapViewModel(
+    offlineMap,
+    FakeMemoryRepository(),
+    routing,
+    dev.pgm.roadmate.presentation.viewmodel.fake.FakeCurrentPlaceRepository(),
+    coordinator,
+)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MapViewModelTest {

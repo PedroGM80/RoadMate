@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.pgm.roadmate.BuildConfig
 import dev.pgm.roadmate.domain.model.MapSearchRequest
 import dev.pgm.roadmate.domain.model.RoutingDataStatus
+import dev.pgm.roadmate.domain.repository.CurrentPlaceRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.RoutingRepository
@@ -28,6 +29,7 @@ class MapViewModel @Inject constructor(
     private val offlineMap: OfflineMapController,
     private val memoryRepository: MemoryRepository,
     private val routingRepository: RoutingRepository,
+    private val currentPlaceRepository: CurrentPlaceRepository,
     mapSearchCoordinator: MapSearchCoordinator,
 ) : ViewModel() {
 
@@ -102,6 +104,9 @@ class MapViewModel @Inject constructor(
         _nameQuery.value = null
         _navigateToResult.value = false
     }
+
+    /** [MapScreen] resolved the driver's street/locality from the offline tiles. */
+    fun onPlaceResolved(label: String?) = currentPlaceRepository.update(label)
 
     /**
      * Called by [MapScreen] once it has resolved the destination for a

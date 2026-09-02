@@ -4,6 +4,7 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dev.pgm.roadmate.domain.repository.CurrentPlaceRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 
 @Module
@@ -15,4 +16,7 @@ abstract class MapModule {
 
     @Binds
     abstract fun bindMapSearchCoordinator(impl: MapSearchCoordinatorImpl): MapSearchCoordinator
+
+    @Binds
+    abstract fun bindCurrentPlaceRepository(impl: CurrentPlaceRepositoryImpl): CurrentPlaceRepository
 }

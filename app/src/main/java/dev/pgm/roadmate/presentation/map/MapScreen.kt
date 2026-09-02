@@ -80,7 +80,11 @@ import org.maplibre.android.plugins.annotation.LineOptions
 import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
 import org.maplibre.android.style.sources.VectorSource
+import org.maplibre.geojson.LineString
+import org.maplibre.geojson.MultiLineString
 import org.maplibre.geojson.Point
+import kotlin.math.cos
+import kotlin.math.hypot
 
 private const val PIN_PREFIX = "roadmate-pin-"
 
@@ -172,6 +176,27 @@ fun MapScreen(
                 return@LaunchedEffect
             }
             delay(500)
+        }
+    }
+
+    // Reverse-geocode the driver's position from the downloaded tiles (no
+    // network geocoder) and publish it for the Voz screen's location chip.
+    LaunchedEffect(mapLibreMap) {
+        val map = mapLibreMap ?: return@LaunchedEffect
+        var last: Pair<Double, Double>? = null
+        while (true) {
+            val here = map.currentLatLon()
+            if (here != null && (last == null || metersBetween(last!!, here) > 40.0)) {
+                last = here
+                val label = runCatching { placeFromTiles(map, here.first, here.second) }
+                    .onFailure { dev.pgm.roadmate.ml.DebugTrace.log("geo: threw ${it.message}") }
+                    .getOrNull()
+                dev.pgm.roadmate.ml.DebugTrace.log("geo: $here -> ${label ?: "null"}")
+                viewModel.onPlaceResolved(label)
+            } else if (last != null && here == null) {
+                dev.pgm.roadmate.ml.DebugTrace.log("geo: no fix yet")
+            }
+            delay(12_000)
         }
     }
 
@@ -569,6 +594,85 @@ private fun MapLibreMap.currentLatLon(): Pair<Double, Double>? {
     val last = locationComponent.takeIf { it.isLocationComponentActivated }?.lastKnownLocation
         ?: return null
     return last.latitude to last.longitude
+}
+
+/** Rough planar distance in metres between two (lat, lon) points. */
+private fun metersBetween(a: Pair<Double, Double>, b: Pair<Double, Double>): Double {
+    val mx = (b.second - a.second) * cos(Math.toRadians(a.first)) * 111_320.0
+    val my = (b.first - a.first) * 110_540.0
+    return hypot(mx, my)
+}
+
+/** Distance in metres from the origin (0,0) to segment a→b (both in local metres). */
+private fun segMeters(ax: Double, ay: Double, bx: Double, by: Double): Double {
+    val dx = bx - ax
+    val dy = by - ay
+    if (dx == 0.0 && dy == 0.0) return hypot(ax, ay)
+    val t = (((-ax) * dx + (-ay) * dy) / (dx * dx + dy * dy)).coerceIn(0.0, 1.0)
+    return hypot(ax + t * dx, ay + t * dy)
+}
+
+/**
+ * Reverse-geocode a coordinate from the loaded offline tiles: the nearest
+ * named road within ~120 m, and the nearest town/locality label. Entirely
+ * on-device — `querySourceFeatures` over the vector source, no network.
+ */
+private fun placeFromTiles(map: MapLibreMap, atLat: Double, atLon: Double): String? {
+    val style = map.style ?: return null
+    val src = style.sources.firstOrNull { it is VectorSource } as? VectorSource ?: return null
+    val cosLat = cos(Math.toRadians(atLat))
+    fun toM(lat: Double, lon: Double): Pair<Double, Double> =
+        (lon - atLon) * cosLat * 111_320.0 to (lat - atLat) * 110_540.0
+
+    // The tile schema's source-layer names vary by style, so read them off the
+    // style's own layers and bucket by what looks like a road vs a place.
+    val srcLayers = style.layers.mapNotNull { l ->
+        runCatching { l.javaClass.getMethod("getSourceLayer").invoke(l) as? String }
+            .getOrNull()?.takeIf { it.isNotBlank() }
+    }.distinct()
+    val roadLayers = srcLayers.filter {
+        it.contains("transport", true) || it.contains("road", true) ||
+            it.contains("street", true) || it.contains("highway", true)
+    }.ifEmpty { listOf("transportation_name", "transportation") }
+    val placeLayers = srcLayers.filter { it.contains("place", true) }.ifEmpty { listOf("place") }
+
+    var road: String? = null
+    var roadM = 130.0
+    runCatching { src.querySourceFeatures(roadLayers.toTypedArray(), null) }
+        .getOrDefault(emptyList())
+        .forEach { f ->
+            val name = f.getStringProperty("name")?.trim()?.takeIf { it.isNotEmpty() } ?: return@forEach
+            val lines: List<List<Point>> = when (val g = f.geometry()) {
+                is LineString -> listOf(g.coordinates())
+                is MultiLineString -> g.coordinates()
+                else -> return@forEach
+            }
+            for (line in lines) for (i in 0 until line.size - 1) {
+                val (ax, ay) = toM(line[i].latitude(), line[i].longitude())
+                val (bx, by) = toM(line[i + 1].latitude(), line[i + 1].longitude())
+                val d = segMeters(ax, ay, bx, by)
+                if (d < roadM) { roadM = d; road = name }
+            }
+        }
+
+    val localityClasses = setOf(
+        "city", "town", "village", "suburb", "hamlet", "neighbourhood", "quarter", "locality",
+    )
+    var locality: String? = null
+    var localityM = Double.MAX_VALUE
+    runCatching { src.querySourceFeatures(placeLayers.toTypedArray(), null) }
+        .getOrDefault(emptyList())
+        .forEach { f ->
+            val cls = f.getStringProperty("class")
+            if (cls != null && cls !in localityClasses) return@forEach
+            val p = f.geometry() as? Point ?: return@forEach
+            val name = f.getStringProperty("name")?.trim()?.takeIf { it.isNotEmpty() } ?: return@forEach
+            val (mx, my) = toM(p.latitude(), p.longitude())
+            val d = hypot(mx, my)
+            if (d < localityM) { localityM = d; locality = name }
+        }
+
+    return listOfNotNull(road, locality).joinToString(" · ").takeIf { it.isNotBlank() }
 }
 
 
