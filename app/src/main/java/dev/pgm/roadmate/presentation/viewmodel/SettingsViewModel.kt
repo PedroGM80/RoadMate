@@ -33,12 +33,19 @@ class SettingsViewModel @Inject constructor(
     val answerStyle: StateFlow<AnswerStyle> = preferences.answerStyle
         .stateIn(viewModelScope, SharingStarted.Eagerly, AnswerStyle.DEFAULT)
 
+    val handsFree: StateFlow<Boolean> = preferences.handsFreeEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+
     fun setTheme(preference: ThemePreference) {
         viewModelScope.launch { preferences.setThemePreference(preference) }
     }
 
     fun setAnswerStyle(style: AnswerStyle) {
         viewModelScope.launch { preferences.setAnswerStyle(style) }
+    }
+
+    fun setHandsFree(enabled: Boolean) {
+        viewModelScope.launch { preferences.setHandsFreeEnabled(enabled) }
     }
 
     fun clearMemory() {

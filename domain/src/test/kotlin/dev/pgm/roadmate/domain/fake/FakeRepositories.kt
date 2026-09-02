@@ -175,6 +175,12 @@ class FakeAssistantPreferencesRepository(
     override suspend fun setThemePreference(preference: ThemePreference) {
         themeFlow.value = preference
     }
+
+    val handsFreeFlow = MutableStateFlow(true)
+    override val handsFreeEnabled: StateFlow<Boolean> = handsFreeFlow
+    override suspend fun setHandsFreeEnabled(enabled: Boolean) {
+        handsFreeFlow.value = enabled
+    }
 }
 
 class FakeMemoryRepository(

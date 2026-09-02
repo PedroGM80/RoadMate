@@ -1,6 +1,7 @@
 package dev.pgm.roadmate.data.repository
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -34,9 +35,19 @@ class AssistantPreferencesRepositoryImpl @Inject constructor(
         context.roadMatePreferencesDataStore.edit { it[THEME_KEY] = preference.name }
     }
 
+    override val handsFreeEnabled: Flow<Boolean> =
+        context.roadMatePreferencesDataStore.data.map { prefs ->
+            prefs[HANDS_FREE_KEY] ?: true
+        }
+
+    override suspend fun setHandsFreeEnabled(enabled: Boolean) {
+        context.roadMatePreferencesDataStore.edit { it[HANDS_FREE_KEY] = enabled }
+    }
+
     private companion object {
         val ANSWER_STYLE_KEY = stringPreferencesKey("answer_style")
         val THEME_KEY = stringPreferencesKey("theme_preference")
+        val HANDS_FREE_KEY = booleanPreferencesKey("hands_free_enabled")
 
         inline fun <reified T : Enum<T>> enumOrNull(name: String): T? =
             runCatching { enumValueOf<T>(name) }.getOrNull()

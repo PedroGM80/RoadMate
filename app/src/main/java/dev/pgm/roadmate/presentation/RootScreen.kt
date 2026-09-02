@@ -15,6 +15,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -63,6 +64,7 @@ fun RootScreen(
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val theme by settingsViewModel.theme.collectAsState()
     val answerStyle by settingsViewModel.answerStyle.collectAsState()
+    val handsFree by settingsViewModel.handsFree.collectAsState()
 
     // A voice search ("busca gasolineras") pulls the map to the front.
     LaunchedEffect(Unit) {
@@ -101,6 +103,8 @@ fun RootScreen(
                             onThemeChange = settingsViewModel::setTheme,
                             answerStyle = answerStyle,
                             onAnswerStyleChange = settingsViewModel::setAnswerStyle,
+                            handsFree = handsFree,
+                            onHandsFreeChange = settingsViewModel::setHandsFree,
                             onClearOfflineMaps = settingsViewModel::clearOfflineMaps,
                             onClearMemory = settingsViewModel::clearMemory,
                         )
@@ -133,6 +137,8 @@ private fun SettingsMenu(
     onThemeChange: (ThemePreference) -> Unit,
     answerStyle: AnswerStyle,
     onAnswerStyleChange: (AnswerStyle) -> Unit,
+    handsFree: Boolean,
+    onHandsFreeChange: (Boolean) -> Unit,
     onClearOfflineMaps: () -> Unit,
     onClearMemory: () -> Unit,
 ) {
@@ -155,6 +161,14 @@ private fun SettingsMenu(
         RadioItem(AnswerStyle.BRIEF, R.string.answer_brief, answerStyle, onAnswerStyleChange, close)
         RadioItem(AnswerStyle.NORMAL, R.string.answer_normal, answerStyle, onAnswerStyleChange, close)
         RadioItem(AnswerStyle.DETAILED, R.string.answer_detailed, answerStyle, onAnswerStyleChange, close)
+
+        HorizontalDivider()
+        MenuHeader(R.string.settings_voice_header)
+        DropdownMenuItem(
+            leadingIcon = { Switch(checked = handsFree, onCheckedChange = null) },
+            text = { Text(stringResource(R.string.settings_hands_free)) },
+            onClick = { onHandsFreeChange(!handsFree) },
+        )
 
         HorizontalDivider()
         DropdownMenuItem(

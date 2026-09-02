@@ -114,7 +114,7 @@ class MainActivity : ComponentActivity() {
         // the wake-word listener when it's configured, otherwise the
         // rest-reminder monitor. Only one holds the mic at a time.
         if (permissionManager.hasRecordAudioPermission()) {
-            if (viewModel.isWakeWordAvailable()) {
+            if (viewModel.handsFreeActive()) {
                 WakeWordForegroundService.start(this)
             } else {
                 SilenceDetectionForegroundService.start(this)

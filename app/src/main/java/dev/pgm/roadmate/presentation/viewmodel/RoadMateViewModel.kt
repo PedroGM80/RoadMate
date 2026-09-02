@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
 import dev.pgm.roadmate.domain.model.TravelContext
+import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
@@ -20,11 +21,13 @@ import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
 import dev.pgm.roadmate.utils.Constants
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Calendar
@@ -56,7 +59,8 @@ class RoadMateViewModel @Inject constructor(
     private val geminiRepository: GeminiRepository,
     private val speechSynthesisRepository: SpeechSynthesisRepository,
     private val greetingRepository: GreetingRepository,
-    private val wakeWordRepository: WakeWordRepository
+    private val wakeWordRepository: WakeWordRepository,
+    private val assistantPreferencesRepository: AssistantPreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RoadMateUiState())
@@ -72,6 +76,10 @@ class RoadMateViewModel @Inject constructor(
      * Vosk capture doesn't get confused with a real stop from onPause().
      */
     private var wakeWordDesired = false
+
+    /** The driver's "manos libres" setting; the wake phrase only runs when on. */
+    val handsFreeEnabled: StateFlow<Boolean> = assistantPreferencesRepository.handsFreeEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     init {
         viewModelScope.launch {
@@ -177,22 +185,25 @@ class RoadMateViewModel @Inject constructor(
         silenceMonitoringJob = null
     }
 
-    /** True when hands-free listening can run — used to decide whether it
-     *  replaces the mic-button-plus-silence-monitor path. */
-    fun isWakeWordAvailable(): Boolean = wakeWordRepository.isAvailable()
+    /** True when the wake phrase should be the active mic consumer: the
+     *  engine is available *and* the driver hasn't switched "manos libres"
+     *  off. Used to pick the foreground and background paths. */
+    fun handsFreeActive(): Boolean =
+        handsFreeEnabled.value && wakeWordRepository.isAvailable()
 
     /**
      * Starts whichever always-on mic consumer applies: the "oye copiloto"
-     * wake-phrase listener when it's available, otherwise the rest-reminder
+     * wake-phrase listener when [handsFreeActive], otherwise the rest-reminder
      * silence monitor. They can't both hold the mic, so this deliberately
-     * runs only one. Call once RECORD_AUDIO is granted (HomeScreen) and on
-     * every onResume() (MainActivity).
+     * runs only one. Call once RECORD_AUDIO is granted (HomeScreen), on every
+     * onResume() (MainActivity), and whenever the setting flips.
      */
     fun startAmbientListening() {
-        if (wakeWordRepository.isAvailable()) {
+        if (handsFreeActive()) {
             stopSilenceMonitoring()
             startWakeWordListening()
         } else {
+            stopWakeWordListening()
             startSilenceMonitoring()
         }
     }

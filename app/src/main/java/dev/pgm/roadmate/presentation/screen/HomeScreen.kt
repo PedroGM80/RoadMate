@@ -66,7 +66,11 @@ fun HomeScreen(
         listOf(Manifest.permission.CALL_PHONE, Manifest.permission.READ_CONTACTS),
     )
 
-    LaunchedEffect(corePermissions.allPermissionsGranted) {
+    val handsFree by viewModel.handsFreeEnabled.collectAsState()
+
+    // Re-runs when the "manos libres" setting flips, so the wake phrase and
+    // the rest-reminder monitor swap without needing a restart.
+    LaunchedEffect(corePermissions.allPermissionsGranted, handsFree) {
         if (corePermissions.allPermissionsGranted) {
             viewModel.startAmbientListening()
             viewModel.refreshLocation()

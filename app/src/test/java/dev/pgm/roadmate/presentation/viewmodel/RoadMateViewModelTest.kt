@@ -42,7 +42,8 @@ class RoadMateViewModelTest {
         greetingSpeechSynthesisRepository: FakeSpeechSynthesisRepository = FakeSpeechSynthesisRepository(),
         geminiRepository: FakeGeminiRepository = FakeGeminiRepository(geminiResponse),
         speechEvents: List<SpeechRecognitionEvent>? = null,
-        wakeWordRepository: FakeWakeWordRepository = FakeWakeWordRepository()
+        wakeWordRepository: FakeWakeWordRepository = FakeWakeWordRepository(),
+        preferencesRepository: FakeAssistantPreferencesRepository = FakeAssistantPreferencesRepository()
     ): RoadMateViewModel {
         val speechSynthesisRepository = FakeSpeechSynthesisRepository()
         val generateResponseUseCase = GenerateResponseUseCase(
@@ -72,7 +73,8 @@ class RoadMateViewModelTest {
             geminiRepository = geminiRepository,
             speechSynthesisRepository = greetingSpeechSynthesisRepository,
             greetingRepository = greetingRepository,
-            wakeWordRepository = wakeWordRepository
+            wakeWordRepository = wakeWordRepository,
+            assistantPreferencesRepository = preferencesRepository
         )
     }
 
@@ -248,10 +250,23 @@ class RoadMateViewModelTest {
         }
 
     @Test
-    fun `isWakeWordAvailable mirrors the repository`() =
+    fun `handsFreeActive needs both the engine and the setting`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            assertFalse(buildViewModel(wakeWordRepository = FakeWakeWordRepository(available = false)).isWakeWordAvailable())
-            assertTrue(buildViewModel(wakeWordRepository = FakeWakeWordRepository(available = true)).isWakeWordAvailable())
+            assertFalse(
+                buildViewModel(wakeWordRepository = FakeWakeWordRepository(available = false)).handsFreeActive(),
+            )
+            assertTrue(
+                buildViewModel(wakeWordRepository = FakeWakeWordRepository(available = true)).handsFreeActive(),
+            )
+
+            val off = FakeAssistantPreferencesRepository()
+            off.setHandsFreeEnabled(false)
+            val vm = buildViewModel(
+                wakeWordRepository = FakeWakeWordRepository(available = true),
+                preferencesRepository = off,
+            )
+            advanceUntilIdle()
+            assertFalse(vm.handsFreeActive())
         }
 
     @Test
