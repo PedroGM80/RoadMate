@@ -26,6 +26,16 @@ So the first two things to do are:
 **Your CI was red before any of this** — those three `:domain` failures. Worth
 confirming that's now green.
 
+The workflow itself was also reviewed and fixed on 2026-09-02. It was valid
+and every action version it pins genuinely exists (checked against the real
+tag lists), but: it installed JDK 21 while `gradle-daemon-jvm.properties` asks
+the daemon for 25, so Gradle had to locate or download a JDK partway through
+every build; the BRouter jar was refetched from a GitHub release each run with
+no cache; and there was no `timeout-minutes` or `permissions` block. All four
+fixed. The pinned action majors are still 1–2 behind current — deliberately
+left alone, since bumping a major blind is how you get a red build for a
+reason unrelated to the code.
+
 ## Open — priority order
 
 1. **Merge check.** Build, run both test tasks, install on the Xiaomi, and

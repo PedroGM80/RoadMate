@@ -10,27 +10,56 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Nothing here writes anything back. Say so, so a compromised action can't.
+permissions:
+  contents: read
+
 jobs:
   unit-tests:
     runs-on: ubuntu-latest
+    # A hung Gradle daemon otherwise sits there for the full six-hour default.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: "21"
+          # Two JDKs on purpose:
+          #   25 — what gradle/gradle-daemon-jvm.properties requires of the
+          #        daemon (toolchainVersion=25). CI used to install only 21,
+          #        so Gradle had to go find or download a 25 mid-build.
+          #   11 — what :domain's jvmToolchain(11) compiles against.
+          # Installing both means Gradle provisions nothing from api.foojay.io
+          # while the build is running. The last one listed becomes JAVA_HOME.
+          java-version: |
+            11
+            25
 
       - uses: gradle/actions/setup-gradle@v5
 
-      # The :app build's preBuild task downloads the ~39 MB Vosk model into
-      # assets (onlyIf it's missing). Cache it so CI doesn't re-fetch from
-      # alphacephei.com every run and doesn't go red if that host is down.
-      - name: Cache Vosk model
+      # Point Gradle at exactly the JDKs setup-java just installed, rather
+      # than hoping auto-detection finds them. Without this a toolchain miss
+      # is a silent download, or a build failure on a runner image change.
+      - name: Tell Gradle where the JDKs are
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.java.installations.fromEnv=JAVA_HOME_11_X64,JAVA_HOME_25_X64" \
+            >> ~/.gradle/gradle.properties
+
+      # Two build-time downloads that aren't code and don't change: the Vosk
+      # Spanish model (~39 MB, into :app's assets by preBuild) and BRouter's
+      # routing jar (~350 KB, into :data/libs by preBuild). Both are fetched
+      # from third-party hosts, so without caching CI goes red whenever
+      # alphacephei.com or a GitHub release is having a bad day — for reasons
+      # that have nothing to do with the commit.
+      - name: Cache build-time downloads
         uses: actions/cache@v5
         with:
-          path: app/src/main/assets/vosk-model-small-es-0.42.zip
-          key: vosk-model-small-es-0.42
+          path: |
+            app/src/main/assets/vosk-model-small-es-0.42.zip
+            data/libs
+          key: build-downloads-vosk-0.42-brouter-1.7.10
 
       - name: Unit tests (:domain + :app)
         run: ./gradlew :domain:test :app:testDebugUnitTest --stacktrace
@@ -48,9 +77,14 @@ jobs:
       # Android Lint sees a class of defect the unit tests structurally
       # cannot: leaked Cursors and AudioRecords, foreground-service type
       # mismatches, permission calls without a check, Compose effects doing
-      # the wrong thing. `checkDependencies = true` in :app covers :data and
-      # :domain too. Non-gating for now (lint { abortOnError = false }) —
-      # read the report, then tighten it.
+      # the wrong thing.
+      #
+      # `checkDependencies = true` in :app pulls :data (an Android library)
+      # into the same analysis. It does NOT cover :domain, which is a plain
+      # kotlin("jvm") module with no lint plugin applied — see NEXT_SESSION.md.
+      #
+      # Non-gating for now (lint { abortOnError = false }): read the report,
+      # fix or baseline what's in it, then tighten.
       - name: Android Lint
         if: ${{ !cancelled() }}
         run: ./gradlew :app:lintDebug --stacktrace

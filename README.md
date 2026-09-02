@@ -176,7 +176,7 @@ Dependency injection is Hilt end to end (`@HiltAndroidApp`, `@AndroidEntryPoint`
 ```
 ./gradlew :app:installDebug          # build and install on a connected device/emulator
 ./gradlew :domain:test :app:testDebugUnitTest   # unit tests (both use hand-rolled fakes)
-./gradlew :app:lintDebug             # Android Lint, checkDependencies covers :data and :domain
+./gradlew :app:lintDebug             # Android Lint (:app + :data; see app/build.gradle.kts)
 ```
 
 That's the whole setup — the model download happens at runtime, so a plain

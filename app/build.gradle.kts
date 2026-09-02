@@ -116,10 +116,15 @@ android {
     }
 
     lint {
-        // :app pulls in :data and :domain, and most of what lint has to say
-        // about this app (mic/permission handling, foreground services,
-        // Compose effects, resource leaks) lives in those modules — so check
-        // them from here rather than wiring three separate lint tasks.
+        // Pulls :data into the same analysis, which is where most of what
+        // lint has to say about this app lives (mic and permission handling,
+        // foreground services, resource leaks).
+        //
+        // It does not reach :domain: that's a plain kotlin("jvm") module, and
+        // a JVM project only contributes a lint model when the
+        // `com.android.lint` plugin is applied to it. :domain is pure logic
+        // with no Android API surface, so there is little for lint to say
+        // there — but the gap is real, not covered by this line.
         checkDependencies = true
 
         // Not a gate yet: this is the first run, and nobody has read the

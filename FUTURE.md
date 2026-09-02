@@ -166,15 +166,29 @@ commitment, just a starting point for the next session. See
   `com.google.mediapipe.**` keep rules are now in place — see "APK size"
   below; R8 itself is still off pending a device check.)
 - **CI pipeline — done, plus lint 2026-09-02.** `.github/workflows/ci.yml`
-  runs `:domain:test :app:testDebugUnitTest` on push / PR / manual dispatch
-  (JDK 21 Temurin, `gradle/actions/setup-gradle`, Vosk model cached), and now
-  `:app:lintDebug` with the report uploaded. Lint is **non-gating** for a
-  first pass (`lint.abortOnError = false` in `app/build.gradle.kts`): read the
-  report, fix or baseline what's there, then flip it to `true` so a regression
-  fails CI instead of scrolling past in a log.
+  runs `:domain:test :app:testDebugUnitTest` on push / PR / manual dispatch,
+  and now `:app:lintDebug` with the report uploaded. Lint is **non-gating**
+  for a first pass (`lint.abortOnError = false` in `app/build.gradle.kts`):
+  read the report, fix or baseline what's there, then flip it to `true` so a
+  regression fails CI instead of scrolling past in a log.
 
-  Open: no instrumented-test or `assembleRelease` job yet (the latter needs
-  signing config + a device to be meaningful).
+  Reviewed 2026-09-02 and fixed: it installed JDK 21 while
+  `gradle-daemon-jvm.properties` asks for 25, so Gradle had to find or
+  download a JDK mid-build; the BRouter jar was fetched from a GitHub release
+  on every run with no cache (the same third-party-outage risk the Vosk model
+  was already cached against); no `timeout-minutes`, no `permissions` block.
+
+  Open:
+  - No instrumented-test or `assembleRelease` job (the latter needs a signing
+    config + a device to be meaningful).
+  - `lint.checkDependencies` covers `:data` but **not** `:domain` — a plain
+    `kotlin("jvm")` module only contributes a lint model with the
+    `com.android.lint` plugin applied. Little to find there (no Android API
+    surface), but it is a real gap.
+  - The pinned action majors are 1–2 behind current (checkout v5 → v7,
+    cache v5 → v6, upload-artifact v6 → v7, setup-gradle v5 → v6). All still
+    exist and work; bump them deliberately, one at a time, where a failure
+    can be read.
 - **Crash reporting — finish it.** Firebase Crashlytics is now wired
   (opt-in via `app/google-services.json`, diagnostics-only, no Analytics).
   Still open: it covers JVM crashes but **not native ones** — MediaPipe,
