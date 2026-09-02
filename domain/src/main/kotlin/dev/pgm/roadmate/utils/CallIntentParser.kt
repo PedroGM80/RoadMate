@@ -9,7 +9,7 @@ package dev.pgm.roadmate.utils
 object CallIntentParser {
 
     private val PATTERNS = listOf(
-        Regex("""(?:llama|llamar|telefonea|telefonear)\s+a\s+(.+)""", RegexOption.IGNORE_CASE)
+        spanishRegex("""(?:llama|llamar|telefonea|telefonear)\s+a\s+(.+)""")
     )
 
     fun extractContactName(userInput: String): String? {

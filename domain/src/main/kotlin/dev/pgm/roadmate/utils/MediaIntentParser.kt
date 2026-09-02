@@ -15,14 +15,13 @@ import dev.pgm.roadmate.domain.model.MediaApp
 object MediaIntentParser {
 
     /** Verbs that, followed somewhere by an app name, mean "open that app". */
-    private val TRIGGER = Regex(
+    private val TRIGGER = spanishRegex(
         """\b(?:abre|abrir|pon|poner|ponme|reproduce|reproducir|inicia|iniciar|lanza|lanzar|arranca|arrancar)\b""",
-        RegexOption.IGNORE_CASE,
     )
 
     private val APP_PATTERNS: List<Pair<Regex, MediaApp>> = listOf(
-        Regex("""\b(?:youtube\s*music|yt\s*music)\b""", RegexOption.IGNORE_CASE) to MediaApp.YOUTUBE_MUSIC,
-        Regex("""\bspotify\b""", RegexOption.IGNORE_CASE) to MediaApp.SPOTIFY,
+        spanishRegex("""\b(?:youtube\s*music|yt\s*music)\b""") to MediaApp.YOUTUBE_MUSIC,
+        spanishRegex("""\bspotify\b""") to MediaApp.SPOTIFY,
     )
 
     fun extractMediaApp(userInput: String): MediaApp? {

@@ -7,6 +7,7 @@ import dev.pgm.roadmate.domain.model.Exchange
 import dev.pgm.roadmate.domain.model.FactType
 import dev.pgm.roadmate.domain.model.UserFact
 import dev.pgm.roadmate.domain.repository.MemoryRepository
+import dev.pgm.roadmate.utils.spanishRegex
 import javax.inject.Inject
 
 class MemoryRepositoryImpl @Inject constructor(
@@ -34,7 +35,9 @@ class MemoryRepositoryImpl @Inject constructor(
     }
 
     override suspend fun searchExchanges(term: String, limit: Int): List<Exchange> {
-        val tokens = term.lowercase().split(Regex("\\W+")).filter { it.length >= 4 }
+        // Unicode-aware split: an ASCII \W chops "Ronda" fine but turns
+        // "Málaga" into "m", "laga", so recall on accented place names failed.
+        val tokens = term.lowercase().split(WORD_SPLIT).filter { it.length >= 4 }
         if (tokens.isEmpty()) return emptyList()
         return dao.latestExchanges(SEARCH_SCAN)
             .map { row ->
@@ -93,6 +96,8 @@ class MemoryRepositoryImpl @Inject constructor(
     }
 
     private companion object {
+        val WORD_SPLIT = spanishRegex("""\W+""", ignoreCase = false)
+
         /** How far back still counts as "still talking about the same thing".
          *  Short on purpose — a stale exchange fed back in makes a small model
          *  answer the old question. */

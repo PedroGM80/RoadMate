@@ -19,7 +19,7 @@ object CallFollowUpParser {
         ordinal("cuart[oa]", 3),
         ordinal("quint[oa]", 4),
     )
-    private val LAST = Regex("""\b[uú]ltim[oa]\b""", RegexOption.IGNORE_CASE)
+    private val LAST = spanishRegex("""\b[uú]ltim[oa]\b""")
 
     private val LABEL_PHRASES: List<Pair<Regex, PhoneLabel>> = listOf(
         labelPhrase("m[oó]vil|celular", PhoneLabel.MOBILE),
@@ -29,10 +29,10 @@ object CallFollowUpParser {
     )
 
     private fun ordinal(word: String, index: Int) =
-        Regex("""\b$word\b""", RegexOption.IGNORE_CASE) to index
+        spanishRegex("""\b$word\b""") to index
 
     private fun labelPhrase(words: String, label: PhoneLabel) =
-        Regex("""\b(?:$words)\b""", RegexOption.IGNORE_CASE) to label
+        spanishRegex("""\b(?:$words)\b""") to label
 
     fun resolve(userInput: String, candidates: List<ContactMatch>): ContactMatch? {
         if (candidates.isEmpty()) return null
@@ -48,7 +48,9 @@ object CallFollowUpParser {
 
         val names = candidates.map { it.name.lowercase() }
         val words = text.lowercase()
-            .split(Regex("""\W+"""))
+            // Unicode-aware: an ASCII \W split turned "Ana García" into
+            // "ana", "garc", "a", so a surname with an accent never matched.
+            .split(spanishRegex("""\W+""", ignoreCase = false))
             .filter { it.length >= 3 && it !in STOPWORDS }
         // Words shared by every candidate (e.g. the first name they all match
         // on) tell nothing apart — only the distinguishing ones count.

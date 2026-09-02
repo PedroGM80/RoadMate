@@ -11,26 +11,23 @@ import dev.pgm.roadmate.domain.model.PlaceCategory
  */
 object PlaceCategoryParser {
 
-    private val FUEL = Regex(
+    private val FUEL = spanishRegex(
         """\b(?:gasolinera|gasolineras|gasolinería|estaci[oó]n(?:es)?\s+de\s+servicio|""" +
             """combustible|carburante|repostar|repostaje|gasoil|gas[oó]leo|di[eé]sel|""" +
             """surtidor|echar\s+gasolina|poner\s+gasolina)\b""",
-        RegexOption.IGNORE_CASE,
     )
 
-    private val HOTEL = Regex(
+    private val HOTEL = spanishRegex(
         """\b(?:hotel|hoteles|hostal|hostales|alojamiento|alojamientos|""" +
             """d[oó]nde\s+dormir|sitio\s+para\s+dormir|pensi[oó]n|pensiones|""" +
             """motel|moteles|casa\s+rural|albergue)\b""",
-        RegexOption.IGNORE_CASE,
     )
 
-    private val FOOD = Regex(
+    private val FOOD = spanishRegex(
         """\b(?:restaurante|restaurantes|sitio\s+para\s+comer|d[oó]nde\s+comer|""" +
             """algo\s+de\s+comer|un\s+bar|bares|cafeter[ií]a|cafeter[ií]as|caf[eé]|""" +
             """comida\s+r[aá]pida|hamburgueser[ií]a|pizzer[ií]a|tapas|""" +
             """men[uú]\s+del\s+d[ií]a)\b""",
-        RegexOption.IGNORE_CASE,
     )
 
     fun parse(query: String): PlaceCategory? {

@@ -39,37 +39,30 @@ object MemoryCommandParser {
     )
 
     private val relationAlt = RELATIONS.joinToString("|")
-    private val SET_HOME = Regex(
+    private val SET_HOME = spanishRegex(
         """\b(?:esta\s+es\s+mi\s+casa|guarda\s+(?:esto|esta\s+ubicaci[oó]n)\s+como\s+(?:mi\s+)?casa|aqu[ií]\s+vivo)\b""",
-        RegexOption.IGNORE_CASE,
     )
-    private val SET_WORK = Regex(
+    private val SET_WORK = spanishRegex(
         """\b(?:aqu[ií]\s+(?:es|est[aá])\s+(?:mi\s+)?trabajo|esto\s+es\s+(?:mi\s+)?trabajo|guarda\s+(?:esto|esta\s+ubicaci[oó]n)\s+como\s+(?:el\s+|mi\s+)?trabajo|aqu[ií]\s+trabajo)\b""",
-        RegexOption.IGNORE_CASE,
     )
-    private val SET_RELATIONSHIP = Regex(
+    private val SET_RELATIONSHIP = spanishRegex(
         """(?:\bguarda\s+a\s+(?<n1>.+?)\s+como\s+mi\s+(?<r1>$relationAlt)\b)""" +
             """|(?:^(?<n2>.+?)\s+es\s+mi\s+(?<r2>$relationAlt)\b)""",
-        RegexOption.IGNORE_CASE,
     )
 
     // "que" / "lo de" is required so "¿te recuerda a algo?" doesn't match.
-    private val REMEMBER = Regex(
+    private val REMEMBER = spanishRegex(
         """\b(?:recuerda|recu[eé]rdame|apunta|an[oó]ta|ten\s+en\s+cuenta)\s+(?:que|lo\s+de)\s+(.+)""",
-        RegexOption.IGNORE_CASE,
     )
-    private val PREFER = Regex("""\bprefiero\s+(.+)""", RegexOption.IGNORE_CASE)
-    private val FORGET = Regex(
+    private val PREFER = spanishRegex("""\bprefiero\s+(.+)""")
+    private val FORGET = spanishRegex(
         """\b(?:olvida|olv[ií]date)\s+(?:lo\s+de\s+|que\s+|de\s+)?(.+)""",
-        RegexOption.IGNORE_CASE,
     )
-    private val RECALL = Regex(
+    private val RECALL = spanishRegex(
         """\bqu[eé]\s+(?:sabes|recuerdas|has\s+aprendido|tienes\s+apuntado)\s+(?:de\s+m[ií]|sobre\s+m[ií])?\s*$""",
-        RegexOption.IGNORE_CASE,
     )
-    private val SEARCH = Regex(
+    private val SEARCH = spanishRegex(
         """\b(?:qu[eé]\s+(?:te\s+dije|dijiste|dijimos|hablamos|comentamos|coment[eé])|de\s+qu[eé]\s+hablamos)\s+(?:sobre|de|acerca\s+de|del|de\s+la|de\s+lo\s+de)\s+(.+)""",
-        RegexOption.IGNORE_CASE,
     )
 
     fun parse(userInput: String): Command? {

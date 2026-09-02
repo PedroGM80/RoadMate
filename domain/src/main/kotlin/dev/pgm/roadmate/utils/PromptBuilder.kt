@@ -41,20 +41,18 @@ object PromptBuilder {
      * a slightly longer prompt costs a fraction of a second, a missing fact
      * costs a wrong answer.
      */
-    private val LOCATION_QUESTION = Regex(
+    private val LOCATION_QUESTION = spanishRegex(
         """\b(?:d[oó]nde|cerca|cercan[oa]s?|lejos|distancia|kil[oó]metros?|km|""" +
             """llego|llegar|llegamos|llegar[eé]|queda|quedan|quedamos|falta|faltan|""" +
             """ruta|camino|trayecto|aqu[ií]|estoy|estamos|ubicaci[oó]n|alrededor|""" +
             """zona|salida|autov[ií]a|autopista|casa|trabajo|barrio)\b""",
-        RegexOption.IGNORE_CASE,
     )
 
-    private val WEATHER_QUESTION = Regex(
+    private val WEATHER_QUESTION = spanishRegex(
         """\b(?:tiempo|clima|llover|lloviendo|llover[aá]|lluvia|chispea|nublad[oa]s?|""" +
             """despejad[oa]s?|solead[oa]|nieve|nevando|granizo|niebla|temperatura|""" +
             """grados|pron[oó]stico|fr[ií]o|calor|viento|ventoso|paraguas|chubasquero|""" +
             """abrigo|chaqueta|cadenas)\b""",
-        RegexOption.IGNORE_CASE,
     )
 
     fun buildPrompt(
@@ -125,5 +123,5 @@ object PromptBuilder {
 
     /** Collapse whitespace/newlines to a single line and hard-cap the length. */
     private fun String.oneLine(max: Int): String =
-        replace(Regex("\\s+"), " ").trim().take(max)
+        replace(spanishRegex("\\s+"), " ").trim().take(max)
 }

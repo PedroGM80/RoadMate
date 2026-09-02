@@ -15,34 +15,31 @@ object MapSearchIntentParser {
      * lookups — it would otherwise also swallow "cómo llego a…").
      */
     private val NAVIGATE_PATTERNS = listOf(
-        Regex(
+        spanishRegex(
             """(?:ll[eé]vame|llevame|gu[ií]ame|guiame|c[oó]mo\s+(?:llego|voy|se\s+va|ir))\s+""" +
                 """(?:a|al|hasta|hacia|para)\s+(.+)""",
-            RegexOption.IGNORE_CASE,
         ),
     )
 
     private val FIND_PATTERNS = listOf(
-        Regex("""(?:busca|buscar|busco|encuentra|encontrar)\s+(.+)""", RegexOption.IGNORE_CASE),
-        Regex("""(?:dónde|donde)\s+hay\s+(.+)""", RegexOption.IGNORE_CASE),
-        Regex("""(?:dónde|donde)\s+(?:está|esta|queda)\s+(.+)""", RegexOption.IGNORE_CASE),
-        Regex("""hay\s+(?:alguna?|algún|algun)\s+(.+)""", RegexOption.IGNORE_CASE),
+        spanishRegex("""(?:busca|buscar|busco|encuentra|encontrar)\s+(.+)"""),
+        spanishRegex("""(?:dónde|donde)\s+hay\s+(.+)"""),
+        spanishRegex("""(?:dónde|donde)\s+(?:está|esta|queda)\s+(.+)"""),
+        spanishRegex("""hay\s+(?:alguna?|algún|algun)\s+(.+)"""),
     )
 
-    private val TRAILING_FILLER = Regex(
+    private val TRAILING_FILLER = spanishRegex(
         """\s+(?:""" +
             """cerca(?:\s+de\s+(?:aqu[ií]|m[ií]))?|""" +
             """m[aá]s\s+cercan[oa]s?|cercan[oa]s?|""" +
             """(?:por\s+)?aqu[ií](?:\s+cerca)?|(?:por|en)\s+la\s+zona""" +
             """)\s*$""",
-        RegexOption.IGNORE_CASE,
     )
 
     /** "busca información sobre…", "busca en internet…" — a fact lookup, not a place. */
-    private val NOT_A_PLACE = Regex(
+    private val NOT_A_PLACE = spanishRegex(
         """^(?:informaci[oó]n|datos?|la\s+respuesta|c[oó]mo|qu[eé]|qui[eé]n|cu[aá]l|cu[aá]ndo|cu[aá]nto|""" +
             """por\s+qu[eé]|significa|el\s+significado|en\s+(?:internet|la\s+web|google))\b""",
-        RegexOption.IGNORE_CASE,
     )
 
     /**

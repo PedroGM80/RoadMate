@@ -13,11 +13,10 @@ import kotlin.math.roundToLong
  */
 object ArithmeticParser {
 
-    private val PATTERN = Regex(
+    private val PATTERN = spanishRegex(
         """^(?:cu[aá]nto\s+(?:es|son)|cu[aá]nto\s+da|calcula)\s+""" +
             """(.+?)\s+(por|x|multiplicado\s+por|entre|dividido\s+(?:por|entre)|m[aá]s|menos)\s+""" +
             """(.+?)\s*$""",
-        RegexOption.IGNORE_CASE,
     )
 
     fun evaluate(userInput: String): String? {
@@ -67,7 +66,7 @@ object ArithmeticParser {
         if (t == "cien" || t == "ciento") return 100.0
         UNITS[t]?.let { return it.toDouble() }
         TENS[t]?.let { return it.toDouble() }
-        val parts = t.split(Regex("\\s+y\\s+"))
+        val parts = t.split(spanishRegex("\\s+y\\s+"))
         if (parts.size == 2) {
             val tens = TENS[parts[0]] ?: return null
             val unit = UNITS[parts[1]] ?: return null

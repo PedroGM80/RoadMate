@@ -15,24 +15,21 @@ package dev.pgm.roadmate.utils
  */
 object WeatherIntentParser {
 
-    private val WEATHER_WORDS = Regex(
+    private val WEATHER_WORDS = spanishRegex(
         """\b(?:llover|lloviendo|llover[aá]|lluvia|chispea|nublad[oa]s?|despejad[oa]s?|""" +
             """solead[oa]|nieve|nevando|granizo|niebla|temperatura|grados|pron[oó]stico|""" +
             """clima|bochorno|hela(?:da|r)|viento|ventoso)\b""",
-        RegexOption.IGNORE_CASE,
     )
 
-    private val WEATHER_TIEMPO = Regex(
+    private val WEATHER_TIEMPO = spanishRegex(
         """(?:qu[eé]\s+tiempo|c[oó]mo\s+est[aá]\s+el\s+(?:tiempo|cielo|d[ií]a)|""" +
             """el\s+tiempo\s+(?:hoy|ahora|para\s+hoy|de\s+hoy|que\s+hace|que\s+va|en\s+\p{L})|""" +
             """hace\s+(?:frío|frio|calor|sol|bueno|mal\s+tiempo|buen\s+tiempo))""",
-        RegexOption.IGNORE_CASE,
     )
 
     /** "cuánto tiempo", "a tiempo", "tiempo libre"… — duration, not weather. */
-    private val NOT_WEATHER_TIEMPO = Regex(
+    private val NOT_WEATHER_TIEMPO = spanishRegex(
         """\b(?:cu[aá]nto\s+tiempo|a\s+tiempo|tiempo\s+(?:libre|de\s+llegada|restante|que\s+queda|para\s+llegar))\b""",
-        RegexOption.IGNORE_CASE,
     )
 
     fun isWeatherQuestion(userInput: String): Boolean {
@@ -42,16 +39,14 @@ object WeatherIntentParser {
     }
 
     /** Trailing "… en <sitio>" of a weather question — a leading article dropped. */
-    private val PLACE_AFTER_EN = Regex(
+    private val PLACE_AFTER_EN = spanishRegex(
         """\ben\s+(?:el\s+|la\s+|los\s+|las\s+)?([\p{L}][\p{L}\s.'’-]{1,39}?)\s*[?!.]*\s*$""",
-        RegexOption.IGNORE_CASE,
     )
 
     /** "en un rato", "en 10 minutos", "en casa", "en general"… — not a place. */
-    private val NOT_A_PLACE = Regex(
+    private val NOT_A_PLACE = spanishRegex(
         """^(?:un|una|unos|unas)\s+(?:rato|ratito|hora|momento|minuto|poco)s?$""" +
             """|^(?:casa|el\s+trabajo|camino|ruta|general|realidad|verdad|serio|breve|directo)$""",
-        RegexOption.IGNORE_CASE,
     )
 
     /**

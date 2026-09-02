@@ -9,12 +9,11 @@ package dev.pgm.roadmate.utils
  */
 object QuestionPunctuation {
 
-    private val INTERROGATIVE_OPENER = Regex(
+    private val INTERROGATIVE_OPENER = spanishRegex(
         """^(?:qu[eé]|cu[aá]l(?:es)?|c[oó]mo|cu[aá]ndo|d[oó]nde|ad[oó]nde|""" +
             """qui[eé]n(?:es)?|cu[aá]nt[oa]s?|por\s+qu[eé]|para\s+qu[eé]|""" +
             """hay\s+(?:alg[uú]n|alguna)|se\s+puede|puedo|podr[íi]as?|""" +
             """est[aá]\s+(?:lejos|cerca|abierto)|falta\s+mucho|queda\s+mucho)\b""",
-        RegexOption.IGNORE_CASE,
     )
 
     fun normalize(raw: String): String {

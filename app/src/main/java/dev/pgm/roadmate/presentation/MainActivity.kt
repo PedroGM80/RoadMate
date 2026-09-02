@@ -6,7 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBars
@@ -16,7 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
-import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
 import dev.pgm.roadmate.presentation.map.MapViewModel
 import dev.pgm.roadmate.presentation.screen.OnboardingScreen
@@ -25,6 +23,7 @@ import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 import dev.pgm.roadmate.presentation.viewmodel.SettingsViewModel
 import dev.pgm.roadmate.service.SilenceDetectionForegroundService
 import dev.pgm.roadmate.service.WakeWordForegroundService
+import dev.pgm.roadmate.ui.rememberIsDarkTheme
 import dev.pgm.roadmate.ui.theme.RoadMateTheme
 import dev.pgm.roadmate.utils.PermissionManager
 import kotlinx.coroutines.launch
@@ -53,13 +52,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themePreference by settingsViewModel.theme.collectAsState()
             val location by settingsViewModel.lastLocation.collectAsState()
-            val dark = when (themePreference) {
-                ThemePreference.SYSTEM -> isSystemInDarkTheme()
-                ThemePreference.LIGHT -> false
-                ThemePreference.DARK -> true
-                ThemePreference.AUTO -> ThemePreference.isNight(java.time.ZonedDateTime.now(), location)
-            }
-            RoadMateTheme(darkTheme = dark) {
+            RoadMateTheme(darkTheme = rememberIsDarkTheme(themePreference, location)) {
                 val isOnboardingCompleted by onboardingRepository.isOnboardingCompleted
                     .collectAsState(initial = null)
 

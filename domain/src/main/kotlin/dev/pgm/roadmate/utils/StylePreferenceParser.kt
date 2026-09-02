@@ -14,10 +14,9 @@ import dev.pgm.roadmate.domain.model.AnswerStyle
  */
 object StylePreferenceParser {
 
-    private val PATTERN = Regex(
+    private val PATTERN = spanishRegex(
         """respuestas?\s+(?:(?:un\s+poco\s+)?m[aá]s\s+)?""" +
             """(cortas?|breves?|resumidas?|larg[ao]s?|detallad[ao]s?|con\s+m[aá]s\s+detalle|con\s+detalle|normales?|est[aá]ndar)""",
-        RegexOption.IGNORE_CASE,
     )
 
     fun parse(userInput: String): AnswerStyle? {

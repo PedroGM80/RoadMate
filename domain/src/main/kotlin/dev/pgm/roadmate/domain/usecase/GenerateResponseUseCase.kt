@@ -27,6 +27,7 @@ import dev.pgm.roadmate.utils.MemoryCommandParser
 import dev.pgm.roadmate.utils.PlaceName
 import dev.pgm.roadmate.utils.PromptBuilder
 import dev.pgm.roadmate.utils.SentenceChunker
+import dev.pgm.roadmate.utils.spanishRegex
 import dev.pgm.roadmate.utils.SpokenText
 import dev.pgm.roadmate.utils.StylePreferenceParser
 import dev.pgm.roadmate.utils.WeatherIntentParser
@@ -242,7 +243,7 @@ class GenerateResponseUseCase @Inject constructor(
             return SpokenText.CALL_NO_PERMISSION
         }
         // "llama a mi hermano" → resolve the relationship to a real name first.
-        val relation = Regex("""^mi\s+(\p{L}+)$""", RegexOption.IGNORE_CASE)
+        val relation = spanishRegex("""^mi\s+(\p{L}+)$""")
             .find(rawName.trim())?.groupValues?.get(1)?.lowercase()
         val contactName = if (relation != null && relation in MemoryCommandParser.RELATIONS) {
             memoryRepository.facts(FactType.RELATIONSHIP).firstOrNull { it.key == relation }?.value
@@ -348,8 +349,8 @@ class GenerateResponseUseCase @Inject constructor(
     private fun savedPlaceFor(query: String): Pair<FactType, String>? {
         val q = query.trim().lowercase()
         return when {
-            Regex("""^(?:mi\s+|a\s+|hacia\s+)?casa$""").matches(q) -> FactType.HOME to "casa"
-            Regex("""^(?:mi\s+|al\s+|el\s+|la\s+)?(?:trabajo|oficina|curro)$""").matches(q) ->
+            spanishRegex("""^(?:mi\s+|a\s+|hacia\s+)?casa$""").matches(q) -> FactType.HOME to "casa"
+            spanishRegex("""^(?:mi\s+|al\s+|el\s+|la\s+)?(?:trabajo|oficina|curro)$""").matches(q) ->
                 FactType.WORK to "trabajo"
             else -> null
         }

@@ -8,12 +8,12 @@ package dev.pgm.roadmate.utils
  */
 object PlaceName {
 
-    private val LEADING_ARTICLE = Regex("""^(?:un|una|unos|unas|el|la|los|las)\s+""", RegexOption.IGNORE_CASE)
+    private val LEADING_ARTICLE = spanishRegex("""^(?:un|una|unos|unas|el|la|los|las)\s+""")
     private const val MAX = 48
 
     fun normalize(raw: String): String =
         raw.trim()
-            .replace(Regex("""\s+"""), " ")
+            .replace(spanishRegex("""\s+"""), " ")
             .replace(LEADING_ARTICLE, "")
             .lowercase()
             .take(MAX)
