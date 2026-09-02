@@ -89,8 +89,11 @@ This file is now the running state, not the original bring-up plan.
    name match against the tiles (`name` / `name:es`, accent-folded).
    `MapSearchCoordinator` bridges the voice pipeline → `RootScreen`/`
    MapViewModel`. No region downloaded → "no tengo un mapa descargado de
-   esta zona", no fallback. **Device check:** does a name match actually
-   find POIs in the downloaded region? tune `NAME_PROPS` / the fold.
+   esta zona", no fallback. "llévame a casa / al trabajo" routes straight to
+   the saved `FactType.HOME`/`WORK` coordinate (`MapSearchRequest.
+   destination`), route end marked with a dot. **Device check:** does a name
+   match actually find POIs in the downloaded region? tune `NAME_PROPS` /
+   the fold.
 8. GPU backend for MediaPipe: dead end on this MediaTek (silent hang);
    could be made opt-in for devices where it works.
 9. **Hands-free wake phrase "oye copiloto".** *Code landed 2026-09-03.*
