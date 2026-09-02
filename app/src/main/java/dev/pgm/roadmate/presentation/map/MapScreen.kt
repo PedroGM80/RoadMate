@@ -94,6 +94,12 @@ private const val NAME_PIN = "NAME"
 /** Tile POI name properties, most specific first. */
 private val NAME_PROPS = arrayOf("name:es", "name", "name:latin", "name_int")
 
+/** Throttles tile reverse-geocoding to "moved enough, and not too often". */
+private class GeoThrottle {
+    var at: Pair<Double, Double>? = null
+    var whenMs = 0L
+}
+
 /** Lower-case and strip accents so "jesus" matches "Jesús". */
 private fun foldForSearch(s: String): String =
     java.text.Normalizer.normalize(s.lowercase(), java.text.Normalizer.Form.NFD)
@@ -124,6 +130,7 @@ fun MapScreen(
     var selectedPoi by remember { mutableStateOf<Pair<String, LatLng>?>(null) }
     var centeredOnUser by remember { mutableStateOf(false) }
     var poiLoading by remember { mutableStateOf(false) }
+    val geoThrottle = remember { GeoThrottle() }
 
     LaunchedEffect(mapView) {
         mapView.getMapAsync { map ->
@@ -156,6 +163,7 @@ fun MapScreen(
                 // Registered here (not before the style loads) so `manager` is real.
                 map.addOnCameraIdleListener {
                     refreshPois(map, mapView, manager, viewModel.poiFilter.value, viewModel.nameQuery.value)
+                    resolvePlaceLabel(map, viewModel, geoThrottle)
                 }
             }
         }
@@ -181,22 +189,14 @@ fun MapScreen(
 
     // Reverse-geocode the driver's position from the downloaded tiles (no
     // network geocoder) and publish it for the Voz screen's location chip.
+    // The camera-idle listener drives this once the map settles; this loop is
+    // the fallback for a stationary driver whose map loads already centred
+    // (no camera move -> no idle callback).
     LaunchedEffect(mapLibreMap) {
         val map = mapLibreMap ?: return@LaunchedEffect
-        var last: Pair<Double, Double>? = null
-        while (true) {
-            val here = map.currentLatLon()
-            if (here != null && (last == null || metersBetween(last!!, here) > 40.0)) {
-                last = here
-                val label = runCatching { placeFromTiles(map, here.first, here.second) }
-                    .onFailure { dev.pgm.roadmate.ml.DebugTrace.log("geo: threw ${it.message}") }
-                    .getOrNull()
-                dev.pgm.roadmate.ml.DebugTrace.log("geo: $here -> ${label ?: "null"}")
-                viewModel.onPlaceResolved(label)
-            } else if (last != null && here == null) {
-                dev.pgm.roadmate.ml.DebugTrace.log("geo: no fix yet")
-            }
-            delay(12_000)
+        repeat(8) {
+            delay(3_000)
+            resolvePlaceLabel(map, viewModel, geoThrottle)
         }
     }
 
@@ -612,33 +612,47 @@ private fun segMeters(ax: Double, ay: Double, bx: Double, by: Double): Double {
     return hypot(ax + t * dx, ay + t * dy)
 }
 
+private val ROAD_SRC_LAYERS = arrayOf("transportation_name", "transportation")
+private val PLACE_SRC_LAYERS = arrayOf("place")
+private val LOCALITY_CLASSES = setOf(
+    "city", "town", "village", "suburb", "hamlet", "neighbourhood", "quarter", "locality",
+)
+
+/**
+ * Resolve the driver's position to "calle · localidad" from the downloaded
+ * tiles and publish it for the Voz screen's chip. Throttled: only when the
+ * driver has moved ~40 m and at most every 8 s. Called from the camera-idle
+ * listener (tiles are parsed by then) and a startup fallback loop.
+ */
+private fun resolvePlaceLabel(map: MapLibreMap, viewModel: MapViewModel, throttle: GeoThrottle) {
+    val here = map.currentLatLon() ?: return
+    val now = System.currentTimeMillis()
+    val moved = throttle.at?.let { metersBetween(it, here) > 40.0 } ?: true
+    if (!moved || now - throttle.whenMs < 8_000L) return
+    throttle.at = here
+    throttle.whenMs = now
+    val label = runCatching { placeFromTiles(map, here.first, here.second) }
+        .onFailure { dev.pgm.roadmate.ml.DebugTrace.log("geo: threw ${it.message}") }
+        .getOrNull()
+    dev.pgm.roadmate.ml.DebugTrace.log("geo: ${here.first},${here.second} -> ${label ?: "null"}")
+    viewModel.onPlaceResolved(label)
+}
+
 /**
  * Reverse-geocode a coordinate from the loaded offline tiles: the nearest
- * named road within ~120 m, and the nearest town/locality label. Entirely
- * on-device — `querySourceFeatures` over the vector source, no network.
+ * named road within ~130 m and the nearest town/locality label. Reads the
+ * vector *source* (like the POI query) so it resolves at driving zoom, and
+ * runs entirely on-device — no network geocoder.
  */
 private fun placeFromTiles(map: MapLibreMap, atLat: Double, atLon: Double): String? {
-    val style = map.style ?: return null
-    val src = style.sources.firstOrNull { it is VectorSource } as? VectorSource ?: return null
+    val src = map.style?.sources?.firstOrNull { it is VectorSource } as? VectorSource ?: return null
     val cosLat = cos(Math.toRadians(atLat))
     fun toM(lat: Double, lon: Double): Pair<Double, Double> =
         (lon - atLon) * cosLat * 111_320.0 to (lat - atLat) * 110_540.0
 
-    // The tile schema's source-layer names vary by style, so read them off the
-    // style's own layers and bucket by what looks like a road vs a place.
-    val srcLayers = style.layers.mapNotNull { l ->
-        runCatching { l.javaClass.getMethod("getSourceLayer").invoke(l) as? String }
-            .getOrNull()?.takeIf { it.isNotBlank() }
-    }.distinct()
-    val roadLayers = srcLayers.filter {
-        it.contains("transport", true) || it.contains("road", true) ||
-            it.contains("street", true) || it.contains("highway", true)
-    }.ifEmpty { listOf("transportation_name", "transportation") }
-    val placeLayers = srcLayers.filter { it.contains("place", true) }.ifEmpty { listOf("place") }
-
     var road: String? = null
     var roadM = 130.0
-    runCatching { src.querySourceFeatures(roadLayers.toTypedArray(), null) }
+    runCatching { src.querySourceFeatures(ROAD_SRC_LAYERS, null) }
         .getOrDefault(emptyList())
         .forEach { f ->
             val name = f.getStringProperty("name")?.trim()?.takeIf { it.isNotEmpty() } ?: return@forEach
@@ -655,16 +669,13 @@ private fun placeFromTiles(map: MapLibreMap, atLat: Double, atLon: Double): Stri
             }
         }
 
-    val localityClasses = setOf(
-        "city", "town", "village", "suburb", "hamlet", "neighbourhood", "quarter", "locality",
-    )
     var locality: String? = null
     var localityM = Double.MAX_VALUE
-    runCatching { src.querySourceFeatures(placeLayers.toTypedArray(), null) }
+    runCatching { src.querySourceFeatures(PLACE_SRC_LAYERS, null) }
         .getOrDefault(emptyList())
         .forEach { f ->
             val cls = f.getStringProperty("class")
-            if (cls != null && cls !in localityClasses) return@forEach
+            if (cls != null && cls !in LOCALITY_CLASSES) return@forEach
             val p = f.geometry() as? Point ?: return@forEach
             val name = f.getStringProperty("name")?.trim()?.takeIf { it.isNotEmpty() } ?: return@forEach
             val (mx, my) = toM(p.latitude(), p.longitude())
@@ -672,7 +683,10 @@ private fun placeFromTiles(map: MapLibreMap, atLat: Double, atLon: Double): Stri
             if (d < localityM) { localityM = d; locality = name }
         }
 
-    return listOfNotNull(road, locality).joinToString(" · ").takeIf { it.isNotBlank() }
+    dev.pgm.roadmate.ml.DebugTrace.log(
+        "geo: road=${road ?: "-"}(${roadM.toInt()}m) locality=${locality ?: "-"}",
+    )
+    return listOfNotNull(road, locality).distinct().joinToString(" · ").takeIf { it.isNotBlank() }
 }
 
 
