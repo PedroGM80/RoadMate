@@ -17,11 +17,13 @@ import dagger.hilt.android.AndroidEntryPoint
 import dev.pgm.roadmate.audio.Earcon
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.repository.LocationRepository
+import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WakeWordRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
 import dev.pgm.roadmate.utils.QuestionPunctuation
+import dev.pgm.roadmate.utils.SpokenText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -55,6 +57,7 @@ class WakeWordForegroundService : Service() {
     @Inject lateinit var generateResponseUseCase: GenerateResponseUseCase
     @Inject lateinit var locationRepository: LocationRepository
     @Inject lateinit var weatherRepository: WeatherRepository
+    @Inject lateinit var speechSynthesis: SpeechSynthesisRepository
 
     private var scope: CoroutineScope? = null
     private var loopJob: Job? = null
@@ -107,7 +110,11 @@ class WakeWordForegroundService : Service() {
                 return
             }
             manager?.notify(NOTIFICATION_ID, buildNotification(LISTENING_TEXT))
-            runCatching { earcon.start() } // audible "listening" cue, screen off
+            runCatching { earcon.start() } // audible cue, screen off
+            runCatching {
+                speechSynthesis.speak(SpokenText.WAKE_ACK)
+                speechSynthesis.awaitDoneSpeaking()
+            }
             runCatching { handleQuestion() }
                 .onFailure { Log.w(TAG, "background question failed", it) }
             manager?.notify(NOTIFICATION_ID, buildNotification())

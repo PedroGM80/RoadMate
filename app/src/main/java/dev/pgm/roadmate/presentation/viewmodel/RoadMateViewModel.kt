@@ -234,6 +234,10 @@ class RoadMateViewModel @Inject constructor(
                 // assistant's own speech.
                 if (listeningJob?.isActive != true && !speechSynthesisRepository.isSpeaking.value) {
                     runCatching { wakeEarcon.start() }
+                    // Acknowledge out loud, then open the mic — wait for the
+                    // "Sí, dime." to finish so STT doesn't hear it.
+                    speechSynthesisRepository.speak(SpokenText.WAKE_ACK)
+                    speechSynthesisRepository.awaitDoneSpeaking()
                     startListening()
                 }
             }

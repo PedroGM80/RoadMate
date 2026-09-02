@@ -9,6 +9,9 @@ package dev.pgm.roadmate.utils
  */
 object SpokenText {
 
+    /** Spoken right after "oye copiloto", before the mic opens for the question. */
+    const val WAKE_ACK = "Sí, dime."
+
     // Calls
     const val CALL_NO_PERMISSION =
         "No puedo llamar sin permiso. Actívalo en ajustes: contactos y teléfono."
