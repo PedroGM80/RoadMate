@@ -33,6 +33,7 @@ import dev.pgm.roadmate.utils.SentenceChunker
 import dev.pgm.roadmate.utils.spanishRegex
 import dev.pgm.roadmate.utils.SpokenText
 import dev.pgm.roadmate.utils.StylePreferenceParser
+import dev.pgm.roadmate.utils.UnitConversionParser
 import dev.pgm.roadmate.utils.WeatherIntentParser
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -150,6 +151,7 @@ class GenerateResponseUseCase @Inject constructor(
         val styleChange = StylePreferenceParser.parse(userInput)
         val memoryCommand = MemoryCommandParser.parse(userInput)
         val arithmetic = ArithmeticParser.evaluate(userInput)
+        val conversion = UnitConversionParser.convert(userInput)
         val parkingIntent = ParkingIntentParser.parse(userInput)
         val shortcut = when {
             // Before the map/call parsers — "llévame al coche" and "dónde está
@@ -171,6 +173,7 @@ class GenerateResponseUseCase @Inject constructor(
             styleChange != null -> handleStyleChange(styleChange)
             memoryCommand != null -> handleMemoryCommand(memoryCommand, context)
             WeatherIntentParser.isWeatherQuestion(userInput) -> handleWeather(context, userInput)
+            conversion != null -> conversion
             arithmetic != null -> arithmetic
             else -> null
         }
