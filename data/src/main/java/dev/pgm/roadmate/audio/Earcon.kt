@@ -42,16 +42,27 @@ class Earcon {
             .setTransferMode(AudioTrack.MODE_STATIC)
             .build()
 
+        // Retire the previous blip *before* the new one starts. The old order
+        // released it afterwards, so two cues close together (wake word fires
+        // while the previous blip is still sounding) released a playing track.
+        retire()
+
         runCatching {
             track.write(samples, 0, samples.size)
             track.play()
         }
-        lastTrack?.let { runCatching { it.release() } }
         lastTrack = track
     }
 
-    fun release() {
-        lastTrack?.let { runCatching { it.release() } }
+    fun release() = retire()
+
+    private fun retire() {
+        lastTrack?.let { previous ->
+            runCatching {
+                if (previous.playState == AudioTrack.PLAYSTATE_PLAYING) previous.stop()
+            }
+            runCatching { previous.release() }
+        }
         lastTrack = null
     }
 

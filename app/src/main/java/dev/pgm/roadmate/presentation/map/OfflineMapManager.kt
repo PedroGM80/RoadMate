@@ -108,15 +108,28 @@ class OfflineMapManager @Inject constructor(
         if (_status.value is OfflineMapStatus.Downloading) return
         offlineManager.listOfflineRegions(object : OfflineManager.ListOfflineRegionsCallback {
             override fun onList(offlineRegions: Array<OfflineRegion>?) {
-                offlineRegions?.forEach { region ->
+                val regions = offlineRegions.orEmpty()
+                if (regions.isEmpty()) {
+                    _status.value = OfflineMapStatus.Idle
+                    return
+                }
+                // Only claim "nothing downloaded" once the deletes have
+                // actually landed — reporting Idle up front made the UI offer
+                // "Descargar esta zona" over regions that were still on disk.
+                var outstanding = regions.size
+                regions.forEach { region ->
                     region.delete(object : OfflineRegion.OfflineRegionDeleteCallback {
-                        override fun onDelete() = Unit
+                        override fun onDelete() = settle()
                         override fun onError(error: String) {
                             Log.w(TAG, "region delete: $error")
+                            settle()
+                        }
+
+                        private fun settle() {
+                            if (--outstanding <= 0) refresh()
                         }
                     })
                 }
-                _status.value = OfflineMapStatus.Idle
             }
 
             override fun onError(error: String) {
@@ -142,11 +155,17 @@ class OfflineMapManager @Inject constructor(
 
             override fun onError(error: OfflineRegionError) {
                 Log.w(TAG, "offline region error: ${error.reason} ${error.message}")
+                // Reporting the failure isn't enough: an ACTIVE region keeps
+                // retrying in the background, so the driver saw "error" while
+                // the download quietly carried on burning data. Stop it, and
+                // let go of the observer so the next attempt starts clean.
+                runCatching { region.setDownloadState(OfflineRegion.STATE_INACTIVE) }
+                activeRegion = null
                 _status.value = OfflineMapStatus.Failed(R.string.map_offline_error_download)
             }
 
             override fun mapboxTileCountLimitExceeded(limit: Long) {
-                region.setDownloadState(OfflineRegion.STATE_INACTIVE)
+                runCatching { region.setDownloadState(OfflineRegion.STATE_INACTIVE) }
                 activeRegion = null
                 _status.value =
                     OfflineMapStatus.Failed(R.string.map_offline_error_too_big)

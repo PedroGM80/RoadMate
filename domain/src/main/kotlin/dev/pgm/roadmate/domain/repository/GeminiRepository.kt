@@ -38,6 +38,19 @@ interface GeminiRepository {
     fun clearCache()
 
     /**
+     * Hands the local model's memory back to the system.
+     *
+     * The loaded model is by far the largest thing in RoadMate's process
+     * (0.5–1.6 GB depending on which one is configured), so when Android
+     * reports memory pressure this is what should be given up: the cost is one
+     * cold start on the next question, against the app being killed outright
+     * mid-trip. Returns true if anything was actually released — a generation
+     * in flight is left alone, and trim requests are advisory, so a false here
+     * is a normal outcome, not a failure.
+     */
+    suspend fun releaseLocalAiMemory(): Boolean = false
+
+    /**
      * Live state of on-device AI for the UI: whether a local backend is
      * ready, whether the model is downloading, waiting for Wi-Fi, or the
      * device is stuck in "modo básico". Lets the UI be upfront instead of

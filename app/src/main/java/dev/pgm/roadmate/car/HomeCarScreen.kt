@@ -11,13 +11,16 @@ import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import androidx.core.graphics.drawable.IconCompat
+import android.util.Log
 import androidx.lifecycle.lifecycleScope
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.repository.LocationRepository
+import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
 import dev.pgm.roadmate.utils.PermissionManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
@@ -40,6 +43,7 @@ class HomeCarScreen(
     private val recordAudioUseCase: RecordAudioUseCase,
     private val generateResponseUseCase: GenerateResponseUseCase,
     private val locationRepository: LocationRepository,
+    private val weatherRepository: WeatherRepository,
     private val permissionManager: PermissionManager
 ) : Screen(carContext) {
 
@@ -105,30 +109,57 @@ class HomeCarScreen(
         invalidate()
 
         lifecycleScope.launch {
-            val userInput = recordAudioUseCase.finalText()
-            if (userInput.isBlank()) {
-                statusText = "No te he oído. Pulsa Escuchar y prueba otra vez."
-                isBusy = false
-                invalidate()
-                return@launch
-            }
-            lastRecognizedInput = userInput
+            // `isBusy` collapses to the host's loading spinner, and the only
+            // way out of it is this coroutine. Anything that throws — the mic
+            // refused, the model, the weather lookup — used to leave the car
+            // screen spinning forever with no button to press. The finally is
+            // the whole point.
+            try {
+                val userInput = recordAudioUseCase.finalText()
+                if (userInput.isBlank()) {
+                    statusText = carContext.getString(R.string.car_not_heard)
+                    return@launch
+                }
+                lastRecognizedInput = userInput
 
-            val location = locationRepository.getCurrentCoordinates()
-            val calendar = Calendar.getInstance()
-            val travelContext = TravelContext(
-                currentLocation = location,
-                hour = calendar.get(Calendar.HOUR_OF_DAY),
-                minute = calendar.get(Calendar.MINUTE),
-                date = calendar.time,
-                userInput = userInput
-            )
+                val location = locationRepository.getCurrentCoordinates()
+                // Same weather the phone would have: without it "¿qué tiempo
+                // hace?" answered "no puedo consultarlo" in the car even where
+                // the handset could.
+                val weather = location?.let { (lat, lon) ->
+                    runCatching { weatherRepository.getCurrentWeatherDescription(lat, lon) }.getOrNull()
+                }
+                val calendar = Calendar.getInstance()
+                val travelContext = TravelContext(
+                    currentLocation = location,
+                    hour = calendar.get(Calendar.HOUR_OF_DAY),
+                    minute = calendar.get(Calendar.MINUTE),
+                    date = calendar.time,
+                    userInput = userInput,
+                    weatherDescription = weather,
+                )
 
-            generateResponseUseCase(travelContext, userInput).collect { response ->
-                statusText = response
+                var answered = false
+                generateResponseUseCase(travelContext, userInput).collect { response ->
+                    answered = true
+                    statusText = response
+                    isBusy = false
+                    invalidate()
+                }
+                if (!answered) statusText = carContext.getString(R.string.car_no_answer)
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                Log.w(TAG, "car question failed", t)
+                statusText = carContext.getString(R.string.car_error)
+            } finally {
                 isBusy = false
                 invalidate()
             }
         }
+    }
+
+    private companion object {
+        const val TAG = "HomeCarScreen"
     }
 }

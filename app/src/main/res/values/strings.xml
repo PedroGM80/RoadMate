@@ -94,4 +94,7 @@
     <string name="map_offline_error_start">No se pudo iniciar la descarga.</string>
     <string name="map_offline_error_download">Fallo al descargar la zona.</string>
     <string name="map_offline_error_too_big">La zona es demasiado grande. Aleja el mapa e inténtalo otra vez.</string>
+    <string name="car_not_heard">No te he oído. Pulsa Escuchar y prueba otra vez.</string>
+    <string name="car_no_answer">No he podido responder. Pulsa Escuchar y prueba otra vez.</string>
+    <string name="car_error">Algo ha fallado. Pulsa Escuchar y prueba otra vez.</string>
 </resources>

@@ -4,7 +4,9 @@ import androidx.car.app.CarAppService
 import androidx.car.app.Session
 import androidx.car.app.validation.HostValidator
 import dagger.hilt.android.AndroidEntryPoint
+import dev.pgm.roadmate.BuildConfig
 import dev.pgm.roadmate.domain.repository.LocationRepository
+import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
 import dev.pgm.roadmate.utils.PermissionManager
@@ -16,9 +18,7 @@ import javax.inject.Inject
  * (unlike Activity/Service), so this Service — which does — receives everything
  * via field injection and passes it down manually into [RoadMateSession].
  *
- * ALLOW_ALL_HOSTS_VALIDATOR is fine for sideloading onto your own car head unit
- * with Android Auto's "Unknown sources" developer option enabled; tighten this
- * before any real distribution.
+ * Host validation is build-type dependent — see [createHostValidator].
  */
 @AndroidEntryPoint
 class RoadMateCarAppService : CarAppService() {
@@ -33,10 +33,35 @@ class RoadMateCarAppService : CarAppService() {
     lateinit var locationRepository: LocationRepository
 
     @Inject
+    lateinit var weatherRepository: WeatherRepository
+
+    @Inject
     lateinit var permissionManager: PermissionManager
 
-    override fun createHostValidator(): HostValidator = HostValidator.ALLOW_ALL_HOSTS_VALIDATOR
+    /**
+     * Who is allowed to bind to this service and drive RoadMate's car screens.
+     *
+     * ALLOW_ALL_HOSTS is what makes sideloading onto your own head unit work
+     * with Android Auto's "Unknown sources" developer option — but it also
+     * lets *any* app on the phone bind and drive the assistant, including
+     * placing calls. That is a debug-build convenience, not something to ship,
+     * so a release build uses the Car App Library's own signature allowlist
+     * (Android Auto and Automotive OS hosts only).
+     */
+    override fun createHostValidator(): HostValidator =
+        if (BuildConfig.DEBUG) {
+            HostValidator.ALLOW_ALL_HOSTS_VALIDATOR
+        } else {
+            HostValidator.Builder(applicationContext)
+                .addAllowedHosts(androidx.car.app.R.array.hosts_allowlist_sample)
+                .build()
+        }
 
-    override fun onCreateSession(): Session =
-        RoadMateSession(recordAudioUseCase, generateResponseUseCase, locationRepository, permissionManager)
+    override fun onCreateSession(): Session = RoadMateSession(
+        recordAudioUseCase,
+        generateResponseUseCase,
+        locationRepository,
+        weatherRepository,
+        permissionManager,
+    )
 }

@@ -56,6 +56,16 @@ class LocalLlmManager @Inject constructor(
     private var engine: LlmInference? = null
 
     /**
+     * Generations currently using [engine].
+     *
+     * [generateResponseStream] hands work to MediaPipe's own thread and
+     * returns, so the inference dispatcher being free does *not* mean the
+     * engine is idle. Closing it while native code is still producing tokens
+     * is a use-after-free, so [releaseEngine] checks this first.
+     */
+    private val inFlight = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /**
      * One thread, dedicated to inference. A generation is a several-second,
      * fully CPU-bound native call; on the shared `Dispatchers.Default` pool it
      * would hold a worker for that entire time and stall unrelated coroutine
@@ -111,6 +121,35 @@ class LocalLlmManager @Inject constructor(
     suspend fun isReady(): Boolean =
         engine != null || withContext(Dispatchers.IO) { modelManager.modelFile() != null }
 
+    /**
+     * Drops the loaded model and gives its memory back.
+     *
+     * The engine holds the whole model resident — 0.5 GB for Qwen2.5-0.5B,
+     * ~1.6 GB for the 1.5B build Pedro actually runs. That is far and away the
+     * largest thing in the process, so when Android says it is short of
+     * memory, this is what should go: otherwise the OS kills RoadMate outright
+     * and the driver loses the assistant mid-trip, rather than paying one cold
+     * start on the next question.
+     *
+     * Runs on [inferenceDispatcher] so it serialises behind anything already
+     * queued there, and refuses while a generation is in flight — a streaming
+     * run continues on MediaPipe's thread after this dispatcher is free again,
+     * and closing under it would crash natively. Trim requests are advisory,
+     * so declining one is fine; the next one will find the engine idle.
+     */
+    suspend fun releaseEngine(): Boolean = withContext(inferenceDispatcher) {
+        if (inFlight.get() > 0) {
+            dbg("release skipped — ${inFlight.get()} generation(s) in flight")
+            return@withContext false
+        }
+        val current = engine ?: return@withContext false
+        engine = null
+        runCatching { current.close() }
+            .onFailure { dbg("engine close failed: ${it.message}") }
+        dbg("engine released")
+        true
+    }
+
     /** Build the engine and run one throwaway generation so the first real
      *  question doesn't eat the ~10 s cold XNNPACK/prefill cost. */
     suspend fun warmUp() = withContext(inferenceDispatcher) {
@@ -132,6 +171,8 @@ class LocalLlmManager @Inject constructor(
     /** Generated text, or null if the model isn't usable / timed out / failed. */
     suspend fun generateResponse(prompt: String): String? = withContext(inferenceDispatcher) {
         val llm = obtainEngine() ?: return@withContext null
+        inFlight.incrementAndGet()
+        try {
         withTimeoutOrNull(Constants.LOCAL_LLM_TIMEOUT_MS) {
             runCatching {
                 val session = LlmInferenceSession.createFromOptions(
@@ -164,6 +205,9 @@ class LocalLlmManager @Inject constructor(
                 dbg("generateResponse FAILED: ${it.stackTraceToString()}")
             }.getOrNull()
         }?.takeIf { it.isNotBlank() }
+        } finally {
+            inFlight.decrementAndGet()
+        }
     }
 
     /**
@@ -233,6 +277,7 @@ class LocalLlmManager @Inject constructor(
         }
 
         var future: Future<*>? = null
+        inFlight.incrementAndGet()
         try {
             session.addQueryChunk(safe)
             future = session.generateResponseAsync(listener)
@@ -251,6 +296,7 @@ class LocalLlmManager @Inject constructor(
             watchdog.cancel()
             runCatching { future?.cancel(true) }
             runCatching { session.close() }
+            inFlight.decrementAndGet()
         }
     }
         // Never drop a batch under back-pressure: emissions are cumulative, so

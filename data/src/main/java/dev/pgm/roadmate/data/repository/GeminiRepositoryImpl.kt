@@ -134,6 +134,13 @@ class GeminiRepositoryImpl @Inject constructor(
 
     override fun clearCache() = synchronized(responseCache) { responseCache.clear() }
 
+    override suspend fun releaseLocalAiMemory(): Boolean {
+        // The cached answers go too: they are strings keyed on whole prompts,
+        // and the point of this call is to be small.
+        clearCache()
+        return localLlmManager.releaseEngine()
+    }
+
     override fun localAiStatus(): Flow<LocalAiStatus> = flow {
         emit(LocalAiStatus.Checking)
         if (geminiNanoManager.checkAvailability()) {

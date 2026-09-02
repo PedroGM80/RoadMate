@@ -51,25 +51,35 @@ class AudioLevelDetector(
         return System.currentTimeMillis() - startedAt
     }
 
+    /**
+     * Starts monitoring. Returns false if the microphone could not be opened —
+     * no permission, no mic, or another owner holds it — so the caller can say
+     * so instead of sitting on a monitor that will never fire. The
+     * `AudioRecord` constructor throws (SecurityException without
+     * RECORD_AUDIO), and an uncaught throw here used to take down whatever
+     * collected the silence flow.
+     */
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
-    fun start() {
-        if (isRunning) return
+    fun start(): Boolean {
+        if (isRunning) return true
 
         val minBufferSize = AudioRecord.getMinBufferSize(SAMPLE_RATE, CHANNEL_CONFIG, AUDIO_FORMAT)
-        if (minBufferSize <= 0) return
+        if (minBufferSize <= 0) return false
 
         val bufferSize = minBufferSize * 2
-        val record = AudioRecord(
-            MediaRecorder.AudioSource.MIC,
-            SAMPLE_RATE,
-            CHANNEL_CONFIG,
-            AUDIO_FORMAT,
-            bufferSize
-        )
+        val record = runCatching {
+            AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                SAMPLE_RATE,
+                CHANNEL_CONFIG,
+                AUDIO_FORMAT,
+                bufferSize
+            )
+        }.getOrNull() ?: return false
 
         if (record.state != AudioRecord.STATE_INITIALIZED) {
             record.release()
-            return
+            return false
         }
 
         audioRecord = record
@@ -99,6 +109,7 @@ class AudioLevelDetector(
                 releaseRecord(record)
             }
         }
+        return true
     }
 
     fun stop() {
@@ -155,7 +166,17 @@ class AudioLevelDetector(
     }
 
     private companion object {
-        const val SAMPLE_RATE = 44_100
+        /**
+         * 16 kHz, not CD rate. This monitor holds the microphone for the whole
+         * trip, and all it ever computes is one RMS figure per buffer — a
+         * level, not speech. 44.1 kHz meant reading and squaring 2.75x more
+         * samples per second for a number that does not change, on a device
+         * that is running navigation off a car charger at best. It also lines
+         * up with what Vosk and the wake word already use, so the mic doesn't
+         * have to be reconfigured between owners. dBFS is a ratio, so the
+         * silence threshold needs no recalibration.
+         */
+        const val SAMPLE_RATE = 16_000
         const val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
         const val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
         const val SHORT_MAX_AMPLITUDE = 32_767.0
