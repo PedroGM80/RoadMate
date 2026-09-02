@@ -150,4 +150,21 @@ class MapViewModelTest {
         assertEquals(emptyList<Pair<Double, Double>>(), vm.route.value)
         assertEquals("No puedo trazar la ruta con el mapa descargado.", vm.routeSummary.value)
     }
+
+    @Test
+    fun `a null route with no Wi-Fi points the driver at Wi-Fi`() = runTest {
+        val routing = FakeRoutingRepository(
+            result = null,
+            status = dev.pgm.roadmate.domain.model.RoutingDataStatus.WaitingForWifi,
+        )
+        val vm = mapViewModel(FakeOfflineMap(), routing = routing)
+
+        vm.routeTo(from = 40.0 to -3.7, to = 41.0 to 2.0)
+        advanceUntilIdle()
+
+        assertEquals(
+            "Conéctate a Wi-Fi para descargar el mapa de ruta de esta zona.",
+            vm.routeSummary.value,
+        )
+    }
 }

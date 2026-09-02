@@ -3,6 +3,7 @@ package dev.pgm.roadmate.presentation.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.pgm.roadmate.audio.Earcon
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
 import dev.pgm.roadmate.domain.model.TravelContext
@@ -76,6 +77,9 @@ class RoadMateViewModel @Inject constructor(
      * Vosk capture doesn't get confused with a real stop from onPause().
      */
     private var wakeWordDesired = false
+
+    /** Rising blip so a hands-free "oye copiloto" sounds like a mic-button tap. */
+    private val wakeEarcon = Earcon()
 
     /** The driver's "manos libres" setting; the wake phrase only runs when on. */
     val handsFreeEnabled: StateFlow<Boolean> = assistantPreferencesRepository.handsFreeEnabled
@@ -229,6 +233,7 @@ class RoadMateViewModel @Inject constructor(
                 // still speaking — the recognizer would otherwise trip on the
                 // assistant's own speech.
                 if (listeningJob?.isActive != true && !speechSynthesisRepository.isSpeaking.value) {
+                    runCatching { wakeEarcon.start() }
                     startListening()
                 }
             }
@@ -372,5 +377,6 @@ class RoadMateViewModel @Inject constructor(
         super.onCleared()
         cancelListening()
         stopWakeWordListening()
+        runCatching { wakeEarcon.release() }
     }
 }

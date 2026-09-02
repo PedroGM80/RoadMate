@@ -110,10 +110,30 @@ class MapViewModel @Inject constructor(
         }
         _routeSummary.value = "Calculando la ruta…"
         routeJob = viewModelScope.launch {
+            // While the engine works, mirror any segment-tile download so the
+            // driver isn't staring at "Calculando…" through a ~50 MB fetch.
+            val watcher = launch {
+                routingRepository.dataStatus.collect { st ->
+                    when (st) {
+                        is RoutingDataStatus.Downloading ->
+                            _routeSummary.value =
+                                "Descargando mapa de ruta… ${(st.progress * 100).roundToInt()}%"
+                        RoutingDataStatus.WaitingForWifi ->
+                            _routeSummary.value = "Necesito Wi-Fi para el mapa de ruta de esta zona."
+                        else -> Unit
+                    }
+                }
+            }
             val result = routingRepository.route(from, to)
+            watcher.cancel()
             if (result == null) {
                 _route.value = emptyList()
-                _routeSummary.value = "No puedo trazar la ruta con el mapa descargado."
+                _routeSummary.value = when (routingRepository.dataStatus.value) {
+                    RoutingDataStatus.WaitingForWifi ->
+                        "Conéctate a Wi-Fi para descargar el mapa de ruta de esta zona."
+                    is RoutingDataStatus.Failed -> "No pude descargar el mapa de ruta."
+                    else -> "No puedo trazar la ruta con el mapa descargado."
+                }
             } else {
                 _route.value = result.points
                 _routeSummary.value = summarize(result.distanceMeters, result.durationSeconds)

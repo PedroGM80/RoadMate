@@ -142,9 +142,10 @@ class FakeRoutingRepository(
         distanceMeters = 12_300,
         durationSeconds = 1_080,
     ),
+    status: RoutingDataStatus = RoutingDataStatus.Idle,
 ) : RoutingRepository {
     val requests = mutableListOf<Pair<Pair<Double, Double>, Pair<Double, Double>>>()
-    override val dataStatus = MutableStateFlow<RoutingDataStatus>(RoutingDataStatus.Idle)
+    override val dataStatus = MutableStateFlow(status)
     override suspend fun route(
         from: Pair<Double, Double>,
         to: Pair<Double, Double>,
