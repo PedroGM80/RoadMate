@@ -3,6 +3,7 @@ package dev.pgm.roadmate.presentation.map
 import androidx.annotation.ColorInt
 import androidx.annotation.StringRes
 import dev.pgm.roadmate.R
+import dev.pgm.roadmate.domain.model.PlaceCategory
 
 /**
  * The POI categories the in-app map can pin. Matching is done against the
@@ -25,5 +26,14 @@ enum class PoiKind(
         R.string.map_poi_food,
         setOf("restaurant", "fast_food", "cafe", "bar", "pub", "food_court"),
         0xFFE65100.toInt(),
-    ),
+    );
+
+    companion object {
+        /** Bridge from the domain-side voice category to the map's POI kind. */
+        fun from(category: PlaceCategory): PoiKind = when (category) {
+            PlaceCategory.FUEL -> FUEL
+            PlaceCategory.HOTEL -> HOTEL
+            PlaceCategory.FOOD -> FOOD
+        }
+    }
 }

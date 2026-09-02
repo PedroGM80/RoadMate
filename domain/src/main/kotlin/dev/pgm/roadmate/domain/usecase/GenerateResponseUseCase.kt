@@ -4,12 +4,13 @@ import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.ContactMatch
 import dev.pgm.roadmate.domain.model.FactType
+import dev.pgm.roadmate.domain.model.MapSearchRequest
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.model.UserFact
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
-import dev.pgm.roadmate.domain.repository.MapSearchRepository
+import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
@@ -20,6 +21,7 @@ import dev.pgm.roadmate.utils.CallIntentParser
 import dev.pgm.roadmate.utils.JokeProvider
 import dev.pgm.roadmate.utils.MapSearchIntentParser
 import dev.pgm.roadmate.utils.MediaIntentParser
+import dev.pgm.roadmate.utils.PlaceCategoryParser
 import dev.pgm.roadmate.utils.MemoryCommandParser
 import dev.pgm.roadmate.utils.PlaceName
 import dev.pgm.roadmate.utils.PromptBuilder
@@ -46,10 +48,11 @@ import javax.inject.Inject
  *  1. "llama a X" — placed directly (ACTION_CALL, no dial-pad confirmation,
  *     by design: hands-free while driving). Ambiguous/missing contacts get a
  *     spoken explanation instead of guessing who to call.
- *  2. "busca/encuentra X" — handed to the device's Maps app as a geo: search
- *     (gasolineras, hoteles, restaurantes...), not looked up by RoadMate
- *     itself, so the "your questions never leave the phone" promise still
- *     holds — the query only travels through the Maps app already on-device.
+ *  2. "busca/encuentra X" — shown on RoadMate's own downloaded offline map,
+ *     never an external Maps app. A category ("gasolineras", "hoteles",
+ *     "restaurantes") becomes a POI filter; anything else is matched by name
+ *     against the downloaded tiles. With no region downloaded, RoadMate says
+ *     so instead of falling back to another app.
  *  3. "abre/pon Spotify|YouTube Music" — launches that music app. Just opens
  *     it (no playback control), and says so.
  *  4. Joke requests — answered from JokeProvider's local bank.
@@ -82,7 +85,7 @@ class GenerateResponseUseCase @Inject constructor(
     private val geminiRepository: GeminiRepository,
     private val speechSynthesisRepository: SpeechSynthesisRepository,
     private val phoneCallRepository: PhoneCallRepository,
-    private val mapSearchRepository: MapSearchRepository,
+    private val mapSearchCoordinator: MapSearchCoordinator,
     private val mediaRepository: MediaRepository,
     private val assistantPreferencesRepository: AssistantPreferencesRepository,
     private val memoryRepository: MemoryRepository
@@ -279,13 +282,26 @@ class GenerateResponseUseCase @Inject constructor(
         else SpokenText.WEATHER_UNAVAILABLE
     }
 
-    private suspend fun handleMapSearch(query: String, location: Pair<Double, Double>?): String =
-        if (mapSearchRepository.searchNearby(query, location)) {
-            memoryRepository.rememberPlace(PlaceName.normalize(query))
-            SpokenText.searchingMap(query)
+    /**
+     * Routes the query to the in-app offline map. A recognised category
+     * becomes a POI filter; otherwise it's a name to match against the
+     * downloaded tiles. Nothing is downloaded → say so; there is no
+     * external-Maps fallback.
+     */
+    private suspend fun handleMapSearch(query: String, location: Pair<Double, Double>?): String {
+        if (!mapSearchCoordinator.hasOfflineMap()) return SpokenText.NO_OFFLINE_MAP
+
+        val category = PlaceCategoryParser.parse(query)
+        mapSearchCoordinator.submit(
+            MapSearchRequest(rawQuery = query, category = category, origin = location),
+        )
+        memoryRepository.rememberPlace(PlaceName.normalize(query))
+        return if (category != null) {
+            SpokenText.showingCategoryOnMap(query)
         } else {
-            SpokenText.noMapsApp(query)
+            SpokenText.searchingMap(query)
         }
+    }
 
     private fun handleMediaRequest(app: MediaApp): String =
         if (mediaRepository.launchMediaApp(app)) {

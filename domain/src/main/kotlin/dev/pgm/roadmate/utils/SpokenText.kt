@@ -20,9 +20,13 @@ object SpokenText {
     fun unknownRelation(relation: String) =
         "No sé quién es tu $relation. Dime antes \"nombre es mi $relation\"."
 
-    // Map search
+    // Map search — always on the downloaded offline map, never an external app
     fun searchingMap(query: String) = "Busco $query en el mapa."
-    fun noMapsApp(query: String) = "No hay ninguna app de mapas para buscar $query."
+    fun showingCategoryOnMap(query: String) = "Te enseño $query en el mapa."
+    const val NO_OFFLINE_MAP =
+        "No tengo un mapa descargado de esta zona. Descárgalo desde la pestaña Mapa."
+    fun notOnOfflineMap(query: String) =
+        "No encuentro $query en el mapa descargado."
 
     // Weather
     fun weatherNow(description: String) = "Ahora mismo: $description."

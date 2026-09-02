@@ -5,6 +5,7 @@ import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.Exchange
 import dev.pgm.roadmate.domain.model.FactType
 import dev.pgm.roadmate.domain.model.LocalAiStatus
+import dev.pgm.roadmate.domain.model.MapSearchRequest
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.SilenceEvent
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
@@ -13,7 +14,7 @@ import dev.pgm.roadmate.domain.model.UserFact
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
-import dev.pgm.roadmate.domain.repository.MapSearchRepository
+import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
@@ -21,6 +22,7 @@ import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asFlow
@@ -134,14 +136,18 @@ class FakePhoneCallRepository(
     }
 }
 
-class FakeMapSearchRepository(private val hasMapsApp: Boolean = true) : MapSearchRepository {
-    var lastQuery: String? = null
-    var lastLocation: Pair<Double, Double>? = null
+class FakeMapSearchCoordinator(private val offlineMapReady: Boolean = true) : MapSearchCoordinator {
+    val submitted = mutableListOf<MapSearchRequest>()
+    val lastRequest: MapSearchRequest? get() = submitted.lastOrNull()
 
-    override fun searchNearby(query: String, location: Pair<Double, Double>?): Boolean {
-        lastQuery = query
-        lastLocation = location
-        return hasMapsApp
+    private val _requests = MutableSharedFlow<MapSearchRequest>(extraBufferCapacity = 8)
+    override val requests: Flow<MapSearchRequest> = _requests
+
+    override fun hasOfflineMap(): Boolean = offlineMapReady
+
+    override suspend fun submit(request: MapSearchRequest) {
+        submitted += request
+        _requests.emit(request)
     }
 }
 

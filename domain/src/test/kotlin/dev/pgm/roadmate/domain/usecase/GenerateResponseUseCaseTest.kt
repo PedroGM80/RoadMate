@@ -2,7 +2,7 @@ package dev.pgm.roadmate.domain.usecase
 
 import dev.pgm.roadmate.domain.fake.FakeAssistantPreferencesRepository
 import dev.pgm.roadmate.domain.fake.FakeGeminiRepository
-import dev.pgm.roadmate.domain.fake.FakeMapSearchRepository
+import dev.pgm.roadmate.domain.fake.FakeMapSearchCoordinator
 import dev.pgm.roadmate.domain.fake.FakeMediaRepository
 import dev.pgm.roadmate.domain.fake.FakeMemoryRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
@@ -14,6 +14,7 @@ import dev.pgm.roadmate.domain.model.FactType
 import dev.pgm.roadmate.domain.model.UserFact
 import dev.pgm.roadmate.domain.model.ContactMatch
 import dev.pgm.roadmate.domain.model.MediaApp
+import dev.pgm.roadmate.domain.model.PlaceCategory
 import dev.pgm.roadmate.domain.model.PhoneLabel
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.utils.JokeProvider
@@ -32,7 +33,7 @@ class GenerateResponseUseCaseTest {
         geminiRepository: FakeGeminiRepository = FakeGeminiRepository(),
         speechSynthesisRepository: FakeSpeechSynthesisRepository = FakeSpeechSynthesisRepository(),
         phoneCallRepository: FakePhoneCallRepository = FakePhoneCallRepository(),
-        mapSearchRepository: FakeMapSearchRepository = FakeMapSearchRepository(),
+        mapSearchCoordinator: FakeMapSearchCoordinator = FakeMapSearchCoordinator(),
         mediaRepository: FakeMediaRepository = FakeMediaRepository(),
         assistantPreferencesRepository: FakeAssistantPreferencesRepository = FakeAssistantPreferencesRepository(),
         memoryRepository: FakeMemoryRepository = FakeMemoryRepository()
@@ -40,7 +41,7 @@ class GenerateResponseUseCaseTest {
         geminiRepository,
         speechSynthesisRepository,
         phoneCallRepository,
-        mapSearchRepository,
+        mapSearchCoordinator,
         mediaRepository,
         assistantPreferencesRepository,
         memoryRepository
@@ -201,38 +202,51 @@ class GenerateResponseUseCaseTest {
     }
 
     @Test
-    fun `map search requests are handed to the Maps app and bypass Gemini`() = runTest {
+    fun `a category map search is submitted to the offline map and bypasses Gemini`() = runTest {
         val geminiRepository = FakeGeminiRepository(response = "no debería usarse")
-        val mapSearchRepository = FakeMapSearchRepository()
+        val coordinator = FakeMapSearchCoordinator()
 
-        val emitted = useCase(geminiRepository, mapSearchRepository = mapSearchRepository)(
+        val emitted = useCase(geminiRepository, mapSearchCoordinator = coordinator)(
             context,
             "busca una gasolinera cerca"
         ).toList()
 
         assertEquals(0, geminiRepository.responseCount)
-        assertEquals("una gasolinera", mapSearchRepository.lastQuery)
-        assertEquals(36.46 to -6.19, mapSearchRepository.lastLocation)
-        assertTrue(emitted.first().contains("una gasolinera"))
+        assertEquals("una gasolinera", coordinator.lastRequest?.rawQuery)
+        assertEquals(PlaceCategory.FUEL, coordinator.lastRequest?.category)
+        assertEquals(36.46 to -6.19, coordinator.lastRequest?.origin)
+        assertTrue(emitted.first().contains("gasolinera"))
     }
 
     @Test
-    fun `dónde hay map search requests are also recognized`() = runTest {
-        val mapSearchRepository = FakeMapSearchRepository()
+    fun `dónde hay map search requests are also recognized as a category`() = runTest {
+        val coordinator = FakeMapSearchCoordinator()
 
-        useCase(mapSearchRepository = mapSearchRepository)(context, "dónde hay un hotel").toList()
+        useCase(mapSearchCoordinator = coordinator)(context, "dónde hay un hotel").toList()
 
-        assertEquals("un hotel", mapSearchRepository.lastQuery)
+        assertEquals("un hotel", coordinator.lastRequest?.rawQuery)
+        assertEquals(PlaceCategory.HOTEL, coordinator.lastRequest?.category)
     }
 
     @Test
-    fun `a map search with no maps app installed says so instead of pretending`() = runTest {
-        val mapSearchRepository = FakeMapSearchRepository(hasMapsApp = false)
+    fun `a named place with no category is still submitted, category null`() = runTest {
+        val coordinator = FakeMapSearchCoordinator()
 
-        val emitted = useCase(mapSearchRepository = mapSearchRepository)(context, "busca una gasolinera")
+        useCase(mapSearchCoordinator = coordinator)(context, "busca el Mercadona").toList()
+
+        assertEquals("el Mercadona", coordinator.lastRequest?.rawQuery)
+        assertEquals(null, coordinator.lastRequest?.category)
+    }
+
+    @Test
+    fun `a map search with no downloaded region says so and submits nothing`() = runTest {
+        val coordinator = FakeMapSearchCoordinator(offlineMapReady = false)
+
+        val emitted = useCase(mapSearchCoordinator = coordinator)(context, "busca una gasolinera")
             .toList()
 
-        assertTrue(emitted.first().contains("ninguna app de mapas"))
+        assertTrue(coordinator.submitted.isEmpty())
+        assertTrue(emitted.first().contains("descargado"))
     }
 
     @Test

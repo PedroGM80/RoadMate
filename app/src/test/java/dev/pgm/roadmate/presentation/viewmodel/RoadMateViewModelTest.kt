@@ -8,7 +8,7 @@ import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeGeminiRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeGreetingRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeLocationRepository
-import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMapSearchRepository
+import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMapSearchCoordinator
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeAssistantPreferencesRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMediaRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMemoryRepository
@@ -49,7 +49,7 @@ class RoadMateViewModelTest {
             geminiRepository,
             speechSynthesisRepository,
             FakePhoneCallRepository(),
-            FakeMapSearchRepository(),
+            FakeMapSearchCoordinator(),
             FakeMediaRepository(),
             FakeAssistantPreferencesRepository(),
             FakeMemoryRepository()

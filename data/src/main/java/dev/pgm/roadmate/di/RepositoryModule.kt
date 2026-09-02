@@ -8,7 +8,6 @@ import dev.pgm.roadmate.data.repository.AssistantPreferencesRepositoryImpl
 import dev.pgm.roadmate.data.repository.GeminiRepositoryImpl
 import dev.pgm.roadmate.data.repository.GreetingRepositoryImpl
 import dev.pgm.roadmate.data.repository.LocationRepositoryImpl
-import dev.pgm.roadmate.data.repository.MapSearchRepositoryImpl
 import dev.pgm.roadmate.data.repository.MediaRepositoryImpl
 import dev.pgm.roadmate.data.repository.MemoryRepositoryImpl
 import dev.pgm.roadmate.data.repository.OnboardingRepositoryImpl
@@ -22,7 +21,6 @@ import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
-import dev.pgm.roadmate.domain.repository.MapSearchRepository
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
@@ -64,9 +62,6 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindPhoneCallRepository(impl: PhoneCallRepositoryImpl): PhoneCallRepository
-
-    @Binds
-    abstract fun bindMapSearchRepository(impl: MapSearchRepositoryImpl): MapSearchRepository
 
     @Binds
     abstract fun bindMediaRepository(impl: MediaRepositoryImpl): MediaRepository

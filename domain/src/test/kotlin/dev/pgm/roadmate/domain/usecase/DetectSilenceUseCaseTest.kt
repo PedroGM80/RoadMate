@@ -2,7 +2,7 @@ package dev.pgm.roadmate.domain.usecase
 
 import dev.pgm.roadmate.domain.fake.FakeAssistantPreferencesRepository
 import dev.pgm.roadmate.domain.fake.FakeGeminiRepository
-import dev.pgm.roadmate.domain.fake.FakeMapSearchRepository
+import dev.pgm.roadmate.domain.fake.FakeMapSearchCoordinator
 import dev.pgm.roadmate.domain.fake.FakeMediaRepository
 import dev.pgm.roadmate.domain.fake.FakeMemoryRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
@@ -26,7 +26,7 @@ class DetectSilenceUseCaseTest {
             FakeGeminiRepository(),
             FakeSpeechSynthesisRepository(),
             FakePhoneCallRepository(),
-            FakeMapSearchRepository(),
+            FakeMapSearchCoordinator(),
             FakeMediaRepository(),
             FakeAssistantPreferencesRepository(),
             FakeMemoryRepository()
@@ -46,7 +46,7 @@ class DetectSilenceUseCaseTest {
             geminiRepository,
             FakeSpeechSynthesisRepository(),
             FakePhoneCallRepository(),
-            FakeMapSearchRepository(),
+            FakeMapSearchCoordinator(),
             FakeMediaRepository(),
             FakeAssistantPreferencesRepository(),
             FakeMemoryRepository()

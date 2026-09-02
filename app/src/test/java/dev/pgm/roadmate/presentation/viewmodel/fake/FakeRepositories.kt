@@ -5,6 +5,7 @@ import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.Exchange
 import dev.pgm.roadmate.domain.model.FactType
 import dev.pgm.roadmate.domain.model.LocalAiStatus
+import dev.pgm.roadmate.domain.model.MapSearchRequest
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.SilenceEvent
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
@@ -14,7 +15,7 @@ import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
-import dev.pgm.roadmate.domain.repository.MapSearchRepository
+import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
@@ -132,11 +133,14 @@ class FakePhoneCallRepository(
     }
 }
 
-class FakeMapSearchRepository : MapSearchRepository {
-    var lastQuery: String? = null
-    override fun searchNearby(query: String, location: Pair<Double, Double>?): Boolean {
-        lastQuery = query
-        return true
+class FakeMapSearchCoordinator(private val offlineMapReady: Boolean = true) : MapSearchCoordinator {
+    val submitted = mutableListOf<MapSearchRequest>()
+    private val _requests = MutableSharedFlow<MapSearchRequest>(extraBufferCapacity = 8)
+    override val requests: Flow<MapSearchRequest> = _requests
+    override fun hasOfflineMap(): Boolean = offlineMapReady
+    override suspend fun submit(request: MapSearchRequest) {
+        submitted += request
+        _requests.emit(request)
     }
 }
 

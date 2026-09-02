@@ -80,6 +80,18 @@ import org.maplibre.geojson.Point
 
 private const val PIN_PREFIX = "roadmate-pin-"
 
+/** Icon key for a name-search result (no category colour). */
+private const val NAME_PIN = "NAME"
+
+/** Tile POI name properties, most specific first. */
+private val NAME_PROPS = arrayOf("name:es", "name", "name:latin", "name_int")
+
+/** Lower-case and strip accents so "jesus" matches "Jesús". */
+private fun foldForSearch(s: String): String =
+    java.text.Normalizer.normalize(s.lowercase(), java.text.Normalizer.Form.NFD)
+        .replace(Regex("\\p{Mn}+"), "")
+        .trim()
+
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun MapScreen(
@@ -89,6 +101,7 @@ fun MapScreen(
     val context = LocalContext.current
     val offlineStatus by viewModel.offlineStatus.collectAsState()
     val poiFilter by viewModel.poiFilter.collectAsState()
+    val nameQuery by viewModel.nameQuery.collectAsState()
 
     val locationPermission = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
 
@@ -116,7 +129,7 @@ fun MapScreen(
                 maybeEnableLocation(map, style, context, locationPermission.status.isGranted)
                 // Registered here (not before the style loads) so `manager` is real.
                 map.addOnCameraIdleListener {
-                    refreshPois(map, mapView, manager, viewModel.poiFilter.value)
+                    refreshPois(map, mapView, manager, viewModel.poiFilter.value, viewModel.nameQuery.value)
                 }
             }
         }
@@ -140,30 +153,32 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(poiFilter, symbolManager) {
+    LaunchedEffect(poiFilter, nameQuery, symbolManager) {
         val map = mapLibreMap ?: return@LaunchedEffect
         val manager = symbolManager ?: return@LaunchedEffect
+        val active = poiFilter != null || nameQuery != null
 
-        // Right after a chip tap the current tiles' source features aren't
-        // queryable yet, so a single pass finds nothing until the map next
-        // idles (e.g. after "recenter"). Retry briefly.
-        var pins = refreshPois(map, mapView, manager, poiFilter)
-        if (poiFilter != null) {
+        // Right after a chip tap / voice search the current tiles' source
+        // features aren't queryable yet, so a single pass finds nothing until
+        // the map next idles (e.g. after "recenter"). Retry briefly.
+        var pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
+        if (active) {
             repeat(6) {
                 if (pins.isNotEmpty()) return@repeat
                 delay(350)
-                pins = refreshPois(map, mapView, manager, poiFilter)
+                pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
             }
         }
 
-        // Turning a filter on: frame the pins so they're actually visible
-        // (they sit across the loaded tiles, not just the ~500 m in view).
-        if (poiFilter != null && pins.size >= 2) {
+        // Turning a filter/search on: frame the pins so they're actually
+        // visible (they sit across the loaded tiles, not just the ~500 m in
+        // view).
+        if (active && pins.size >= 2) {
             val b = LatLngBounds.Builder().includes(pins).build()
             runCatching {
                 map.animateCamera(CameraUpdateFactory.newLatLngBounds(b, 120), 400)
             }
-        } else if (poiFilter != null && pins.size == 1) {
+        } else if (active && pins.size == 1) {
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(pins.first(), 15.0), 400)
         }
     }
@@ -446,9 +461,11 @@ private fun refreshPois(
     mapView: MapView,
     manager: SymbolManager,
     kind: PoiKind?,
+    nameQuery: String?,
 ): List<LatLng> {
     return runCatching {
-        if (kind == null) {
+        val needle = nameQuery?.let(::foldForSearch).takeUnless { it.isNullOrBlank() }
+        if (kind == null && needle == null) {
             manager.deleteAll()
             return emptyList()
         }
@@ -459,11 +476,20 @@ private fun refreshPois(
             .orEmpty()
             .filter { it.geometry() is Point }
 
-        val fallbackLabel = fallbackLabelFor(mapView.context, kind)
-        val matches = points.filter { it.getStringProperty("class") in kind.classes }
+        val iconImage = PIN_PREFIX + (kind?.name ?: NAME_PIN)
+        val fallbackLabel = kind?.let { fallbackLabelFor(mapView.context, it) } ?: nameQuery.orEmpty()
+        val matches = if (kind != null) {
+            points.filter { it.getStringProperty("class") in kind.classes }
+        } else {
+            points.filter { f ->
+                NAME_PROPS.any { prop ->
+                    f.getStringProperty(prop)?.let { foldForSearch(it).contains(needle!!) } == true
+                }
+            }
+        }
 
         dev.pgm.roadmate.ml.DebugTrace.log(
-            "POI ${kind.name}: source=${vectorSource?.id} pois=${points.size} " +
+            "POI ${kind?.name ?: "name:$needle"}: source=${vectorSource?.id} pois=${points.size} " +
                 "matching=${matches.size}; classes = " +
                 points.mapNotNull { it.getStringProperty("class") }.groupingBy { it }.eachCount(),
         )
@@ -481,7 +507,7 @@ private fun refreshPois(
                 // whole symbol. The name rides along in `data` for the sheet.
                 at to SymbolOptions()
                     .withLatLng(at)
-                    .withIconImage(PIN_PREFIX + kind.name)
+                    .withIconImage(iconImage)
                     .withIconSize(1.2f)
                     .withData(com.google.gson.JsonPrimitive(name))
             }
@@ -527,6 +553,19 @@ private fun registerPinIcons(style: Style, context: Context) {
 
         style.addImage(PIN_PREFIX + kind.name, bitmap)
     }
+
+    // Neutral pin for name searches ("busca el Mercadona") — no category tint.
+    val nameBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+    Canvas(nameBitmap).apply {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        paint.color = 0x33000000
+        drawCircle(cx, cx + 1f * density, cx - ring, paint)
+        paint.color = 0xFFFFFFFF.toInt()
+        drawCircle(cx, cx, cx - ring, paint)
+        paint.color = 0xFF455A64.toInt()
+        drawCircle(cx, cx, cx - ring * 2.2f, paint)
+    }
+    style.addImage(PIN_PREFIX + NAME_PIN, nameBitmap)
 }
 
 private fun launchNavigation(context: Context, name: String, latLng: LatLng) {

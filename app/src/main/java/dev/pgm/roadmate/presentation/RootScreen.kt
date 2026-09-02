@@ -22,6 +22,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,6 +63,11 @@ fun RootScreen(
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val theme by settingsViewModel.theme.collectAsState()
     val answerStyle by settingsViewModel.answerStyle.collectAsState()
+
+    // A voice search ("busca gasolineras") pulls the map to the front.
+    LaunchedEffect(Unit) {
+        mapViewModel.showMap.collect { tab = 1 }
+    }
 
     @Suppress("DEPRECATION")
     val dualPane = currentWindowAdaptiveInfo().windowSizeClass
