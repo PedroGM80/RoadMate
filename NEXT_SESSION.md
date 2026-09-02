@@ -80,9 +80,15 @@ This file is now the running state, not the original bring-up plan.
    attribution overlaps the chip row's corner; consider a "N cerca" count.
 6. ~~Verify the OpenWeather key once it activates~~ — key is live (see
    tooling notes). Left: confirm "¿qué tiempo hace?" answers in-app on device.
-7. Voice-search → offline-map routing (design already in git history under
-   "docs: plan voice-search -> offline map routing") — now unblocked since
-   the POI query works.
+7. ~~Voice search → offline map~~ — *done 2026-09-03.* "busca gasolineras"
+   and friends show on RoadMate's own downloaded map; **all external-Maps
+   (`geo:` / `google.navigation:`) handoffs removed** per user ("el mapa de
+   Google no debe usarlo"). `PlaceCategoryParser` → `PoiKind` filter, or a
+   name match against the tiles (`name` / `name:es`, accent-folded).
+   `MapSearchCoordinator` bridges the voice pipeline → `RootScreen`/`
+   MapViewModel`. No region downloaded → "no tengo un mapa descargado de
+   esta zona", no fallback. **Device check:** does a name match actually
+   find POIs in the downloaded region? tune `NAME_PROPS` / the fold.
 8. GPU backend for MediaPipe: dead end on this MediaTek (silent hang);
    could be made opt-in for devices where it works.
 9. **Hands-free wake phrase "oye copiloto".** *Code landed 2026-09-03.*
@@ -122,6 +128,32 @@ This file is now the running state, not the original bring-up plan.
      reliably? Tune with a second phrasing in the grammar or the trigger
      token if not. Check for self-triggering on the assistant's own TTS
      (already guarded by the `isSpeaking` check, but confirm).
+
+10. **Offline turn-by-turn routing (BRouter).** User wants "llévame a X"
+    and the POI-sheet "Ir" to route *on the downloaded map*, no external
+    app. This is its own focused pass — it can't be built blind (route
+    quality, `.rd5` format, engine threading all need a device). API
+    research is done:
+    - **Engine:** `com.github.abrensch.brouter:brouter-core:v1.7.8` via
+      JitPack (`maven("https://jitpack.io")`). Apache-2.0, **pure Java, no
+      NDK.** Entry point `btools.router.RoutingEngine` (extends `Thread`):
+      `new RoutingEngine(null, null, segmentDir, List<OsmNodeNamed>, rc)`,
+      `doRun(maxMs)`, read `foundTrack` (`OsmTrack`, has the geometry).
+      `RoutingContext.localFunction` = path to a `.brf` profile;
+      `RoutingParamCollector` parses it.
+    - **Profile:** bundle `car-fast.brf` (or `trekking.brf`) from the
+      brouter repo `misc/profiles2/` in `data` assets.
+    - **Data:** `.rd5` segment files (5°×5° tiles, ~10–150 MB), one-time
+      Wi-Fi download from `https://brouter.de/brouter/segments4/` — mirror
+      `LocalAiModelManager`'s download+progress pattern. Spain ≈ `E0_N35`,
+      `E5_N35`, `E10_N40`.
+    - **Wiring:** `RoutingRepository.route(from, to): List<LatLng>` (data
+      module, runs the engine off-main), draw the polyline with MapLibre's
+      `LineManager` (annotation plugin already a dep), speak distance/ETA.
+      "llévame a X" reuses the POI name/category query for the destination.
+      No spoken turn-by-turn for v1 — route line + distance only.
+    - Without downloaded `.rd5`: say "descarga los datos de ruta de esta
+      zona", no fallback.
 
 ## Not for a device — still open from before
 
