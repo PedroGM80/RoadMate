@@ -129,31 +129,33 @@ This file is now the running state, not the original bring-up plan.
      token if not. Check for self-triggering on the assistant's own TTS
      (already guarded by the `isSpeaking` check, but confirm).
 
-10. **Offline turn-by-turn routing (BRouter).** User wants "llévame a X"
-    and the POI-sheet "Ir" to route *on the downloaded map*, no external
-    app. This is its own focused pass — it can't be built blind (route
-    quality, `.rd5` format, engine threading all need a device). API
-    research is done:
-    - **Engine:** `com.github.abrensch.brouter:brouter-core:v1.7.8` via
-      JitPack (`maven("https://jitpack.io")`). Apache-2.0, **pure Java, no
-      NDK.** Entry point `btools.router.RoutingEngine` (extends `Thread`):
-      `new RoutingEngine(null, null, segmentDir, List<OsmNodeNamed>, rc)`,
-      `doRun(maxMs)`, read `foundTrack` (`OsmTrack`, has the geometry).
-      `RoutingContext.localFunction` = path to a `.brf` profile;
-      `RoutingParamCollector` parses it.
-    - **Profile:** bundle `car-fast.brf` (or `trekking.brf`) from the
-      brouter repo `misc/profiles2/` in `data` assets.
-    - **Data:** `.rd5` segment files (5°×5° tiles, ~10–150 MB), one-time
-      Wi-Fi download from `https://brouter.de/brouter/segments4/` — mirror
-      `LocalAiModelManager`'s download+progress pattern. Spain ≈ `E0_N35`,
-      `E5_N35`, `E10_N40`.
-    - **Wiring:** `RoutingRepository.route(from, to): List<LatLng>` (data
-      module, runs the engine off-main), draw the polyline with MapLibre's
-      `LineManager` (annotation plugin already a dep), speak distance/ETA.
-      "llévame a X" reuses the POI name/category query for the destination.
-      No spoken turn-by-turn for v1 — route line + distance only.
-    - Without downloaded `.rd5`: say "descarga los datos de ruta de esta
-      zona", no fallback.
+10. **Offline routing (BRouter).** *Code landed 2026-09-03* — compiles,
+    dexes, unit-tested at the seams; the **engine itself is unverified on
+    device** (route quality, `.rd5` fetch, timing). No external app.
+    - **Engine jar:** JitPack only publishes sources, so
+      `:data:downloadBRouterJar` fetches `brouter-<v>-ro.jar` (~350 KB, MIT,
+      pure Java — `btools.router/mapaccess/expressions/codec/util`) from the
+      GitHub release into `data/libs/` (gitignored). Bump `brouterVersion`
+      in `data/build.gradle.kts` to update.
+    - `BRouterRouter` (`RoutingRepository`): unpacks bundled
+      `assets/brouter/car.brf` + `lookups.dat`, `ProfileCache.parseProfile`,
+      `RoutingParamCollector().getWayPointList("lon,lat|lon,lat")`,
+      `RoutingEngine(null,null,segmentDir,wps,rc).doRun(25s)`, reads
+      `foundTrack.nodes` → lat/lon, `.distance`, `.getTotalSeconds()`.
+      Null on no-data / no-route.
+    - `RoutingDataManager`: on demand, downloads the `.rd5` tile(s) a route
+      needs from `brouter.de/brouter/segments4/`, **Wi-Fi-only**, resumable;
+      `SegmentTiles.nameFor(lat,lon)` gives the 5° tile name.
+    - `MapViewModel.routeTo` / `route` / `routeSummary`; `MapScreen` draws it
+      with a `LineManager` + a "12,3 km · 18 min" chip. "llévame a X"
+      resolves the destination to the first offline POI match, then routes
+      from the current fix.
+    - **Device bring-up:** does `RoutingEngine` run on arm64 with a real
+      `.rd5` (Madrid = `W5_N40.rd5`)? Check `doRun` timing, the tile download
+      over the app's network, and that the polyline renders. If the engine
+      throws, log `getErrorMessage()`. R8: `btools.server.*` is unused — add
+      keep/`-dontwarn` rules when R8 comes on.
+    - Still no spoken turn-by-turn (route line + distance only).
 
 ## Not for a device — still open from before
 
