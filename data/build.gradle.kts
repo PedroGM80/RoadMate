@@ -80,9 +80,16 @@ dependencies {
     implementation(libs.mediapipe.tasks.genai)
     // Offline Spanish speech-to-text (Kaldi). Works with no Google speech
     // pack — the model is bundled in :app assets.
-    // Offline Spanish STT and "RoadMate" wake-word spotting (grammar-limited
-    // Recognizer) both run on this — no extra engine, no account, no cost.
+    // Offline Spanish STT and "oye copiloto" wake-word spotting (grammar-
+    // limited Recognizer) both run on this — no extra engine, no account.
     implementation(libs.vosk.android)
+    // Offline turn-by-turn routing. Pure-Java (no NDK), Apache-2.0; segment
+    // data (.rd5) is downloaded per area at runtime, no account.
+    implementation(libs.brouter.core)
+    implementation(libs.brouter.mapaccess)
+    implementation(libs.brouter.expressions)
+    implementation(libs.brouter.codec)
+    implementation(libs.brouter.util)
     implementation(libs.play.services.location)
 
     implementation(libs.retrofit)
