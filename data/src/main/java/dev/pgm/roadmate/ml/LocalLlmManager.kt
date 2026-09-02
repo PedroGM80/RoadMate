@@ -180,19 +180,32 @@ class LocalLlmManager @Inject constructor(
         }
 
         dbg("stream PROMPT (${safe.length} chars) >>>\n$safe")
-        val raw = StringBuilder()
+        // AtomicReference, not StringBuilder: the listener runs on MediaPipe's
+        // thread and the watchdog reads the accumulator from another.
+        val acc = java.util.concurrent.atomic.AtomicReference("")
+        val finished = java.util.concurrent.atomic.AtomicBoolean(false)
         val t0 = System.currentTimeMillis()
 
-        val listener = ProgressListener<String> { partial, done ->
-            if (!partial.isNullOrEmpty()) raw.append(partial)
-            if (!partial.isNullOrEmpty() || done) {
-                val text = raw.toString()
-                trySend(text.fixMojibake() ?: text)
-            }
-            if (done) {
-                dbg("stream RESPONSE (${System.currentTimeMillis() - t0} ms) <<< \"$raw\"")
+        // The final value (whole answer, mojibake repaired) must reach the
+        // collector, so it goes out with a suspending send() before close()
+        // rather than a trySend() that a full buffer could drop. Guarded so
+        // "done" and the watchdog can't both run it.
+        fun finish(reason: String) {
+            if (!finished.compareAndSet(false, true)) return
+            launch {
+                val text = acc.get()
+                dbg("stream $reason (${System.currentTimeMillis() - t0} ms) <<< \"$text\"")
+                runCatching { if (text.isNotEmpty()) send(text.fixMojibake() ?: text) }
                 close()
             }
+        }
+
+        val listener = ProgressListener<String> { partial, done ->
+            if (!partial.isNullOrEmpty()) {
+                val text = acc.updateAndGet { it + partial }
+                trySend(text.fixMojibake() ?: text)
+            }
+            if (done) finish("RESPONSE")
         }
 
         var future: Future<*>? = null
@@ -207,8 +220,7 @@ class LocalLlmManager @Inject constructor(
 
         val watchdog = launch {
             delay(Constants.LOCAL_LLM_TIMEOUT_MS)
-            dbg("stream: timed out after ${Constants.LOCAL_LLM_TIMEOUT_MS} ms")
-            close()
+            finish("TIMEOUT")
         }
 
         awaitClose {
@@ -224,22 +236,33 @@ class LocalLlmManager @Inject constructor(
         .flowOn(inferenceDispatcher)
 
     /**
-     * MediaPipe `tasks-genai` hands back the model's UTF-8 output decoded as
-     * Latin-1, so "kilómetros" arrives as "kilÃ³metros". If the string carries
-     * that signature, round-trip the bytes back through UTF-8.
+     * MediaPipe `tasks-genai` mis-decodes some of the model's UTF-8 output as
+     * Latin-1, so "kilómetros" can arrive as "kilÃ³metros". Crucially the
+     * corruption is *partial* — a single response mixes "vehículo" (intact)
+     * with "estÃ©" (doubly-encoded) — so a whole-string ISO-8859-1→UTF-8
+     * round-trip fixes the broken accents but shreds the intact ones.
+     *
+     * Instead, rewrite only the mojibake pattern: a `Ã`/`Â` lead byte (which
+     * never occurs in Spanish text) followed by a U+0080–U+00BF continuation
+     * byte, decoded back to the character those two bytes are UTF-8 for.
+     * Untouched accents are left alone.
      */
     private fun String?.fixMojibake(): String? {
         val s = this ?: return null
         if (!s.contains('Ã') && !s.contains('Â')) return s
-        return runCatching {
-            String(s.toByteArray(Charsets.ISO_8859_1), Charsets.UTF_8)
-        }.getOrDefault(s)
+        return MOJIBAKE_PAIR.replace(s) { m ->
+            val bytes = byteArrayOf(m.value[0].code.toByte(), m.value[1].code.toByte())
+            runCatching { String(bytes, Charsets.UTF_8) }.getOrDefault(m.value)
+        }
     }
 
     private companion object {
         const val MAX_TOKENS = 512
         const val TOP_K = 40
         const val TEMPERATURE = 0.2f
+
+        /** UTF-8-as-Latin-1 mojibake: `Ã`/`Â` then a continuation byte. */
+        val MOJIBAKE_PAIR = Regex("[ÂÃ][-¿]")
 
         /** Hard ceiling on prompt length fed to the native engine. Well under
          *  the model's KV window; PromptBuilder already caps to a similar size. */
