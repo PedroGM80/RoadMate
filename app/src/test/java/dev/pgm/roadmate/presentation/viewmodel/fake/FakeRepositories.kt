@@ -106,7 +106,12 @@ class FakeSpeechRecognitionRepository(
         else listOf(SpeechRecognitionEvent.Partial(result), SpeechRecognitionEvent.Result(result))
     )
 
-    override fun recognize(): Flow<SpeechRecognitionEvent> = events.asFlow()
+    private var calls = 0
+
+    /** First call yields the configured events; later calls are silence, so
+     *  the follow-up loop terminates like it would with a quiet driver. */
+    override fun recognize(): Flow<SpeechRecognitionEvent> =
+        if (calls++ == 0) events.asFlow() else listOf(SpeechRecognitionEvent.Result("")).asFlow()
 }
 
 class FakeSilenceDetectionRepository(

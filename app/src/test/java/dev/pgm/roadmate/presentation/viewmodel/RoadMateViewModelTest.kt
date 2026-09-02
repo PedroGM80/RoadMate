@@ -270,13 +270,15 @@ class RoadMateViewModelTest {
         }
 
     @Test
-    fun `a wake-word detection runs the same listen-and-answer cycle as a mic tap`() =
+    fun `a wake-word detection answers, then the follow-up window times out to IDLE`() =
         runTest(mainDispatcherRule.testDispatcher) {
             val wakeWord = FakeWakeWordRepository(available = true)
+            val spoken = FakeSpeechSynthesisRepository()
             val viewModel = buildViewModel(
                 recognizedSpeech = "¿cuánto queda?",
                 geminiResponse = "quedan 10 km",
                 wakeWordRepository = wakeWord,
+                greetingSpeechSynthesisRepository = spoken,
             )
 
             viewModel.startAmbientListening()
@@ -285,8 +287,27 @@ class RoadMateViewModelTest {
             advanceUntilIdle()
 
             val state = viewModel.uiState.value
+            // Ack spoken, answer produced; the second (silent) turn settles to IDLE.
+            assertTrue(spoken.spoken.contains("Sí, dime."))
+            assertEquals("quedan 10 km", state.currentResponse)
+            assertEquals(RoadMateStatus.IDLE, state.status)
+            assertFalse(state.isListening)
+        }
+
+    @Test
+    fun `without hands-free a mic tap answers once and stays on the answer`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val viewModel = buildViewModel(
+                recognizedSpeech = "¿cuánto queda?",
+                geminiResponse = "quedan 10 km",
+                wakeWordRepository = FakeWakeWordRepository(available = false),
+            )
+
+            viewModel.startListening()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
             assertEquals(RoadMateStatus.SPEAKING, state.status)
-            assertEquals("¿cuánto queda?", state.lastRecognizedInput)
             assertEquals("quedan 10 km", state.currentResponse)
         }
 

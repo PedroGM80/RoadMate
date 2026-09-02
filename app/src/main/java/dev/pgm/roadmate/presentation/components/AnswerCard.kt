@@ -50,7 +50,8 @@ fun AnswerCard(
         }
     }
 
-    val listening = uiState.status == RoadMateStatus.LISTENING
+    val listening = uiState.status == RoadMateStatus.LISTENING ||
+        uiState.status == RoadMateStatus.FOLLOW_UP
     val body = when {
         uiState.currentResponse.isNotBlank() -> uiState.currentResponse
         listening && uiState.lastRecognizedInput.isBlank() -> stringResource(R.string.home_listening)

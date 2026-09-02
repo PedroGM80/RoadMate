@@ -21,6 +21,9 @@ import dev.pgm.roadmate.utils.SpokenText
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
 import dev.pgm.roadmate.utils.Constants
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -34,7 +37,17 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Calendar
 import javax.inject.Inject
 
-enum class RoadMateStatus { IDLE, LISTENING, PROCESSING, SPEAKING }
+/**
+ * The voice loop's state.
+ *
+ * IDLE — nothing (the "oye copiloto" listener runs when hands-free is on).
+ * LISTENING — mic open, capturing a question.
+ * PROCESSING — generating the answer.
+ * SPEAKING — reading the answer aloud.
+ * FOLLOW_UP — answer done, mic briefly open again for a follow-up without
+ *   needing the wake phrase; a few seconds of silence drops back to IDLE.
+ */
+enum class RoadMateStatus { IDLE, LISTENING, PROCESSING, SPEAKING, FOLLOW_UP }
 
 data class RoadMateUiState(
     val status: RoadMateStatus = RoadMateStatus.IDLE,
@@ -259,65 +272,105 @@ class RoadMateViewModel @Inject constructor(
         wakeWordJob?.cancel()
         wakeWordJob = null
         listeningJob = viewModelScope.launch {
-          try {
-            _uiState.value = _uiState.value.copy(
-                status = RoadMateStatus.LISTENING,
-                isListening = true,
-                lastRecognizedInput = "",
-                currentResponse = "",
-                isError = false
-            )
+            try {
+                var followUp = false
+                while (isActive) {
+                    val handled = captureAndRespond(followUp)
+                    // Only keep the conversation open (no wake phrase needed for
+                    // the next question) while hands-free is on.
+                    if (!handled || !handsFreeActive()) break
+                    followUp = true
+                }
+            } finally {
+                // captureAndRespond already left the right resting state
+                // (SPEAKING after an answer, IDLE after silence/failure); a
+                // cancellation (mic button / onPause) may not have — clear the
+                // mic flag, then bring hands-free listening back.
+                if (_uiState.value.isListening) {
+                    _uiState.value = _uiState.value.copy(
+                        status = RoadMateStatus.IDLE,
+                        isListening = false,
+                    )
+                }
+                if (resumeWakeWord && wakeWordDesired) startWakeWordListening()
+            }
+        }
+    }
 
-            var finalText = ""
-            var failure: String? = null
+    /**
+     * One turn: open the mic, transcribe, answer. Returns true if a real
+     * question was handled, false on silence / empty / failure — the caller
+     * then stops the follow-up loop.
+     *
+     * [followUp] shortens the "nothing said" window (the driver is already in
+     * a conversation) and keeps the previous answer on screen.
+     */
+    private suspend fun captureAndRespond(followUp: Boolean): Boolean = coroutineScope {
+        _uiState.value = _uiState.value.copy(
+            status = if (followUp) RoadMateStatus.FOLLOW_UP else RoadMateStatus.LISTENING,
+            isListening = true,
+            lastRecognizedInput = "",
+            currentResponse = if (followUp) _uiState.value.currentResponse else "",
+            isError = false,
+        )
+
+        var finalText = ""
+        var failure: String? = null
+        var heardSpeech = false
+
+        val capture = launch {
             recordAudioUseCase()
                 .catch { failure = SpokenText.SPEECH_FLOW_ERROR }
                 .collect { event ->
                     when (event) {
-                        // Live transcription so the user sees what's being heard.
-                        is SpeechRecognitionEvent.Partial ->
+                        is SpeechRecognitionEvent.Partial -> {
+                            heardSpeech = true
                             _uiState.value = _uiState.value.copy(lastRecognizedInput = event.text)
-
+                        }
                         is SpeechRecognitionEvent.Result -> finalText = event.text
-
                         is SpeechRecognitionEvent.Failed -> failure = event.message
                     }
                 }
-
-            failure?.let { message ->
-                _uiState.value = _uiState.value.copy(
-                    status = RoadMateStatus.IDLE,
-                    isListening = false,
-                    currentResponse = message,
-                    isError = true
-                )
-                speechSynthesisRepository.speak(message)
-                return@launch
-            }
-
-            if (finalText.isBlank()) {
-                _uiState.value = _uiState.value.copy(
-                    status = RoadMateStatus.IDLE,
-                    isListening = false,
-                    lastRecognizedInput = ""
-                )
-                return@launch
-            }
-
-            // Vosk returns bare lowercase text; punctuate an obvious question
-            // so it reads right and the model gets a clearer signal.
-            val recognized = QuestionPunctuation.normalize(finalText)
-            _uiState.value = _uiState.value.copy(
-                status = RoadMateStatus.PROCESSING,
-                lastRecognizedInput = recognized
-            )
-            respondTo(recognized)
-          } finally {
-              // Mic is free again — bring hands-free listening back, unless
-              // something (onPause) has since cleared the intent.
-              if (resumeWakeWord && wakeWordDesired) startWakeWordListening()
-          }
         }
+        // Silence watchdog: if nothing is said within the window, stop waiting
+        // and let the loop fall back to the wake phrase.
+        val watchdog = launch {
+            delay(if (followUp) FOLLOW_UP_SILENCE_MS else FIRST_SILENCE_MS)
+            if (!heardSpeech) capture.cancel()
+        }
+        capture.join()
+        watchdog.cancel()
+
+        failure?.let { message ->
+            _uiState.value = _uiState.value.copy(
+                status = RoadMateStatus.IDLE,
+                isListening = false,
+                currentResponse = message,
+                isError = true,
+            )
+            speechSynthesisRepository.speak(message)
+            return@coroutineScope false
+        }
+
+        // Vosk returns bare lowercase text; punctuate an obvious question so it
+        // reads right and the model gets a clearer signal.
+        val recognized = QuestionPunctuation.normalize(finalText)
+        if (recognized.isBlank()) {
+            _uiState.value = _uiState.value.copy(
+                status = RoadMateStatus.IDLE,
+                isListening = false,
+                lastRecognizedInput = "",
+            )
+            return@coroutineScope false
+        }
+
+        _uiState.value = _uiState.value.copy(
+            status = RoadMateStatus.PROCESSING,
+            lastRecognizedInput = recognized,
+        )
+        respondTo(recognized)
+        speechSynthesisRepository.awaitDoneSpeaking()
+        true
     }
 
     fun cancelListening() {
@@ -382,5 +435,13 @@ class RoadMateViewModel @Inject constructor(
         cancelListening()
         stopWakeWordListening()
         runCatching { wakeEarcon.release() }
+    }
+
+    private companion object {
+        /** Give up waiting for the first question this long after "Sí, dime.". */
+        const val FIRST_SILENCE_MS = 8_000L
+
+        /** Shorter window for a follow-up — the driver's already talking to it. */
+        const val FOLLOW_UP_SILENCE_MS = 6_000L
     }
 }

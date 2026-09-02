@@ -41,6 +41,7 @@
     <string name="home_state_listening">Escuchando…</string>
     <string name="home_state_processing">Procesando…</string>
     <string name="home_state_speaking">Respondiendo</string>
+    <string name="home_state_follow_up">¿Algo más?</string>
 
     <!-- Mic button -->
     <string name="mic_start">Escuchar</string>

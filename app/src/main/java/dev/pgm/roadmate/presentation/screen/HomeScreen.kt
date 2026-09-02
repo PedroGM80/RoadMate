@@ -199,4 +199,5 @@ private fun statusLabel(status: RoadMateStatus): String = when (status) {
     RoadMateStatus.LISTENING -> stringResource(R.string.home_state_listening)
     RoadMateStatus.PROCESSING -> stringResource(R.string.home_state_processing)
     RoadMateStatus.SPEAKING -> stringResource(R.string.home_state_speaking)
+    RoadMateStatus.FOLLOW_UP -> stringResource(R.string.home_state_follow_up)
 }
