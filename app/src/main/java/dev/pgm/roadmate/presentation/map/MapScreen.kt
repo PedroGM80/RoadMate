@@ -238,11 +238,18 @@ fun MapScreen(
                 }
             }
 
-            // "llévame a…": route to the first match instead of just pinning it.
+            // "llévame a…": route to the *nearest* match, not just the first
+            // one the tile query happened to return.
             if (navigateToResult && pins.isNotEmpty()) {
+                val here = map.currentLatLon()
+                val target = if (here != null) {
+                    pins.minByOrNull { metersBetween(here, it.latitude to it.longitude) } ?: pins.first()
+                } else {
+                    pins.first()
+                }
                 viewModel.onNavigationTargetResolved(
-                    from = map.currentLatLon(),
-                    to = pins.first().let { it.latitude to it.longitude },
+                    from = here,
+                    to = target.latitude to target.longitude,
                 )
                 return@LaunchedEffect
             }

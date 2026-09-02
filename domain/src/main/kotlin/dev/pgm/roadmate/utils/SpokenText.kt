@@ -34,6 +34,15 @@ object SpokenText {
     fun notOnOfflineMap(query: String) =
         "No encuentro $query en el mapa descargado."
 
+    // Routing — spoken once the offline route is (or isn't) traced
+    fun routeTraced(distance: String, duration: String) =
+        "Ruta trazada: $distance, unos $duration."
+    const val ROUTE_UNKNOWN_ORIGIN = "No sé dónde estás ahora mismo."
+    const val ROUTE_NOT_POSSIBLE = "No puedo trazar la ruta con el mapa descargado."
+    const val ROUTE_NEEDS_WIFI =
+        "Conéctate a Wi-Fi para descargar el mapa de ruta de esta zona."
+    const val ROUTE_DOWNLOAD_FAILED = "No pude descargar el mapa de ruta."
+
     // Weather
     fun weatherNow(description: String) = "Ahora mismo: $description."
     fun weatherAt(place: String, description: String) = "En $place: $description."

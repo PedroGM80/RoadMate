@@ -10,7 +10,9 @@ import dev.pgm.roadmate.domain.repository.CurrentPlaceRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.RoutingRepository
+import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.utils.PlaceName
+import dev.pgm.roadmate.utils.SpokenText
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,6 +32,7 @@ class MapViewModel @Inject constructor(
     private val memoryRepository: MemoryRepository,
     private val routingRepository: RoutingRepository,
     private val currentPlaceRepository: CurrentPlaceRepository,
+    private val speechSynthesisRepository: SpeechSynthesisRepository,
     mapSearchCoordinator: MapSearchCoordinator,
 ) : ViewModel() {
 
@@ -122,7 +125,8 @@ class MapViewModel @Inject constructor(
         routeJob?.cancel()
         if (from == null) {
             _route.value = emptyList()
-            _routeSummary.value = "No sé dónde estás ahora mismo."
+            _routeSummary.value = SpokenText.ROUTE_UNKNOWN_ORIGIN
+            speechSynthesisRepository.speak(SpokenText.ROUTE_UNKNOWN_ORIGIN)
             return
         }
         _routeSummary.value = "Calculando la ruta…"
@@ -145,15 +149,18 @@ class MapViewModel @Inject constructor(
             watcher.cancel()
             if (result == null) {
                 _route.value = emptyList()
-                _routeSummary.value = when (routingRepository.dataStatus.value) {
-                    RoutingDataStatus.WaitingForWifi ->
-                        "Conéctate a Wi-Fi para descargar el mapa de ruta de esta zona."
-                    is RoutingDataStatus.Failed -> "No pude descargar el mapa de ruta."
-                    else -> "No puedo trazar la ruta con el mapa descargado."
+                val line = when (routingRepository.dataStatus.value) {
+                    RoutingDataStatus.WaitingForWifi -> SpokenText.ROUTE_NEEDS_WIFI
+                    is RoutingDataStatus.Failed -> SpokenText.ROUTE_DOWNLOAD_FAILED
+                    else -> SpokenText.ROUTE_NOT_POSSIBLE
                 }
+                _routeSummary.value = line
+                speechSynthesisRepository.speak(line)
             } else {
                 _route.value = result.points
-                _routeSummary.value = summarize(result.distanceMeters, result.durationSeconds)
+                val (dist, time) = formatDistanceTime(result.distanceMeters, result.durationSeconds)
+                _routeSummary.value = "$dist · $time"
+                speechSynthesisRepository.speak(SpokenText.routeTraced(dist, time))
             }
         }
     }
@@ -176,12 +183,13 @@ class MapViewModel @Inject constructor(
         viewModelScope.launch { memoryRepository.rememberPlace(PlaceName.normalize(placeLabel)) }
     }
 
-    private fun summarize(meters: Int, seconds: Int): String {
+    /** ("12,3 km", "18 min") — the chip joins with " · ", speech reads them apart. */
+    private fun formatDistanceTime(meters: Int, seconds: Int): Pair<String, String> {
         val km = meters / 1000.0
         val dist = if (km < 20) "%.1f km".format(SPANISH, km) else "${km.roundToInt()} km"
         val mins = (seconds / 60.0).roundToInt().coerceAtLeast(1)
         val time = if (mins < 60) "$mins min" else "${mins / 60} h ${mins % 60} min"
-        return "$dist · $time"
+        return dist to time
     }
 
     private companion object {
