@@ -13,6 +13,7 @@ import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
+import dev.pgm.roadmate.domain.repository.CalendarRepository
 import dev.pgm.roadmate.domain.repository.MessagingRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.ReminderRepository
@@ -20,6 +21,7 @@ import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.utils.ArithmeticParser
 import dev.pgm.roadmate.utils.CallFollowUpParser
+import dev.pgm.roadmate.utils.CalendarQuestionParser
 import dev.pgm.roadmate.utils.CallIntentParser
 import dev.pgm.roadmate.utils.JokeProvider
 import dev.pgm.roadmate.utils.LocationQuestionParser
@@ -121,7 +123,8 @@ class GenerateResponseUseCase @Inject constructor(
     private val memoryRepository: MemoryRepository,
     private val weatherRepository: WeatherRepository,
     private val messagingRepository: MessagingRepository,
-    private val reminderRepository: ReminderRepository
+    private val reminderRepository: ReminderRepository,
+    private val calendarRepository: CalendarRepository
 ) {
     /** The candidates from an unresolved "llama a X" — awaiting "la segunda" etc. */
     private var pendingCall: List<ContactMatch>? = null
@@ -161,12 +164,14 @@ class GenerateResponseUseCase @Inject constructor(
         val parkingIntent = ParkingIntentParser.parse(userInput)
         val messageRequest = MessageIntentParser.parse(userInput)
         val reminder = ReminderIntentParser.parse(userInput)
+        val calendarScope = CalendarQuestionParser.parse(userInput)
         val shortcut = when {
             // Before the map/call parsers — "llévame al coche" and "dónde está
             // el coche" would otherwise be read as a place search.
             parkingIntent != null -> handleParking(parkingIntent, context)
             messageRequest != null -> handleMessage(messageRequest)
             reminder != null -> handleReminder(reminder, context)
+            calendarScope != null -> handleCalendar(calendarScope, context)
             // "¿dónde estoy?" — answer from the map if it has a street resolved,
             // otherwise fall through to the model (it has the coordinates).
             LocationQuestionParser.matches(userInput) && !context.placeLabel.isNullOrBlank() ->
@@ -419,6 +424,48 @@ class GenerateResponseUseCase @Inject constructor(
         }
         reminderRepository.schedule(r.text, whenMillis)
         return SpokenText.reminderSet(phrase)
+    }
+
+    /** "¿qué tengo hoy?" / "¿cuál es mi próxima cita?" from the device calendar. */
+    private suspend fun handleCalendar(
+        scope: CalendarQuestionParser.Scope,
+        context: TravelContext,
+    ): String {
+        if (!calendarRepository.hasPermission()) return SpokenText.CALENDAR_NO_PERMISSION
+        val now = context.date.time
+
+        return when (scope) {
+            CalendarQuestionParser.Scope.TODAY -> {
+                val endOfDay = java.util.Calendar.getInstance().apply {
+                    time = context.date
+                    set(java.util.Calendar.HOUR_OF_DAY, 23)
+                    set(java.util.Calendar.MINUTE, 59)
+                    set(java.util.Calendar.SECOND, 59)
+                }.timeInMillis
+                val events = calendarRepository.eventsBetween(now, endOfDay).filter { it.endMillis > now }
+                if (events.isEmpty()) SpokenText.CALENDAR_NOTHING_TODAY
+                else SpokenText.calendarToday(events.take(4).joinToString("; ", transform = ::describeEvent))
+            }
+            CalendarQuestionParser.Scope.NEXT -> {
+                val events = calendarRepository
+                    .eventsBetween(now, now + 7L * 24 * 3_600_000L)
+                    .filter { it.endMillis > now && !it.allDay }
+                val next = events.firstOrNull() ?: return SpokenText.CALENDAR_NOTHING_NEXT
+                SpokenText.calendarNext(describeEvent(next))
+            }
+        }
+    }
+
+    private fun describeEvent(e: dev.pgm.roadmate.domain.model.CalendarEvent): String {
+        val time = if (e.allDay) {
+            "todo el día"
+        } else {
+            val cal = java.util.Calendar.getInstance().apply { timeInMillis = e.startMillis }
+            "a las %02d:%02d".format(
+                cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE),
+            )
+        }
+        return e.title + " " + time + (e.location?.let { ", en $it" } ?: "")
     }
 
     private fun placeResolvedCall(match: ContactMatch): String {

@@ -4,6 +4,7 @@ import dev.pgm.roadmate.domain.fake.FakeAssistantPreferencesRepository
 import dev.pgm.roadmate.domain.fake.FakeGeminiRepository
 import dev.pgm.roadmate.domain.fake.FakeMapSearchCoordinator
 import dev.pgm.roadmate.domain.fake.FakeMediaRepository
+import dev.pgm.roadmate.domain.fake.FakeCalendarRepository
 import dev.pgm.roadmate.domain.fake.FakeMemoryRepository
 import dev.pgm.roadmate.domain.fake.FakeMessagingRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
@@ -43,7 +44,8 @@ class GenerateResponseUseCaseTest {
         memoryRepository: FakeMemoryRepository = FakeMemoryRepository(),
         weatherRepository: FakeWeatherRepository = FakeWeatherRepository(),
         messagingRepository: FakeMessagingRepository = FakeMessagingRepository(),
-        reminderRepository: FakeReminderRepository = FakeReminderRepository()
+        reminderRepository: FakeReminderRepository = FakeReminderRepository(),
+        calendarRepository: FakeCalendarRepository = FakeCalendarRepository()
     ) = GenerateResponseUseCase(
         geminiRepository,
         speechSynthesisRepository,
@@ -54,7 +56,8 @@ class GenerateResponseUseCaseTest {
         memoryRepository,
         weatherRepository,
         messagingRepository,
-        reminderRepository
+        reminderRepository,
+        calendarRepository
     )
 
     @Test
@@ -131,6 +134,26 @@ class GenerateResponseUseCaseTest {
 
         assertEquals(listOf("No encuentro a Nadie en tus contactos."), emitted)
         assertNull(sms.sentTo)
+    }
+
+    @Test
+    fun `"qué tengo hoy" reads the day's calendar`() = runTest {
+        val today0900 = context.date.time + 3 * 3_600_000L
+        val cal = FakeCalendarRepository(
+            events = listOf(
+                dev.pgm.roadmate.domain.model.CalendarEvent("Dentista", today0900, today0900 + 3_600_000L, allDay = false),
+            ),
+        )
+
+        val emitted = useCase(calendarRepository = cal)(context, "¿qué tengo hoy?").toList()
+
+        assertTrue(emitted.single().startsWith("Hoy tienes: Dentista a las "))
+    }
+
+    @Test
+    fun `"qué tengo hoy" with an empty calendar says so`() = runTest {
+        val emitted = useCase()(context, "¿qué tengo hoy?").toList()
+        assertEquals(listOf("No tienes nada en la agenda hoy."), emitted)
     }
 
     @Test

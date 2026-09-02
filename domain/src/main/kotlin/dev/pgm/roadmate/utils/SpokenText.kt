@@ -86,6 +86,14 @@ object SpokenText {
     // Reminders ("recuérdame …")
     fun reminderSet(whenPhrase: String) = "Vale, te aviso $whenPhrase."
 
+    // Calendar ("¿qué tengo hoy?")
+    const val CALENDAR_NO_PERMISSION =
+        "No puedo ver tu agenda sin permiso. Actívalo en ajustes: calendario."
+    const val CALENDAR_NOTHING_TODAY = "No tienes nada en la agenda hoy."
+    const val CALENDAR_NOTHING_NEXT = "No tienes ninguna cita próxima."
+    fun calendarToday(list: String) = "Hoy tienes: $list."
+    fun calendarNext(event: String) = "Tu próxima cita: $event."
+
     // Text messages ("dile a Ana que…")
     const val SMS_NO_PERMISSION =
         "No puedo enviar mensajes sin permiso. Actívalo en ajustes: SMS."

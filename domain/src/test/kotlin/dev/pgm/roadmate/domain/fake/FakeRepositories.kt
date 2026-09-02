@@ -11,7 +11,9 @@ import dev.pgm.roadmate.domain.model.SilenceEvent
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
 import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.domain.model.UserFact
+import dev.pgm.roadmate.domain.model.CalendarEvent
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
+import dev.pgm.roadmate.domain.repository.CalendarRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
@@ -164,6 +166,15 @@ class FakeMessagingRepository(
         sentBody = body
         return true
     }
+}
+
+class FakeCalendarRepository(
+    private val granted: Boolean = true,
+    private val events: List<CalendarEvent> = emptyList(),
+) : CalendarRepository {
+    override fun hasPermission(): Boolean = granted
+    override suspend fun eventsBetween(fromMillis: Long, toMillis: Long): List<CalendarEvent> =
+        events.filter { it.endMillis > fromMillis && it.startMillis < toMillis }.sortedBy { it.startMillis }
 }
 
 class FakeReminderRepository : ReminderRepository {

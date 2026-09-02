@@ -33,7 +33,8 @@ class DetectSilenceUseCaseTest {
             FakeMemoryRepository(),
             FakeWeatherRepository(),
             dev.pgm.roadmate.domain.fake.FakeMessagingRepository(),
-            dev.pgm.roadmate.domain.fake.FakeReminderRepository()
+            dev.pgm.roadmate.domain.fake.FakeReminderRepository(),
+        dev.pgm.roadmate.domain.fake.FakeCalendarRepository()
         )
         val useCase = DetectSilenceUseCase(silenceDetectionRepository, generateResponseUseCase)
 
@@ -56,7 +57,8 @@ class DetectSilenceUseCaseTest {
             FakeMemoryRepository(),
             FakeWeatherRepository(),
             dev.pgm.roadmate.domain.fake.FakeMessagingRepository(),
-            dev.pgm.roadmate.domain.fake.FakeReminderRepository()
+            dev.pgm.roadmate.domain.fake.FakeReminderRepository(),
+        dev.pgm.roadmate.domain.fake.FakeCalendarRepository()
         )
         val useCase = DetectSilenceUseCase(FakeSilenceDetectionRepository(), generateResponseUseCase)
 

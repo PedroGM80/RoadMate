@@ -5,6 +5,7 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dev.pgm.roadmate.data.repository.AssistantPreferencesRepositoryImpl
+import dev.pgm.roadmate.data.repository.CalendarRepositoryImpl
 import dev.pgm.roadmate.data.repository.GeminiRepositoryImpl
 import dev.pgm.roadmate.data.repository.GreetingRepositoryImpl
 import dev.pgm.roadmate.data.repository.LocationRepositoryImpl
@@ -21,6 +22,7 @@ import dev.pgm.roadmate.data.repository.WeatherRepositoryImpl
 import dev.pgm.roadmate.reminder.ReminderScheduler
 import dev.pgm.roadmate.routing.BRouterRouter
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
+import dev.pgm.roadmate.domain.repository.CalendarRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
@@ -94,4 +96,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindReminderRepository(impl: ReminderScheduler): ReminderRepository
+
+    @Binds
+    abstract fun bindCalendarRepository(impl: CalendarRepositoryImpl): CalendarRepository
 }
