@@ -5,6 +5,7 @@ import dev.pgm.roadmate.domain.fake.FakeGeminiRepository
 import dev.pgm.roadmate.domain.fake.FakeMapSearchCoordinator
 import dev.pgm.roadmate.domain.fake.FakeMediaRepository
 import dev.pgm.roadmate.domain.fake.FakeMemoryRepository
+import dev.pgm.roadmate.domain.fake.FakeMessagingRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
 import dev.pgm.roadmate.domain.fake.FakeWeatherRepository
@@ -22,6 +23,7 @@ import dev.pgm.roadmate.utils.JokeProvider
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Date
@@ -38,7 +40,8 @@ class GenerateResponseUseCaseTest {
         mediaRepository: FakeMediaRepository = FakeMediaRepository(),
         assistantPreferencesRepository: FakeAssistantPreferencesRepository = FakeAssistantPreferencesRepository(),
         memoryRepository: FakeMemoryRepository = FakeMemoryRepository(),
-        weatherRepository: FakeWeatherRepository = FakeWeatherRepository()
+        weatherRepository: FakeWeatherRepository = FakeWeatherRepository(),
+        messagingRepository: FakeMessagingRepository = FakeMessagingRepository()
     ) = GenerateResponseUseCase(
         geminiRepository,
         speechSynthesisRepository,
@@ -47,7 +50,8 @@ class GenerateResponseUseCaseTest {
         mediaRepository,
         assistantPreferencesRepository,
         memoryRepository,
-        weatherRepository
+        weatherRepository,
+        messagingRepository
     )
 
     @Test
@@ -99,6 +103,31 @@ class GenerateResponseUseCaseTest {
         val emitted = useCase(gemini, weatherRepository = weather)(context, "¿qué tiempo hace en Narnia?").toList()
 
         assertEquals(listOf("No consigo el tiempo de Narnia ahora mismo."), emitted)
+    }
+
+    @Test
+    fun `"dile a X que Y" sends an SMS to the resolved contact`() = runTest {
+        val phone = FakePhoneCallRepository(
+            lookupResult = ContactLookupResult.Found(ContactMatch("Ana García", "600111222")),
+        )
+        val sms = FakeMessagingRepository()
+
+        val emitted = useCase(phoneCallRepository = phone, messagingRepository = sms)(
+            context, "dile a Ana que llego en veinte minutos",
+        ).toList()
+
+        assertEquals(listOf("Mensaje enviado a Ana García."), emitted)
+        assertEquals("600111222", sms.sentTo)
+        assertEquals("llego en veinte minutos", sms.sentBody)
+    }
+
+    @Test
+    fun `a message to an unknown contact is not sent`() = runTest {
+        val sms = FakeMessagingRepository()
+        val emitted = useCase(messagingRepository = sms)(context, "manda un mensaje a Nadie: hola").toList()
+
+        assertEquals(listOf("No encuentro a Nadie en tus contactos."), emitted)
+        assertNull(sms.sentTo)
     }
 
     @Test

@@ -13,6 +13,7 @@ import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
+import dev.pgm.roadmate.domain.repository.MessagingRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
@@ -23,6 +24,7 @@ import dev.pgm.roadmate.utils.JokeProvider
 import dev.pgm.roadmate.utils.LocationQuestionParser
 import dev.pgm.roadmate.utils.MapSearchIntentParser
 import dev.pgm.roadmate.utils.MediaIntentParser
+import dev.pgm.roadmate.utils.MessageIntentParser
 import dev.pgm.roadmate.utils.PlaceCategoryParser
 import dev.pgm.roadmate.utils.MemoryCommandParser
 import dev.pgm.roadmate.utils.ParkingIntentParser
@@ -115,7 +117,8 @@ class GenerateResponseUseCase @Inject constructor(
     private val mediaRepository: MediaRepository,
     private val assistantPreferencesRepository: AssistantPreferencesRepository,
     private val memoryRepository: MemoryRepository,
-    private val weatherRepository: WeatherRepository
+    private val weatherRepository: WeatherRepository,
+    private val messagingRepository: MessagingRepository
 ) {
     /** The candidates from an unresolved "llama a X" — awaiting "la segunda" etc. */
     private var pendingCall: List<ContactMatch>? = null
@@ -153,10 +156,12 @@ class GenerateResponseUseCase @Inject constructor(
         val arithmetic = ArithmeticParser.evaluate(userInput)
         val conversion = UnitConversionParser.convert(userInput)
         val parkingIntent = ParkingIntentParser.parse(userInput)
+        val messageRequest = MessageIntentParser.parse(userInput)
         val shortcut = when {
             // Before the map/call parsers — "llévame al coche" and "dónde está
             // el coche" would otherwise be read as a place search.
             parkingIntent != null -> handleParking(parkingIntent, context)
+            messageRequest != null -> handleMessage(messageRequest)
             // "¿dónde estoy?" — answer from the map if it has a street resolved,
             // otherwise fall through to the model (it has the coordinates).
             LocationQuestionParser.matches(userInput) && !context.placeLabel.isNullOrBlank() ->
@@ -347,6 +352,25 @@ class GenerateResponseUseCase @Inject constructor(
                 }
             }
             ContactLookupResult.NotFound -> SpokenText.contactNotFound(contactName)
+        }
+    }
+
+    /**
+     * "dile a Ana que llego" — resolve the recipient in contacts (same lookup
+     * as calls) and hand the text to [MessagingRepository] as an SMS. An
+     * ambiguous name is not sent: safer to ask again than to text the wrong
+     * person.
+     */
+    private suspend fun handleMessage(request: MessageIntentParser.Request): String {
+        if (!messagingRepository.hasSmsPermission()) return SpokenText.SMS_NO_PERMISSION
+
+        return when (val result = phoneCallRepository.findContactByName(request.recipient)) {
+            is ContactLookupResult.Found -> {
+                val ok = messagingRepository.sendSms(result.contact.phoneNumber, request.body)
+                if (ok) SpokenText.messageSent(result.contact.name) else SpokenText.MESSAGE_FAILED
+            }
+            is ContactLookupResult.Ambiguous -> SpokenText.CALL_AMBIGUOUS
+            ContactLookupResult.NotFound -> SpokenText.contactNotFound(request.recipient)
         }
     }
 

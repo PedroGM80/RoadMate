@@ -55,7 +55,8 @@ class RoadMateViewModelTest {
             FakeMediaRepository(),
             FakeAssistantPreferencesRepository(),
             FakeMemoryRepository(),
-            FakeWeatherRepository()
+            FakeWeatherRepository(),
+            dev.pgm.roadmate.presentation.viewmodel.fake.FakeMessagingRepository()
         )
         val speechRepo = if (speechEvents != null) {
             FakeSpeechRecognitionRepository(speechEvents)

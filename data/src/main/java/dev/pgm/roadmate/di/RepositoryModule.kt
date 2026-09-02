@@ -10,6 +10,7 @@ import dev.pgm.roadmate.data.repository.GreetingRepositoryImpl
 import dev.pgm.roadmate.data.repository.LocationRepositoryImpl
 import dev.pgm.roadmate.data.repository.MediaRepositoryImpl
 import dev.pgm.roadmate.data.repository.MemoryRepositoryImpl
+import dev.pgm.roadmate.data.repository.MessagingRepositoryImpl
 import dev.pgm.roadmate.data.repository.OnboardingRepositoryImpl
 import dev.pgm.roadmate.data.repository.PhoneCallRepositoryImpl
 import dev.pgm.roadmate.data.repository.SilenceDetectionRepositoryImpl
@@ -24,6 +25,7 @@ import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
+import dev.pgm.roadmate.domain.repository.MessagingRepository
 import dev.pgm.roadmate.domain.repository.RoutingRepository
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
@@ -84,4 +86,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindRoutingRepository(impl: BRouterRouter): RoutingRepository
+
+    @Binds
+    abstract fun bindMessagingRepository(impl: MessagingRepositoryImpl): MessagingRepository
 }

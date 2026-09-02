@@ -63,7 +63,11 @@ fun HomeScreen(
             null
         }
     val callPermissions = rememberMultiplePermissionsState(
-        listOf(Manifest.permission.CALL_PHONE, Manifest.permission.READ_CONTACTS),
+        listOf(
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.SEND_SMS,
+        ),
     )
 
     // Null while DataStore is still being read; the effect below re-runs when
