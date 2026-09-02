@@ -19,11 +19,6 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        // BRouter (offline routing engine) publishes only via JitPack.
-        // Scoped so nothing else can resolve from here.
-        maven("https://jitpack.io") {
-            content { includeGroupByRegex("com\\.github\\.abrensch.*") }
-        }
     }
 }
 

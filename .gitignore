@@ -18,6 +18,9 @@ local.properties
 # the :app downloadVoskModel task, not stored in git (see app/build.gradle.kts).
 /app/src/main/assets/vosk-model-small-es-0.42.zip
 
+# BRouter routing jar — fetched at build time by :data:downloadBRouterJar.
+/data/libs/
+
 # Firebase config — per-project, embeds an API key + project number. Add your
 # own to turn Crashlytics on; its absence just disables Firebase (see
 # app/build.gradle.kts).

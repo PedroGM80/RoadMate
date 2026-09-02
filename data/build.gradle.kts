@@ -1,10 +1,49 @@
+import java.net.URI
 import java.util.Properties
+import java.util.zip.ZipInputStream
 
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.google.devtools.ksp)
     alias(libs.plugins.hilt.android)
 }
+
+// BRouter's routing-only jar (~350 KB, MIT, pure Java — btools.router/
+// mapaccess/expressions/codec/util). Fetched at build time from the GitHub
+// release rather than committed; it's the only distribution — the JitPack
+// build publishes sources-only poms. libs/ is gitignored.
+val brouterVersion = "1.7.10"
+val downloadBRouter = tasks.register("downloadBRouterJar") {
+    description = "Downloads the BRouter routing-only jar into libs/"
+    // Resolve everything to plain serializable locals so the task action is
+    // safe under Gradle's configuration cache (no script/project references).
+    val url = "https://github.com/abrensch/brouter/releases/download/" +
+        "v$brouterVersion/brouter-$brouterVersion.zip"
+    val wanted = "brouter-$brouterVersion/brouter-$brouterVersion-ro.jar"
+    val target = layout.projectDirectory.file("libs/brouter-$brouterVersion-ro.jar").asFile
+    outputs.file(target)
+    onlyIf { !target.exists() }
+    doLast {
+        target.parentFile.mkdirs()
+        var found = false
+        URI(url).toURL().openStream().use { raw ->
+            ZipInputStream(raw.buffered()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    if (entry.name == wanted) {
+                        target.outputStream().use { output -> zip.copyTo(output) }
+                        found = true
+                        break
+                    }
+                    zip.closeEntry()
+                }
+            }
+        }
+        check(found) { "$wanted not in the release zip" }
+        check(target.length() > 100_000L) { "BRouter jar download looks truncated (${target.length()} B)" }
+    }
+}
+tasks.named("preBuild") { dependsOn(downloadBRouter) }
 
 // OPENWEATHER_API_KEY is read from local.properties (gitignored, per-machine)
 // so the key never lands in source control. Absent by default; WeatherDataSource
@@ -83,13 +122,10 @@ dependencies {
     // Offline Spanish STT and "oye copiloto" wake-word spotting (grammar-
     // limited Recognizer) both run on this — no extra engine, no account.
     implementation(libs.vosk.android)
-    // Offline turn-by-turn routing. Pure-Java (no NDK), Apache-2.0; segment
-    // data (.rd5) is downloaded per area at runtime, no account.
-    implementation(libs.brouter.core)
-    implementation(libs.brouter.mapaccess)
-    implementation(libs.brouter.expressions)
-    implementation(libs.brouter.codec)
-    implementation(libs.brouter.util)
+    // Offline turn-by-turn routing (BRouter, MIT, pure Java, no NDK). The jar
+    // is fetched by the downloadBRouterJar task above; .rd5 segment data is
+    // downloaded per area at runtime, no account.
+    implementation(files(layout.projectDirectory.file("libs/brouter-$brouterVersion-ro.jar")))
     implementation(libs.play.services.location)
 
     implementation(libs.retrofit)

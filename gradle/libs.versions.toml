@@ -48,7 +48,6 @@ hilt = "2.60.1"
 aicore = "0.0.1-exp02"
 mediapipeTasksGenai = "0.10.27"
 voskAndroid = "0.3.47"
-brouter = "v1.7.8"
 maplibre = "11.11.0"
 maplibreAnnotation = "3.0.2"
 javaxInject = "1"
@@ -107,13 +106,6 @@ hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.r
 aicore = { group = "com.google.ai.edge.aicore", name = "aicore", version.ref = "aicore" }
 mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipeTasksGenai" }
 vosk-android = { group = "com.alphacephei", name = "vosk-android", version.ref = "voskAndroid" }
-# JitPack publishes each BRouter module separately and doesn't wire the
-# inter-module deps, so brouter-core's siblings are listed explicitly.
-brouter-core = { group = "com.github.abrensch.brouter", name = "brouter-core", version.ref = "brouter" }
-brouter-mapaccess = { group = "com.github.abrensch.brouter", name = "brouter-mapaccess", version.ref = "brouter" }
-brouter-expressions = { group = "com.github.abrensch.brouter", name = "brouter-expressions", version.ref = "brouter" }
-brouter-codec = { group = "com.github.abrensch.brouter", name = "brouter-codec", version.ref = "brouter" }
-brouter-util = { group = "com.github.abrensch.brouter", name = "brouter-util", version.ref = "brouter" }
 maplibre-android-sdk = { group = "org.maplibre.gl", name = "android-sdk", version.ref = "maplibre" }
 maplibre-annotation = { group = "org.maplibre.gl", name = "android-plugin-annotation-v9", version.ref = "maplibreAnnotation" }
 javax-inject = { group = "javax.inject", name = "javax.inject", version.ref = "javaxInject" }

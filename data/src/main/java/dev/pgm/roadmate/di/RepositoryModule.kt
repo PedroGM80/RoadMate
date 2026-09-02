@@ -17,12 +17,14 @@ import dev.pgm.roadmate.data.repository.SpeechRecognitionRepositoryImpl
 import dev.pgm.roadmate.data.repository.SpeechSynthesisRepositoryImpl
 import dev.pgm.roadmate.data.repository.WakeWordRepositoryImpl
 import dev.pgm.roadmate.data.repository.WeatherRepositoryImpl
+import dev.pgm.roadmate.routing.BRouterRouter
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
+import dev.pgm.roadmate.domain.repository.RoutingRepository
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
@@ -79,4 +81,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindWakeWordRepository(impl: WakeWordRepositoryImpl): WakeWordRepository
+
+    @Binds
+    abstract fun bindRoutingRepository(impl: BRouterRouter): RoutingRepository
 }
