@@ -19,6 +19,7 @@ import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MediaRepository
+import dev.pgm.roadmate.domain.repository.ReverseGeocodeRepository
 import dev.pgm.roadmate.domain.repository.RoutingRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
@@ -139,6 +140,10 @@ class FakePhoneCallRepository(
     override fun placeCall(phoneNumber: String) {
         placedCallTo = phoneNumber
     }
+}
+
+class FakeReverseGeocodeRepository(private val label: String? = null) : ReverseGeocodeRepository {
+    override suspend fun describe(lat: Double, lon: Double): String? = label
 }
 
 class FakeRoutingRepository(

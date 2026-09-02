@@ -15,6 +15,7 @@ import dev.pgm.roadmate.data.repository.PhoneCallRepositoryImpl
 import dev.pgm.roadmate.data.repository.SilenceDetectionRepositoryImpl
 import dev.pgm.roadmate.data.repository.SpeechRecognitionRepositoryImpl
 import dev.pgm.roadmate.data.repository.SpeechSynthesisRepositoryImpl
+import dev.pgm.roadmate.data.repository.AndroidReverseGeocoder
 import dev.pgm.roadmate.data.repository.WakeWordRepositoryImpl
 import dev.pgm.roadmate.data.repository.WeatherRepositoryImpl
 import dev.pgm.roadmate.routing.BRouterRouter
@@ -24,6 +25,7 @@ import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
+import dev.pgm.roadmate.domain.repository.ReverseGeocodeRepository
 import dev.pgm.roadmate.domain.repository.RoutingRepository
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
@@ -84,4 +86,7 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindRoutingRepository(impl: BRouterRouter): RoutingRepository
+
+    @Binds
+    abstract fun bindReverseGeocodeRepository(impl: AndroidReverseGeocoder): ReverseGeocodeRepository
 }

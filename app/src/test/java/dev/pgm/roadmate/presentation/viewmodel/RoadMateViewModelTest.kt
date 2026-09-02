@@ -13,6 +13,7 @@ import dev.pgm.roadmate.presentation.viewmodel.fake.FakeAssistantPreferencesRepo
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMediaRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMemoryRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakePhoneCallRepository
+import dev.pgm.roadmate.presentation.viewmodel.fake.FakeReverseGeocodeRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeSilenceDetectionRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeSpeechRecognitionRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeSpeechSynthesisRepository
@@ -74,7 +75,8 @@ class RoadMateViewModelTest {
             speechSynthesisRepository = greetingSpeechSynthesisRepository,
             greetingRepository = greetingRepository,
             wakeWordRepository = wakeWordRepository,
-            assistantPreferencesRepository = preferencesRepository
+            assistantPreferencesRepository = preferencesRepository,
+            reverseGeocodeRepository = FakeReverseGeocodeRepository()
         )
     }
 

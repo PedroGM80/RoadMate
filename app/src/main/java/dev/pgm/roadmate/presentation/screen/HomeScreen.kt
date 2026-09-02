@@ -103,6 +103,7 @@ fun HomeScreen(
 
         LocationRow(
             location = uiState.location,
+            placeLabel = uiState.locationLabel,
             unavailable = uiState.locationUnavailable,
             onRetry = viewModel::refreshLocation,
             modifier = Modifier.padding(top = Spacing.sm),
@@ -133,11 +134,13 @@ fun HomeScreen(
 @Composable
 private fun LocationRow(
     location: Pair<Double, Double>?,
+    placeLabel: String?,
     unavailable: Boolean,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val label = when {
+        !placeLabel.isNullOrBlank() -> placeLabel
         location != null -> stringResource(R.string.location_coords, location.first, location.second)
         unavailable -> stringResource(R.string.location_unavailable)
         else -> stringResource(R.string.location_searching)
