@@ -17,8 +17,9 @@ This file is now the running state, not the original bring-up plan.
   `adb exec-out run-as dev.pgm.roadmate cat files/aicore_debug.log`.
 - `local.properties` (untracked) has: the Xiaomi doesn't matter here, but it
   now points `LOCAL_AI_MODEL_URL` at **Qwen2.5-1.5B-Instruct q8**
-  (`~1.5 GB`, Apache-2.0, ungated) and has `OPENWEATHER_API_KEY` set (the
-  key was still returning 401 — new keys take ~1-2 h to activate; retry).
+  (`~1.5 GB`, Apache-2.0, ungated) and has `OPENWEATHER_API_KEY` set. The key
+  **activated 2026-09-02** — verified live: `data/2.5/weather` returns 200 for
+  Madrid with the app's own params. Still untested end-to-end in-app.
 
 ## What works on device now
 
@@ -37,12 +38,21 @@ This file is now the running state, not the original bring-up plan.
 
 ## Open — priority order
 
-1. **Streaming answer → TTS per sentence** (the big latency win).
-   `LlmInferenceSession.generateResponseAsync` with a progress listener,
-   buffer to sentence boundaries, feed `TextToSpeechManager` incrementally.
-   Target: start speaking at ~1.5 s instead of ~6 s. See the latency audit
-   in the session log / commit `perf: warm the local model at startup`.
-2. **Strip the debug tracing** before this branch merges: `DebugTrace.kt`,
+1. **Streaming answer → TTS per sentence** — *code done 2026-09-02, needs
+   on-device verification.* `LocalLlmManager.generateResponseStream`
+   (`generateResponseAsync` + `ProgressListener` wrapped in `callbackFlow`,
+   own inference thread); `GeminiRepository.getResponseStream` streams for
+   the MediaPipe backend only (AICore/fallback still one-shot);
+   `GenerateResponseUseCase.streamGeminiAnswer` speaks each sentence via the
+   new `SentenceChunker` as it lands, still emits cumulative text to the UI.
+   **Verify on device:** first audio latency (target ~1.5 s vs ~6 s), no
+   dropped/duplicated sentences, mojibake-free speech, timeout still lands on
+   "modo básico". Also folded in: `buildGeminiPrompt` fans out its 6 memory
+   reads with `async` instead of running them sequentially.
+2. **Strip the debug tracing** — do this LAST, right before a release build /
+   R8 verification (the new streaming traces are useful for step 1's
+   on-device check): `DebugTrace.kt`, all `dbg(...)` / `DebugTrace.log(...)`
+   in `LocalLlmManager`,
    all `dbg(...)` / `DebugTrace.log(...)` calls in `LocalLlmManager`,
    `GeminiNanoManager`, `GeminiRepositoryImpl`, `VoskSpeechRecognizer`,
    `MapScreen.refreshPois`. Grep `DebugTrace`.
@@ -54,7 +64,8 @@ This file is now the running state, not the original bring-up plan.
    the question doesn't need them; tighten Vosk end-of-speech.
 5. Map polish: markers slightly big / overlap when clustered; MapLibre
    attribution overlaps the chip row's corner; consider a "N cerca" count.
-6. Verify the OpenWeather key once it activates ("¿qué tiempo hace?").
+6. ~~Verify the OpenWeather key once it activates~~ — key is live (see
+   tooling notes). Left: confirm "¿qué tiempo hace?" answers in-app on device.
 7. Voice-search → offline-map routing (design already in git history under
    "docs: plan voice-search -> offline map routing") — now unblocked since
    the POI query works.
