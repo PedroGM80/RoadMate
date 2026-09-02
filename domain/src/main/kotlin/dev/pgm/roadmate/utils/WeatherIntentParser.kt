@@ -24,7 +24,7 @@ object WeatherIntentParser {
 
     private val WEATHER_TIEMPO = Regex(
         """(?:qu[eé]\s+tiempo|c[oó]mo\s+est[aá]\s+el\s+(?:tiempo|cielo|d[ií]a)|""" +
-            """el\s+tiempo\s+(?:hoy|ahora|para\s+hoy|de\s+hoy|que\s+hace|que\s+va)|""" +
+            """el\s+tiempo\s+(?:hoy|ahora|para\s+hoy|de\s+hoy|que\s+hace|que\s+va|en\s+\p{L})|""" +
             """hace\s+(?:frío|frio|calor|sol|bueno|mal\s+tiempo|buen\s+tiempo))""",
         RegexOption.IGNORE_CASE,
     )
@@ -39,5 +39,31 @@ object WeatherIntentParser {
         val text = userInput.trim()
         if (NOT_WEATHER_TIEMPO.containsMatchIn(text)) return false
         return WEATHER_WORDS.containsMatchIn(text) || WEATHER_TIEMPO.containsMatchIn(text)
+    }
+
+    /** Trailing "… en <sitio>" of a weather question — a leading article dropped. */
+    private val PLACE_AFTER_EN = Regex(
+        """\ben\s+(?:el\s+|la\s+|los\s+|las\s+)?([\p{L}][\p{L}\s.'’-]{1,39}?)\s*[?!.]*\s*$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /** "en un rato", "en 10 minutos", "en casa", "en general"… — not a place. */
+    private val NOT_A_PLACE = Regex(
+        """^(?:un|una|unos|unas)\s+(?:rato|ratito|hora|momento|minuto|poco)s?$""" +
+            """|^(?:casa|el\s+trabajo|camino|ruta|general|realidad|verdad|serio|breve|directo)$""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /**
+     * The place a weather question is about ("¿qué tiempo hace en Ronda?" ->
+     * "Ronda"), or null when it's about here. Only meaningful once
+     * [isWeatherQuestion] is true.
+     */
+    fun placeIn(userInput: String): String? {
+        val match = PLACE_AFTER_EN.find(userInput.trim()) ?: return null
+        val place = match.groupValues[1].trim().trim('.', ',', ';', '·').trim()
+        if (place.length < 2 || place.any { it.isDigit() }) return null
+        if (NOT_A_PLACE.containsMatchIn(place)) return null
+        return place.replaceFirstChar { it.uppercaseChar() }
     }
 }

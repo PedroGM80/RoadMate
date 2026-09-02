@@ -8,4 +8,12 @@ package dev.pgm.roadmate.domain.repository
  */
 interface WeatherRepository {
     suspend fun getCurrentWeatherDescription(lat: Double, lon: Double): String?
+
+    /**
+     * Weather for a place the driver named out loud ("¿qué tiempo hace en
+     * Sevilla?"). The place name is resolved by the weather service itself,
+     * so this works for any town without a downloaded map. Null when it
+     * can't be resolved or fetched.
+     */
+    suspend fun getWeatherDescriptionFor(placeName: String): String?
 }

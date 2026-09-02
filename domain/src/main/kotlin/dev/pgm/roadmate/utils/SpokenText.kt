@@ -36,6 +36,8 @@ object SpokenText {
 
     // Weather
     fun weatherNow(description: String) = "Ahora mismo: $description."
+    fun weatherAt(place: String, description: String) = "En $place: $description."
+    fun weatherUnavailableFor(place: String) = "No consigo el tiempo de $place ahora mismo."
     const val WEATHER_UNAVAILABLE = "No puedo consultar el tiempo ahora mismo."
 
     // Media

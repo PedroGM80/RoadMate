@@ -15,6 +15,7 @@ import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
+import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.utils.ArithmeticParser
 import dev.pgm.roadmate.utils.CallFollowUpParser
 import dev.pgm.roadmate.utils.CallIntentParser
@@ -88,7 +89,8 @@ class GenerateResponseUseCase @Inject constructor(
     private val mapSearchCoordinator: MapSearchCoordinator,
     private val mediaRepository: MediaRepository,
     private val assistantPreferencesRepository: AssistantPreferencesRepository,
-    private val memoryRepository: MemoryRepository
+    private val memoryRepository: MemoryRepository,
+    private val weatherRepository: WeatherRepository
 ) {
     /** The candidates from an unresolved "llama a X" — awaiting "la segunda" etc. */
     private var pendingCall: List<ContactMatch>? = null
@@ -123,7 +125,7 @@ class GenerateResponseUseCase @Inject constructor(
             JokeProvider.matchesJokeIntent(userInput) -> JokeProvider.randomJoke()
             styleChange != null -> handleStyleChange(styleChange)
             memoryCommand != null -> handleMemoryCommand(memoryCommand, context)
-            WeatherIntentParser.isWeatherQuestion(userInput) -> handleWeather(context)
+            WeatherIntentParser.isWeatherQuestion(userInput) -> handleWeather(context, userInput)
             arithmetic != null -> arithmetic
             else -> null
         }
@@ -276,11 +278,18 @@ class GenerateResponseUseCase @Inject constructor(
     }
 
     /**
-     * Answers straight from the weather already fetched into [TravelContext]
-     * — no model call. Null when there's no fix, no network, or no
-     * `OPENWEATHER_API_KEY` configured; say so plainly rather than guess.
+     * "¿qué tiempo hace?" — for here, straight from the weather already
+     * fetched into [TravelContext] (no model call). For "…en <sitio>",
+     * fetch that place on demand. Say so plainly when it's unavailable
+     * (no fix, no network, no `OPENWEATHER_API_KEY`) rather than guess.
      */
-    private fun handleWeather(context: TravelContext): String {
+    private suspend fun handleWeather(context: TravelContext, userInput: String): String {
+        val place = WeatherIntentParser.placeIn(userInput)
+        if (place != null) {
+            val elsewhere = weatherRepository.getWeatherDescriptionFor(place)
+            return if (!elsewhere.isNullOrBlank()) SpokenText.weatherAt(place, elsewhere)
+            else SpokenText.weatherUnavailableFor(place)
+        }
         val description = context.weatherDescription
         return if (!description.isNullOrBlank()) SpokenText.weatherNow(description)
         else SpokenText.WEATHER_UNAVAILABLE

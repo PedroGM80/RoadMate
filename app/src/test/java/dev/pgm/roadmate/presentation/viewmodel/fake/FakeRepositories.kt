@@ -64,6 +64,7 @@ class FakeLocationRepository(
 
 class FakeWeatherRepository(private val description: String? = null) : WeatherRepository {
     override suspend fun getCurrentWeatherDescription(lat: Double, lon: Double): String? = description
+    override suspend fun getWeatherDescriptionFor(placeName: String): String? = description
 }
 
 class FakeGeminiRepository(

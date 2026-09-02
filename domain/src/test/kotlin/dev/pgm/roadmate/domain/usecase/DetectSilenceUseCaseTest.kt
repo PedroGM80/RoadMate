@@ -8,6 +8,7 @@ import dev.pgm.roadmate.domain.fake.FakeMemoryRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.domain.fake.FakeSilenceDetectionRepository
 import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
+import dev.pgm.roadmate.domain.fake.FakeWeatherRepository
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.utils.Constants
 import kotlinx.coroutines.flow.toList
@@ -29,7 +30,8 @@ class DetectSilenceUseCaseTest {
             FakeMapSearchCoordinator(),
             FakeMediaRepository(),
             FakeAssistantPreferencesRepository(),
-            FakeMemoryRepository()
+            FakeMemoryRepository(),
+            FakeWeatherRepository()
         )
         val useCase = DetectSilenceUseCase(silenceDetectionRepository, generateResponseUseCase)
 
@@ -49,7 +51,8 @@ class DetectSilenceUseCaseTest {
             FakeMapSearchCoordinator(),
             FakeMediaRepository(),
             FakeAssistantPreferencesRepository(),
-            FakeMemoryRepository()
+            FakeMemoryRepository(),
+            FakeWeatherRepository()
         )
         val useCase = DetectSilenceUseCase(FakeSilenceDetectionRepository(), generateResponseUseCase)
 

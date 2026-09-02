@@ -21,6 +21,7 @@ import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
+import dev.pgm.roadmate.domain.repository.WeatherRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -119,6 +120,18 @@ class FakeLocationRepository(
     override val location: StateFlow<Pair<Double, Double>?> = _location
 
     override suspend fun getCurrentCoordinates(forceRefresh: Boolean): Pair<Double, Double>? = _location.value
+}
+
+class FakeWeatherRepository(
+    private val here: String? = null,
+    private val byName: Map<String, String?> = emptyMap(),
+) : WeatherRepository {
+    val requestedNames = mutableListOf<String>()
+    override suspend fun getCurrentWeatherDescription(lat: Double, lon: Double): String? = here
+    override suspend fun getWeatherDescriptionFor(placeName: String): String? {
+        requestedNames += placeName
+        return byName[placeName]
+    }
 }
 
 class FakePhoneCallRepository(

@@ -10,4 +10,7 @@ class WeatherRepositoryImpl @Inject constructor(
 
     override suspend fun getCurrentWeatherDescription(lat: Double, lon: Double): String? =
         weatherDataSource.getCurrentWeatherDescription(lat, lon)
+
+    override suspend fun getWeatherDescriptionFor(placeName: String): String? =
+        weatherDataSource.getCurrentWeatherDescriptionFor(placeName)
 }

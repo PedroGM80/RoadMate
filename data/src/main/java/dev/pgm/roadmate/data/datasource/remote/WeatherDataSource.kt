@@ -40,6 +40,14 @@ private interface OpenWeatherApi {
         @Query("units") units: String = "metric",
         @Query("lang") lang: String = "es"
     ): WeatherResponse
+
+    @GET("data/2.5/weather")
+    suspend fun getCurrentWeatherByName(
+        @Query("q") query: String,
+        @Query("appid") apiKey: String,
+        @Query("units") units: String = "metric",
+        @Query("lang") lang: String = "es"
+    ): WeatherResponse
 }
 
 /**
@@ -83,6 +91,32 @@ class WeatherDataSource @Inject constructor(
         }.onSuccess {
             dev.pgm.roadmate.ml.DebugTrace.log("weather: $lat,$lon -> ${it ?: "null (empty body)"}")
         }.getOrNull()
+    }
+
+    /**
+     * Weather for a named place — OpenWeather resolves the name itself, so no
+     * downloaded map is needed. Tries "<name>,ES" first (the driver speaks
+     * Spanish, most asks are local towns) then the bare name worldwide.
+     */
+    suspend fun getCurrentWeatherDescriptionFor(placeName: String): String? {
+        if (apiKey.isBlank()) {
+            dev.pgm.roadmate.ml.DebugTrace.log("weather: no API key in this build")
+            return null
+        }
+        for (q in listOf("$placeName,ES", placeName)) {
+            val response = runCatching { api.getCurrentWeatherByName(q, apiKey) }
+                .onFailure {
+                    dev.pgm.roadmate.ml.DebugTrace.log(
+                        "weather: '$q' failed: ${it.javaClass.simpleName}: ${it.message}",
+                    )
+                }
+                .getOrNull() ?: continue
+            val sky = response.weather.firstOrNull()?.description ?: continue
+            val out = describe(sky, response)
+            dev.pgm.roadmate.ml.DebugTrace.log("weather: '$q' -> $out")
+            return out
+        }
+        return null
     }
 
     /**

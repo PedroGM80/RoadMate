@@ -54,7 +54,8 @@ class RoadMateViewModelTest {
             FakeMapSearchCoordinator(),
             FakeMediaRepository(),
             FakeAssistantPreferencesRepository(),
-            FakeMemoryRepository()
+            FakeMemoryRepository(),
+            FakeWeatherRepository()
         )
         val speechRepo = if (speechEvents != null) {
             FakeSpeechRecognitionRepository(speechEvents)

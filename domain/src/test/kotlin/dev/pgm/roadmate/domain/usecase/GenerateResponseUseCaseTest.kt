@@ -7,6 +7,7 @@ import dev.pgm.roadmate.domain.fake.FakeMediaRepository
 import dev.pgm.roadmate.domain.fake.FakeMemoryRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
+import dev.pgm.roadmate.domain.fake.FakeWeatherRepository
 import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ContactLookupResult
 import dev.pgm.roadmate.domain.model.Exchange
@@ -36,7 +37,8 @@ class GenerateResponseUseCaseTest {
         mapSearchCoordinator: FakeMapSearchCoordinator = FakeMapSearchCoordinator(),
         mediaRepository: FakeMediaRepository = FakeMediaRepository(),
         assistantPreferencesRepository: FakeAssistantPreferencesRepository = FakeAssistantPreferencesRepository(),
-        memoryRepository: FakeMemoryRepository = FakeMemoryRepository()
+        memoryRepository: FakeMemoryRepository = FakeMemoryRepository(),
+        weatherRepository: FakeWeatherRepository = FakeWeatherRepository()
     ) = GenerateResponseUseCase(
         geminiRepository,
         speechSynthesisRepository,
@@ -44,7 +46,8 @@ class GenerateResponseUseCaseTest {
         mapSearchCoordinator,
         mediaRepository,
         assistantPreferencesRepository,
-        memoryRepository
+        memoryRepository,
+        weatherRepository
     )
 
     @Test
@@ -71,6 +74,31 @@ class GenerateResponseUseCaseTest {
         assertEquals(0, gemini.responseCount)
         assertEquals(listOf("Ahora mismo: cielo despejado, 18°C."), emitted)
         assertEquals("Ahora mismo: cielo despejado, 18°C.", speech.lastSpoken)
+    }
+
+    @Test
+    fun `weather for a named place is fetched for that place, not here`() = runTest {
+        val gemini = FakeGeminiRepository(response = "no debería usarse")
+        val weather = FakeWeatherRepository(
+            here = "cielo despejado, 18°C",
+            byName = mapOf("Ronda" to "lluvia ligera, 11°C"),
+        )
+        val withHere = context.copy(weatherDescription = "cielo despejado, 18°C")
+
+        val emitted = useCase(gemini, weatherRepository = weather)(withHere, "¿qué tiempo hace en Ronda?").toList()
+
+        assertEquals(listOf("En Ronda: lluvia ligera, 11°C."), emitted)
+        assertEquals(listOf("Ronda"), weather.requestedNames)
+    }
+
+    @Test
+    fun `weather for an unresolvable place says so plainly`() = runTest {
+        val gemini = FakeGeminiRepository(response = "no debería usarse")
+        val weather = FakeWeatherRepository(here = "cielo despejado, 18°C")
+
+        val emitted = useCase(gemini, weatherRepository = weather)(context, "¿qué tiempo hace en Narnia?").toList()
+
+        assertEquals(listOf("No consigo el tiempo de Narnia ahora mismo."), emitted)
     }
 
     @Test
