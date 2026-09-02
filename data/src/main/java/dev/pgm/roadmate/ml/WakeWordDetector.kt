@@ -2,122 +2,131 @@ package dev.pgm.roadmate.ml
 
 import android.content.Context
 import android.util.Log
-import ai.picovoice.porcupine.PorcupineException
-import ai.picovoice.porcupine.PorcupineManager
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dev.pgm.roadmate.data.BuildConfig
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import org.json.JSONObject
+import org.vosk.Recognizer
+import org.vosk.android.RecognitionListener
+import org.vosk.android.SpeechService
 import java.io.File
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * On-device wake-word ("RoadMate") detection via Picovoice Porcupine. Runs a
- * tiny always-on model on a background thread that Porcupine owns; when it
- * hears the keyword it fires [detections].
+ * Hands-free activation with no extra engine, account, or cost: a Vosk
+ * [Recognizer] restricted to a tiny grammar so it only ever "hears" the wake
+ * phrase ("oye copiloto") or `[unk]` for everything else. It runs on the same
+ * bundled Spanish model as dictation ([VoskModelProvider]).
  *
- * Needs two things, both per-machine and gitignored:
- *  - `PICOVOICE_ACCESS_KEY` in `local.properties` (free from
- *    console.picovoice.ai) → [BuildConfig.PICOVOICE_ACCESS_KEY].
- *  - a trained keyword `wake/roadmate.ppn` and its matching language params
- *    `wake/porcupine_params.pv` in this module's assets.
- * Missing any of them, [isConfigured] is false and [detections] completes
- * immediately so the app falls back to the mic button.
+ * The wake phrase has to be built from words the Spanish model actually
+ * knows — "RoadMate" isn't in the lexicon, "oye copiloto" is.
  *
- * Porcupine's `PorcupineManager` holds its own `AudioRecord`; it must not run
- * at the same time as Vosk's `SpeechService` or the rest-reminder monitor, so
- * the collector is expected to stop this while any of those hold the mic.
+ * Like Vosk dictation this holds an `AudioRecord` via [SpeechService], so the
+ * collector must stop it before [VoskSpeechRecognizer] opens the mic for the
+ * real question.
  */
 @Singleton
 class WakeWordDetector @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val modelProvider: VoskModelProvider,
 ) {
 
     init {
         DebugTrace.init(File(context.filesDir, "aicore_debug.log"))
     }
 
-    /** Key present and both asset files bundled — worth trying to start. */
-    fun isConfigured(): Boolean =
-        BuildConfig.PICOVOICE_ACCESS_KEY.isNotBlank() &&
-            assetExists(KEYWORD_ASSET) &&
-            assetExists(PARAMS_ASSET)
+    /**
+     * Always true — the model is bundled, so hands-free is available on every
+     * device. (A user-facing off switch is a separate setting, TODO.) If the
+     * model fails to load at runtime, [detections] just completes and callers
+     * fall back to the mic button.
+     */
+    fun isConfigured(): Boolean = true
 
     fun detections(): Flow<Unit> = callbackFlow {
-        if (!isConfigured()) {
-            DebugTrace.log("wake: not configured (key/asset missing) — mic button only")
+        val model = runCatching { modelProvider.get() }.getOrNull()
+        if (model == null) {
+            DebugTrace.log("wake: Vosk model unavailable — mic button only")
             close()
             return@callbackFlow
         }
 
-        val keywordPath = runCatching { unpackAsset(KEYWORD_ASSET) }.getOrNull()
-        val paramsPath = runCatching { unpackAsset(PARAMS_ASSET) }.getOrNull()
-        if (keywordPath == null || paramsPath == null) {
-            DebugTrace.log("wake: could not unpack model assets — mic button only")
+        val recognizer = try {
+            Recognizer(model, SAMPLE_RATE, GRAMMAR)
+        } catch (e: IOException) {
+            Log.w(TAG, "wake recognizer init failed", e)
+            DebugTrace.log("wake: recognizer init failed: ${e.message}")
             close()
             return@callbackFlow
         }
 
-        val manager = try {
-            PorcupineManager.Builder()
-                .setAccessKey(BuildConfig.PICOVOICE_ACCESS_KEY)
-                .setModelPath(paramsPath)
-                .setKeywordPath(keywordPath)
-                .setSensitivity(SENSITIVITY)
-                .setErrorCallback { e -> DebugTrace.log("wake: engine error: ${e.message}") }
-                .build(context) { keywordIndex ->
-                    DebugTrace.log("wake: heard the wake word (#$keywordIndex)")
-                    trySend(Unit)
-                }
-        } catch (e: PorcupineException) {
-            Log.w(TAG, "Porcupine init failed", e)
-            DebugTrace.log("wake: init failed: ${e.message} — mic button only")
+        val listener = object : RecognitionListener {
+            override fun onPartialResult(hypothesis: String?) {
+                if (hypothesis.mentionsWakePhrase("partial")) fire()
+            }
+
+            override fun onResult(hypothesis: String?) {
+                if (hypothesis.mentionsWakePhrase("text")) fire()
+            }
+
+            override fun onFinalResult(hypothesis: String?) {
+                if (hypothesis.mentionsWakePhrase("text")) fire()
+            }
+
+            override fun onError(exception: Exception?) {
+                Log.w(TAG, "wake recognition error", exception)
+                DebugTrace.log("wake: error: ${exception?.message}")
+                close()
+            }
+
+            override fun onTimeout() { /* keep listening */ }
+
+            private fun fire() {
+                DebugTrace.log("wake: heard the wake phrase")
+                trySend(Unit)
+            }
+        }
+
+        val speechService = try {
+            SpeechService(recognizer, SAMPLE_RATE)
+        } catch (e: IOException) {
+            Log.w(TAG, "could not open microphone for wake word", e)
+            DebugTrace.log("wake: mic open failed: ${e.message}")
+            runCatching { recognizer.close() }
             close()
             return@callbackFlow
         }
 
-        try {
-            manager.start()
-        } catch (e: PorcupineException) {
-            Log.w(TAG, "Porcupine start failed", e)
-            DebugTrace.log("wake: start failed: ${e.message} — mic button only")
-            runCatching { manager.delete() }
-            close()
-            return@callbackFlow
-        }
-        DebugTrace.log("wake: listening for \"RoadMate\"")
+        // No timeout: listen until the collector stops us.
+        speechService.startListening(listener)
+        DebugTrace.log("wake: listening for \"$WAKE_PHRASE\"")
 
         awaitClose {
-            runCatching { manager.stop() }
-            runCatching { manager.delete() }
+            runCatching { speechService.stop() }
+            runCatching { speechService.shutdown() }
+            runCatching { recognizer.close() }
             DebugTrace.log("wake: stopped")
         }
     }
 
-    private fun assetExists(name: String): Boolean =
-        runCatching { context.assets.open("$ASSET_DIR/$name").close() }.isSuccess
-
-    /** Porcupine reads model files from disk, not from the asset manager. */
-    private fun unpackAsset(name: String): String {
-        val outDir = File(context.filesDir, ASSET_DIR).apply { mkdirs() }
-        val outFile = File(outDir, name)
-        if (!outFile.exists() || outFile.length() == 0L) {
-            context.assets.open("$ASSET_DIR/$name").use { input ->
-                outFile.outputStream().use { input.copyTo(it) }
-            }
-        }
-        return outFile.absolutePath
+    private fun String?.mentionsWakePhrase(field: String): Boolean {
+        if (this.isNullOrBlank()) return false
+        val text = runCatching { JSONObject(this).optString(field) }.getOrDefault("")
+        return text.contains(WAKE_TOKEN, ignoreCase = true)
     }
 
     private companion object {
         const val TAG = "WakeWordDetector"
-        const val ASSET_DIR = "wake"
-        const val KEYWORD_ASSET = "roadmate.ppn"
-        const val PARAMS_ASSET = "porcupine_params.pv"
+        const val SAMPLE_RATE = 16000.0f
+        const val WAKE_PHRASE = "oye copiloto"
 
-        /** 0..1; higher = fewer misses, more false triggers. 0.5 is Picovoice's default. */
-        const val SENSITIVITY = 0.6f
+        /** The distinctive half of the phrase — matched even if "oye" is dropped. */
+        const val WAKE_TOKEN = "copiloto"
+
+        /** Vosk grammar: only the phrase or out-of-vocabulary noise. */
+        const val GRAMMAR = "[\"$WAKE_PHRASE\", \"[unk]\"]"
     }
 }

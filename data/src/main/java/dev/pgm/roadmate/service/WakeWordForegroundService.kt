@@ -33,18 +33,18 @@ import java.util.Calendar
 import javax.inject.Inject
 
 /**
- * Keeps the "RoadMate" wake word listening while the app is backgrounded, and
- * answers the question that follows without bringing the UI up — the driver
- * never has to look at or touch the phone.
+ * Keeps the "oye copiloto" wake phrase listening while the app is
+ * backgrounded, and answers the question that follows without bringing the UI
+ * up — the driver never has to look at or touch the phone.
  *
  * Mirrors [SilenceDetectionForegroundService]: MainActivity starts this in
- * onPause() (instead of the silence service) when the wake-word engine is
- * configured, and stops it in onResume(), handing the mic back to the
- * ViewModel's own wake-word job so only one consumer holds it at a time.
+ * onPause() (instead of the silence service) when hands-free is available,
+ * and stops it in onResume(), handing the mic back to the ViewModel's own
+ * wake-word job so only one consumer holds it at a time.
  *
- * Loop: wait for one detection (which frees Porcupine's mic), run STT +
- * [GenerateResponseUseCase] (which speaks the answer itself), then start
- * listening for the wake word again.
+ * Loop: wait for one detection (which frees the wake recognizer's mic), run
+ * STT + [GenerateResponseUseCase] (which speaks the answer itself), then
+ * start listening for the wake phrase again.
  */
 @AndroidEntryPoint
 class WakeWordForegroundService : Service() {
@@ -156,7 +156,7 @@ class WakeWordForegroundService : Service() {
         private const val TAG = "WakeWordFgs"
         private const val CHANNEL_ID = "wake_word"
         private const val NOTIFICATION_ID = 4203
-        private const val IDLE_TEXT = "Di \"RoadMate\" para preguntar"
+        private const val IDLE_TEXT = "Di \"oye, copiloto\" para preguntar"
         private const val LISTENING_TEXT = "Escuchando…"
 
         fun start(context: Context) {

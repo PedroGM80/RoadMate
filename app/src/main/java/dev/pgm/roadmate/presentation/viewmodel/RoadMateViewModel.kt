@@ -177,13 +177,13 @@ class RoadMateViewModel @Inject constructor(
         silenceMonitoringJob = null
     }
 
-    /** True when the wake-word engine is configured — used to decide whether
-     *  hands-free replaces the mic-button-plus-silence-monitor path. */
+    /** True when hands-free listening can run — used to decide whether it
+     *  replaces the mic-button-plus-silence-monitor path. */
     fun isWakeWordAvailable(): Boolean = wakeWordRepository.isAvailable()
 
     /**
-     * Starts whichever always-on mic consumer applies: the "RoadMate"
-     * wake-word listener when it's configured, otherwise the rest-reminder
+     * Starts whichever always-on mic consumer applies: the "oye copiloto"
+     * wake-phrase listener when it's available, otherwise the rest-reminder
      * silence monitor. They can't both hold the mic, so this deliberately
      * runs only one. Call once RECORD_AUDIO is granted (HomeScreen) and on
      * every onResume() (MainActivity).
@@ -204,9 +204,9 @@ class RoadMateViewModel @Inject constructor(
     }
 
     /**
-     * Starts the hands-free wake-word listener ("RoadMate"). No-op when the
-     * engine isn't configured (the app then relies on the mic button). Holds
-     * the mic continuously, so it is mutually exclusive with the rest-reminder
+     * Starts the hands-free wake-phrase listener ("oye copiloto"). No-op when
+     * it isn't available (the app then relies on the mic button). Holds the
+     * mic continuously, so it is mutually exclusive with the rest-reminder
      * silence monitor — callers start one or the other, not both.
      */
     fun startWakeWordListening() {
@@ -215,8 +215,8 @@ class RoadMateViewModel @Inject constructor(
         wakeWordJob = wakeWordRepository.detections()
             .onEach {
                 // Ignore detections while we're already capturing a question or
-                // still speaking — Porcupine would otherwise trip on RoadMate's
-                // own "RoadMate".
+                // still speaking — the recognizer would otherwise trip on the
+                // assistant's own speech.
                 if (listeningJob?.isActive != true && !speechSynthesisRepository.isSpeaking.value) {
                     startListening()
                 }

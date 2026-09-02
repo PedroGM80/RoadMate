@@ -15,12 +15,6 @@ val localProperties = Properties().apply {
 }
 val openWeatherApiKey: String = localProperties.getProperty("OPENWEATHER_API_KEY", "")
 
-// Picovoice AccessKey for the Porcupine wake-word engine ("RoadMate", hands
-// free). Free from console.picovoice.ai; per-machine, gitignored. Blank by
-// default — WakeWordDetector treats a blank key (or a missing .ppn asset) as
-// "wake word unavailable" and the app falls back to the mic button only.
-val picovoiceAccessKey: String = localProperties.getProperty("PICOVOICE_ACCESS_KEY", "")
-
 // The universal local-AI fallback model. Downloaded at runtime (Wi-Fi only,
 // on explicit opt-in) by LocalAiModelManager and run through MediaPipe.
 // Defaults to Qwen2.5-0.5B-Instruct q8 (~547 MB, Apache-2.0, ungated on
@@ -49,7 +43,6 @@ android {
         minSdk = 31 // com.google.ai.edge.aicore requires 31+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "OPENWEATHER_API_KEY", "\"$openWeatherApiKey\"")
-        buildConfigField("String", "PICOVOICE_ACCESS_KEY", "\"$picovoiceAccessKey\"")
         buildConfigField("String", "LOCAL_AI_MODEL_URL", "\"$localAiModelUrl\"")
         buildConfigField("String", "LOCAL_AI_MODEL_FILENAME", "\"$localAiModelFilename\"")
         buildConfigField("long", "LOCAL_AI_MODEL_SIZE_BYTES", "${localAiModelSizeBytes}L")
@@ -87,11 +80,9 @@ dependencies {
     implementation(libs.mediapipe.tasks.genai)
     // Offline Spanish speech-to-text (Kaldi). Works with no Google speech
     // pack — the model is bundled in :app assets.
+    // Offline Spanish STT and "RoadMate" wake-word spotting (grammar-limited
+    // Recognizer) both run on this — no extra engine, no account, no cost.
     implementation(libs.vosk.android)
-    // Wake-word detection ("RoadMate", hands-free). On-device, no network.
-    // Needs a Picovoice AccessKey (PICOVOICE_ACCESS_KEY in local.properties)
-    // and a trained keyword .ppn in assets; absent either, it no-ops.
-    implementation(libs.porcupine.android)
     implementation(libs.play.services.location)
 
     implementation(libs.retrofit)
