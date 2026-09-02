@@ -229,6 +229,17 @@ class GenerateResponseUseCaseTest {
     }
 
     @Test
+    fun `a take-me-there request submits with navigate = true and says so`() = runTest {
+        val coordinator = FakeMapSearchCoordinator()
+
+        val emitted = useCase(mapSearchCoordinator = coordinator)(context, "llévame a la playa").toList()
+
+        assertEquals("la playa", coordinator.lastRequest?.rawQuery)
+        assertEquals(true, coordinator.lastRequest?.navigate)
+        assertTrue(emitted.first().contains("Te llevo"))
+    }
+
+    @Test
     fun `a named place with no category is still submitted, category null`() = runTest {
         val coordinator = FakeMapSearchCoordinator()
 

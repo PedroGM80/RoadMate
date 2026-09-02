@@ -45,6 +45,18 @@ object MapSearchIntentParser {
         RegexOption.IGNORE_CASE,
     )
 
+    /**
+     * True when the phrasing asks to *go* somewhere ("llévame a…", "cómo
+     * llego a…") rather than only find it — the caller then draws a route,
+     * not just a pin.
+     */
+    fun isNavigationRequest(userInput: String): Boolean {
+        val trimmed = userInput.trim()
+        return NAVIGATE_PATTERNS.any { p ->
+            p.find(trimmed)?.let { clean(it.groupValues[1]).isNotBlank() } == true
+        }
+    }
+
     fun extractSearchQuery(userInput: String): String? {
         val trimmedInput = userInput.trim()
 

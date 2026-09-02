@@ -11,4 +11,6 @@ data class MapSearchRequest(
     val rawQuery: String,
     val category: PlaceCategory?,
     val origin: Pair<Double, Double>?,
+    /** true → the driver asked to be taken there; draw a route, not just a pin. */
+    val navigate: Boolean = false,
 )

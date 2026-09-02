@@ -7,6 +7,8 @@ import dev.pgm.roadmate.domain.model.FactType
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.MapSearchRequest
 import dev.pgm.roadmate.domain.model.MediaApp
+import dev.pgm.roadmate.domain.model.RouteResult
+import dev.pgm.roadmate.domain.model.RoutingDataStatus
 import dev.pgm.roadmate.domain.model.SilenceEvent
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
 import dev.pgm.roadmate.domain.model.ThemePreference
@@ -17,6 +19,7 @@ import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MediaRepository
+import dev.pgm.roadmate.domain.repository.RoutingRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
@@ -130,6 +133,24 @@ class FakePhoneCallRepository(
     override suspend fun findContactByName(name: String): ContactLookupResult = lookupResult
     override fun placeCall(phoneNumber: String) {
         placedCallTo = phoneNumber
+    }
+}
+
+class FakeRoutingRepository(
+    private val result: RouteResult? = RouteResult(
+        points = listOf(40.0 to -3.7, 40.1 to -3.6),
+        distanceMeters = 12_300,
+        durationSeconds = 1_080,
+    ),
+) : RoutingRepository {
+    val requests = mutableListOf<Pair<Pair<Double, Double>, Pair<Double, Double>>>()
+    override val dataStatus = MutableStateFlow<RoutingDataStatus>(RoutingDataStatus.Idle)
+    override suspend fun route(
+        from: Pair<Double, Double>,
+        to: Pair<Double, Double>,
+    ): RouteResult? {
+        requests += from to to
+        return result
     }
 }
 

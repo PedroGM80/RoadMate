@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
@@ -71,6 +72,8 @@ import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.plugins.annotation.LineManager
+import org.maplibre.android.plugins.annotation.LineOptions
 import org.maplibre.android.plugins.annotation.SymbolManager
 import org.maplibre.android.plugins.annotation.SymbolOptions
 import org.maplibre.android.style.sources.VectorSource
@@ -100,12 +103,16 @@ fun MapScreen(
     val offlineStatus by viewModel.offlineStatus.collectAsState()
     val poiFilter by viewModel.poiFilter.collectAsState()
     val nameQuery by viewModel.nameQuery.collectAsState()
+    val navigateToResult by viewModel.navigateToResult.collectAsState()
+    val route by viewModel.route.collectAsState()
+    val routeSummary by viewModel.routeSummary.collectAsState()
 
     val locationPermission = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
 
     val mapView = rememberMapViewWithLifecycle()
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var symbolManager by remember { mutableStateOf<SymbolManager?>(null) }
+    var lineManager by remember { mutableStateOf<LineManager?>(null) }
     var selectedPoi by remember { mutableStateOf<Pair<String, LatLng>?>(null) }
     var centeredOnUser by remember { mutableStateOf(false) }
 
@@ -114,6 +121,8 @@ fun MapScreen(
             mapLibreMap = map
             map.setStyle(Style.Builder().fromUri(viewModel.styleUrl)) { style ->
                 registerPinIcons(style, context)
+                // Created before the SymbolManager so the route line sits under the pins.
+                lineManager = LineManager(mapView, map, style)
                 val manager = SymbolManager(mapView, map, style).apply {
                     iconAllowOverlap = true
                     textAllowOverlap = false
@@ -151,7 +160,7 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(poiFilter, nameQuery, symbolManager) {
+    LaunchedEffect(poiFilter, nameQuery, navigateToResult, symbolManager) {
         val map = mapLibreMap ?: return@LaunchedEffect
         val manager = symbolManager ?: return@LaunchedEffect
         val active = poiFilter != null || nameQuery != null
@@ -168,6 +177,15 @@ fun MapScreen(
             }
         }
 
+        // "llévame a…": route to the first match instead of just pinning it.
+        if (navigateToResult && pins.isNotEmpty()) {
+            viewModel.onNavigationTargetResolved(
+                from = map.currentLatLon(),
+                to = pins.first().let { it.latitude to it.longitude },
+            )
+            return@LaunchedEffect
+        }
+
         // Turning a filter/search on: frame the pins so they're actually
         // visible (they sit across the loaded tiles, not just the ~500 m in
         // view).
@@ -178,6 +196,32 @@ fun MapScreen(
             }
         } else if (active && pins.size == 1) {
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(pins.first(), 15.0), 400)
+        }
+    }
+
+    // Draw (or clear) the offline route line.
+    LaunchedEffect(route, lineManager) {
+        val manager = lineManager ?: return@LaunchedEffect
+        runCatching { manager.deleteAll() }
+        if (route.size < 2) return@LaunchedEffect
+        val pts = route.map { LatLng(it.first, it.second) }
+        runCatching {
+            manager.create(
+                LineOptions()
+                    .withLatLngs(pts)
+                    .withLineColor("#1565C0")
+                    .withLineWidth(5f),
+            )
+        }
+        mapLibreMap?.let { m ->
+            runCatching {
+                m.animateCamera(
+                    CameraUpdateFactory.newLatLngBounds(
+                        LatLngBounds.Builder().includes(pts).build(), 140,
+                    ),
+                    500,
+                )
+            }
         }
     }
 
@@ -201,7 +245,32 @@ fun MapScreen(
                     showReady = false
                 }
             }
-            if (offlineStatus !is OfflineMapStatus.Ready || showReady) {
+            if (routeSummary != null) {
+                Surface(
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    tonalElevation = 3.dp,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            routeSummary.orEmpty(),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                        Spacer(Modifier.width(Spacing.sm))
+                        IconButton(onClick = viewModel::clearRoute, modifier = Modifier.size(20.dp)) {
+                            Icon(
+                                painterResource(R.drawable.lucide_ic_square),
+                                contentDescription = stringResource(R.string.action_cancel),
+                            )
+                        }
+                    }
+                }
+            } else if (offlineStatus !is OfflineMapStatus.Ready || showReady) {
                 OfflineStatusChip(
                     status = offlineStatus,
                     modifier = Modifier.align(Alignment.TopCenter),
@@ -269,11 +338,10 @@ fun MapScreen(
                 name = name.ifBlank { stringResource(R.string.map_poi_fallback_name) },
                 onNavigate = {
                     viewModel.recordVisit(name)
-                    // No external Maps: centre the offline map on it. Turn-by-turn
-                    // routing (BRouter, offline) is the next step — NEXT_SESSION.md.
-                    mapLibreMap?.animateCamera(
-                        CameraUpdateFactory.newLatLngZoom(latLng, DRIVING_ZOOM),
-                        500,
+                    // Offline route via BRouter — no external Maps.
+                    viewModel.routeTo(
+                        from = mapLibreMap?.currentLatLon(),
+                        to = latLng.latitude to latLng.longitude,
                     )
                     selectedPoi = null
                 },
@@ -404,6 +472,14 @@ private fun centerOnUser(map: MapLibreMap): Boolean {
 
 /** Street-level zoom for a moving driver — city-wide (~13) is too far out. */
 private const val DRIVING_ZOOM = 15.5
+
+/** The driver's current position as (lat, lon), or null with no fix. */
+@SuppressLint("MissingPermission")
+private fun MapLibreMap.currentLatLon(): Pair<Double, Double>? {
+    val last = locationComponent.takeIf { it.isLocationComponentActivated }?.lastKnownLocation
+        ?: return null
+    return last.latitude to last.longitude
+}
 
 
 @Composable

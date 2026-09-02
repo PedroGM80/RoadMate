@@ -1,7 +1,9 @@
 package dev.pgm.roadmate.utils
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MapSearchIntentParserTest {
@@ -28,6 +30,15 @@ class MapSearchIntentParserTest {
         assertEquals("hospital", MapSearchIntentParser.extractSearchQuery("cómo llego al hospital"))
         assertEquals("el aeropuerto", MapSearchIntentParser.extractSearchQuery("guíame hasta el aeropuerto"))
         assertEquals("casa", MapSearchIntentParser.extractSearchQuery("llévame a casa"))
+    }
+
+    @Test
+    fun `flags take-me-there phrasings as navigation, plain finds as not`() {
+        assertTrue(MapSearchIntentParser.isNavigationRequest("llévame a la playa"))
+        assertTrue(MapSearchIntentParser.isNavigationRequest("cómo llego al hospital"))
+        assertTrue(MapSearchIntentParser.isNavigationRequest("guíame hasta el aeropuerto"))
+        assertFalse(MapSearchIntentParser.isNavigationRequest("busca gasolineras"))
+        assertFalse(MapSearchIntentParser.isNavigationRequest("dónde hay un hotel"))
     }
 
     @Test

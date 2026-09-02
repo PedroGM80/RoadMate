@@ -5,6 +5,7 @@ import dev.pgm.roadmate.domain.model.PlaceCategory
 import dev.pgm.roadmate.presentation.viewmodel.MainDispatcherRule
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMapSearchCoordinator
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeMemoryRepository
+import dev.pgm.roadmate.presentation.viewmodel.fake.FakeRoutingRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +34,8 @@ private class FakeOfflineMap : OfflineMapController {
 private fun mapViewModel(
     offlineMap: OfflineMapController,
     coordinator: FakeMapSearchCoordinator = FakeMapSearchCoordinator(),
-) = MapViewModel(offlineMap, FakeMemoryRepository(), coordinator)
+    routing: FakeRoutingRepository = FakeRoutingRepository(),
+) = MapViewModel(offlineMap, FakeMemoryRepository(), routing, coordinator)
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MapViewModelTest {
@@ -109,5 +111,43 @@ class MapViewModelTest {
 
         assertNull(vm.poiFilter.value)
         assertEquals("el Mercadona", vm.nameQuery.value)
+    }
+
+    @Test
+    fun `routeTo draws the route and summarises distance and time`() = runTest {
+        val routing = FakeRoutingRepository()
+        val vm = mapViewModel(FakeOfflineMap(), routing = routing)
+
+        vm.routeTo(from = 40.0 to -3.7, to = 40.1 to -3.6)
+        advanceUntilIdle()
+
+        assertEquals(listOf(40.0 to -3.7, 40.1 to -3.6), vm.route.value)
+        assertEquals("12,3 km · 18 min", vm.routeSummary.value)
+        assertEquals(1, routing.requests.size)
+    }
+
+    @Test
+    fun `routeTo with no known origin explains instead of routing`() = runTest {
+        val routing = FakeRoutingRepository()
+        val vm = mapViewModel(FakeOfflineMap(), routing = routing)
+
+        vm.routeTo(from = null, to = 40.1 to -3.6)
+        advanceUntilIdle()
+
+        assertEquals(emptyList<Pair<Double, Double>>(), vm.route.value)
+        assertEquals("No sé dónde estás ahora mismo.", vm.routeSummary.value)
+        assertEquals(0, routing.requests.size)
+    }
+
+    @Test
+    fun `a null route result reports it could not be traced`() = runTest {
+        val routing = FakeRoutingRepository(result = null)
+        val vm = mapViewModel(FakeOfflineMap(), routing = routing)
+
+        vm.routeTo(from = 40.0 to -3.7, to = 41.0 to 2.0)
+        advanceUntilIdle()
+
+        assertEquals(emptyList<Pair<Double, Double>>(), vm.route.value)
+        assertEquals("No puedo trazar la ruta con el mapa descargado.", vm.routeSummary.value)
     }
 }

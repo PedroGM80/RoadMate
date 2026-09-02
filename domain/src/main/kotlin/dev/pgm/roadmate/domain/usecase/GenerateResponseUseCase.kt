@@ -114,7 +114,11 @@ class GenerateResponseUseCase @Inject constructor(
         val arithmetic = ArithmeticParser.evaluate(userInput)
         val shortcut = when {
             contactName != null -> handleCallRequest(contactName)
-            mapQuery != null -> handleMapSearch(mapQuery, context.currentLocation)
+            mapQuery != null -> handleMapSearch(
+                mapQuery,
+                context.currentLocation,
+                navigate = MapSearchIntentParser.isNavigationRequest(userInput),
+            )
             mediaApp != null -> handleMediaRequest(mediaApp)
             JokeProvider.matchesJokeIntent(userInput) -> JokeProvider.randomJoke()
             styleChange != null -> handleStyleChange(styleChange)
@@ -288,18 +292,27 @@ class GenerateResponseUseCase @Inject constructor(
      * downloaded tiles. Nothing is downloaded → say so; there is no
      * external-Maps fallback.
      */
-    private suspend fun handleMapSearch(query: String, location: Pair<Double, Double>?): String {
+    private suspend fun handleMapSearch(
+        query: String,
+        location: Pair<Double, Double>?,
+        navigate: Boolean,
+    ): String {
         if (!mapSearchCoordinator.hasOfflineMap()) return SpokenText.NO_OFFLINE_MAP
 
         val category = PlaceCategoryParser.parse(query)
         mapSearchCoordinator.submit(
-            MapSearchRequest(rawQuery = query, category = category, origin = location),
+            MapSearchRequest(
+                rawQuery = query,
+                category = category,
+                origin = location,
+                navigate = navigate,
+            ),
         )
         memoryRepository.rememberPlace(PlaceName.normalize(query))
-        return if (category != null) {
-            SpokenText.showingCategoryOnMap(query)
-        } else {
-            SpokenText.searchingMap(query)
+        return when {
+            navigate -> SpokenText.navigatingTo(query)
+            category != null -> SpokenText.showingCategoryOnMap(query)
+            else -> SpokenText.searchingMap(query)
         }
     }
 
