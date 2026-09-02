@@ -194,6 +194,20 @@ fun MapScreen(
             pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
         }
 
+        // Still nothing: the previous category's "fit to pins" likely zoomed
+        // out past the POI vector layer (min zoom ~14), so querySourceFeatures
+        // has no tiles to read. Zoom back in — onCameraIdle then re-queries.
+        if (pins.isEmpty() && (map.cameraPosition.zoom) < 14.0) {
+            runCatching {
+                map.animateCamera(CameraUpdateFactory.zoomTo(14.5), 300)
+            }
+            repeat(6) {
+                delay(400)
+                pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
+                if (pins.isNotEmpty()) return@repeat
+            }
+        }
+
         // "llévame a…": route to the first match instead of just pinning it.
         if (navigateToResult && pins.isNotEmpty()) {
             viewModel.onNavigationTargetResolved(
@@ -204,12 +218,22 @@ fun MapScreen(
         }
 
         // Turning a filter/search on: frame the pins so they're actually
-        // visible (they sit across the loaded tiles, not just the ~500 m in
-        // view).
+        // visible. Clamp the zoom so a city-wide spread doesn't drop below the
+        // POI layer's min zoom — otherwise the *next* category switch queries
+        // tiles that aren't loaded and finds nothing.
         if (pins.size >= 2) {
             val b = LatLngBounds.Builder().includes(pins).build()
             runCatching {
-                map.animateCamera(CameraUpdateFactory.newLatLngBounds(b, 120), 400)
+                val cam = map.getCameraForLatLngBounds(b, intArrayOf(120, 120, 120, 120))
+                if (cam != null) {
+                    val z = cam.zoom.coerceIn(13.5, 16.5)
+                    map.animateCamera(
+                        CameraUpdateFactory.newCameraPosition(
+                            org.maplibre.android.camera.CameraPosition.Builder(cam).zoom(z).build(),
+                        ),
+                        400,
+                    )
+                }
             }
         } else if (pins.size == 1) {
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(pins.first(), 15.0), 400)
