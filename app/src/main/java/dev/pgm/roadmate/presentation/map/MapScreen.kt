@@ -2,11 +2,9 @@ package dev.pgm.roadmate.presentation.map
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.net.Uri
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -271,7 +269,12 @@ fun MapScreen(
                 name = name.ifBlank { stringResource(R.string.map_poi_fallback_name) },
                 onNavigate = {
                     viewModel.recordVisit(name)
-                    launchNavigation(context, name, latLng)
+                    // No external Maps: centre the offline map on it. Turn-by-turn
+                    // routing (BRouter, offline) is the next step — NEXT_SESSION.md.
+                    mapLibreMap?.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(latLng, DRIVING_ZOOM),
+                        500,
+                    )
                     selectedPoi = null
                 },
                 onDismiss = { selectedPoi = null },
@@ -568,15 +571,3 @@ private fun registerPinIcons(style: Style, context: Context) {
     style.addImage(PIN_PREFIX + NAME_PIN, nameBitmap)
 }
 
-private fun launchNavigation(context: Context, name: String, latLng: LatLng) {
-    val googleNav = Intent(
-        Intent.ACTION_VIEW,
-        Uri.parse("google.navigation:q=${latLng.latitude},${latLng.longitude}"),
-    ).setPackage("com.google.android.apps.maps")
-    val geoFallback = Intent(
-        Intent.ACTION_VIEW,
-        Uri.parse("geo:${latLng.latitude},${latLng.longitude}?q=${Uri.encode(name)}"),
-    )
-    runCatching { context.startActivity(googleNav) }
-        .onFailure { runCatching { context.startActivity(geoFallback) } }
-}
