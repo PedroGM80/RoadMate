@@ -2,6 +2,7 @@ package dev.pgm.roadmate.domain.repository
 
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 
 /**
  * Contract for asking the on-device model a question and getting text back.
@@ -13,6 +14,18 @@ import kotlinx.coroutines.flow.Flow
 interface GeminiRepository {
 
     suspend fun getResponse(prompt: String): String
+
+    /**
+     * Streaming form of [getResponse]: emits the answer as the model produces
+     * it, so a caller can start speaking the first sentence without waiting
+     * for the whole reply. Every emission is the full text so far (cumulative)
+     * and the last one is the complete answer. Backends that can't stream —
+     * AICore today, the "modo básico" fallback, a cache hit — emit once.
+     *
+     * Default implementation just wraps [getResponse]; the real backend
+     * ([dev.pgm.roadmate.data.repository.GeminiRepositoryImpl]) overrides it.
+     */
+    fun getResponseStream(prompt: String): Flow<String> = flow { emit(getResponse(prompt)) }
 
     /**
      * Pre-loads the downloaded model so the first real question doesn't pay

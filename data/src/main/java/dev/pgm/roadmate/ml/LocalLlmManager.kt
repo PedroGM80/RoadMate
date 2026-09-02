@@ -4,12 +4,23 @@ import android.content.Context
 import android.util.Log
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
+import com.google.mediapipe.tasks.genai.llminference.ProgressListener
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.utils.Constants
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.buffer
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,9 +32,15 @@ import javax.inject.Singleton
  *
  * The `LlmInference` engine is heavy (loads ~550 MB), so it's created once
  * and kept; a fresh short-lived session is used per question. Generation is
- * off-loaded to a background dispatcher and bounded by
+ * off-loaded to [inferenceDispatcher] — one dedicated thread, so a
+ * multi-second CPU-bound run can't pin a shared `Dispatchers.Default` worker
+ * and starve unrelated coroutines — and bounded by
  * [Constants.LOCAL_LLM_TIMEOUT_MS]; on timeout or any failure this returns
  * null and the caller falls back to the canned "modo básico" text.
+ *
+ * [generateResponseStream] is the same generation surfaced token-batch by
+ * token-batch, so callers can speak the first sentence while the rest is
+ * still being produced.
  *
  * `com.google.mediapipe:tasks-genai` moves fast — verify the builder/session
  * signatures against the version in the catalog before shipping.
@@ -36,6 +53,16 @@ class LocalLlmManager @Inject constructor(
 
     @Volatile
     private var engine: LlmInference? = null
+
+    /**
+     * One thread, dedicated to inference. A generation is a several-second,
+     * fully CPU-bound native call; on the shared `Dispatchers.Default` pool it
+     * would hold a worker for that entire time and stall unrelated coroutine
+     * work. Process-lived (this is a [Singleton]), so it's never shut down.
+     */
+    private val inferenceDispatcher =
+        Executors.newSingleThreadExecutor { r -> Thread(r, "roadmate-llm").apply { isDaemon = true } }
+            .asCoroutineDispatcher()
 
     init {
         DebugTrace.init(File(context.filesDir, "aicore_debug.log"))
@@ -64,11 +91,11 @@ class LocalLlmManager @Inject constructor(
         .getOrNull()
         ?.also { engine = it }
 
-    suspend fun isReady(): Boolean = withContext(Dispatchers.Default) { obtainEngine() != null }
+    suspend fun isReady(): Boolean = withContext(inferenceDispatcher) { obtainEngine() != null }
 
     /** Build the engine and run one throwaway generation so the first real
      *  question doesn't eat the ~10 s cold XNNPACK/prefill cost. */
-    suspend fun warmUp() = withContext(Dispatchers.Default) {
+    suspend fun warmUp() = withContext(inferenceDispatcher) {
         if (engine != null) return@withContext
         runCatching {
             val t0 = System.currentTimeMillis()
@@ -79,7 +106,7 @@ class LocalLlmManager @Inject constructor(
     }
 
     /** Generated text, or null if the model isn't usable / timed out / failed. */
-    suspend fun generateResponse(prompt: String): String? = withContext(Dispatchers.Default) {
+    suspend fun generateResponse(prompt: String): String? = withContext(inferenceDispatcher) {
         val llm = obtainEngine() ?: return@withContext null
         withTimeoutOrNull(Constants.LOCAL_LLM_TIMEOUT_MS) {
             runCatching {
@@ -114,6 +141,87 @@ class LocalLlmManager @Inject constructor(
             }.getOrNull()
         }?.takeIf { it.isNotBlank() }
     }
+
+    /**
+     * Streams the model's answer, one partial-result batch at a time. Each
+     * emission is the cumulative text so far; the flow completes when
+     * generation finishes or [Constants.LOCAL_LLM_TIMEOUT_MS] elapses,
+     * whichever comes first. Emits nothing and completes if the engine can't
+     * be built, so the caller can fall back to "modo básico".
+     *
+     * MediaPipe invokes the [ProgressListener] on its own worker thread;
+     * [callbackFlow] hands each batch back to the collector, and the producer
+     * runs on [inferenceDispatcher] via [flowOn].
+     */
+    fun generateResponseStream(prompt: String): Flow<String> = callbackFlow {
+        val llm = obtainEngine()
+        if (llm == null) {
+            dbg("stream: engine unavailable")
+            close()
+            return@callbackFlow
+        }
+
+        val safe = prompt
+            .replace(Regex("[\\p{Cntrl}&&[^\n]]"), " ")
+            .take(MAX_PROMPT_CHARS)
+
+        val session = runCatching {
+            LlmInferenceSession.createFromOptions(
+                llm,
+                LlmInferenceSession.LlmInferenceSessionOptions.builder()
+                    .setTopK(TOP_K)
+                    .setTemperature(TEMPERATURE)
+                    .build(),
+            )
+        }.getOrElse {
+            dbg("stream: session create failed: ${it.message}")
+            close(it)
+            return@callbackFlow
+        }
+
+        dbg("stream PROMPT (${safe.length} chars) >>>\n$safe")
+        val raw = StringBuilder()
+        val t0 = System.currentTimeMillis()
+
+        val listener = ProgressListener<String> { partial, done ->
+            if (!partial.isNullOrEmpty()) raw.append(partial)
+            if (!partial.isNullOrEmpty() || done) {
+                val text = raw.toString()
+                trySend(text.fixMojibake() ?: text)
+            }
+            if (done) {
+                dbg("stream RESPONSE (${System.currentTimeMillis() - t0} ms) <<< \"$raw\"")
+                close()
+            }
+        }
+
+        var future: Future<*>? = null
+        try {
+            session.addQueryChunk(safe)
+            future = session.generateResponseAsync(listener)
+        } catch (t: Throwable) {
+            Log.w(TAG, "generateResponseAsync failed", t)
+            dbg("stream: generateResponseAsync threw: ${t.stackTraceToString()}")
+            close(t)
+        }
+
+        val watchdog = launch {
+            delay(Constants.LOCAL_LLM_TIMEOUT_MS)
+            dbg("stream: timed out after ${Constants.LOCAL_LLM_TIMEOUT_MS} ms")
+            close()
+        }
+
+        awaitClose {
+            watchdog.cancel()
+            runCatching { future?.cancel(true) }
+            runCatching { session.close() }
+        }
+    }
+        // Never drop a batch under back-pressure: emissions are cumulative, so
+        // the last one carries the whole answer and must reach the collector
+        // even if it is briefly slower than generation.
+        .buffer(Channel.UNLIMITED)
+        .flowOn(inferenceDispatcher)
 
     /**
      * MediaPipe `tasks-genai` hands back the model's UTF-8 output decoded as

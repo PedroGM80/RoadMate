@@ -23,17 +23,24 @@ import dev.pgm.roadmate.utils.MediaIntentParser
 import dev.pgm.roadmate.utils.MemoryCommandParser
 import dev.pgm.roadmate.utils.PlaceName
 import dev.pgm.roadmate.utils.PromptBuilder
+import dev.pgm.roadmate.utils.SentenceChunker
 import dev.pgm.roadmate.utils.SpokenText
 import dev.pgm.roadmate.utils.StylePreferenceParser
 import dev.pgm.roadmate.utils.WeatherIntentParser
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 
 /**
- * Builds a prompt from [TravelContext], asks Gemini Nano for a response, speaks
- * it aloud, and emits the response text for the UI to display.
+ * Builds a prompt from [TravelContext], asks the on-device model for a
+ * response, speaks it aloud, and emits the response text for the UI to
+ * display. Real questions are streamed: the answer is spoken sentence by
+ * sentence as the model produces it (see [streamGeminiAnswer]) rather than
+ * after the whole reply, and each emission carries the cumulative text.
  *
  * Local shortcuts are checked before ever touching Gemini, in this order:
  *  1. "llama a X" — placed directly (ACTION_CALL, no dial-pad confirmation,
@@ -102,7 +109,7 @@ class GenerateResponseUseCase @Inject constructor(
         val styleChange = StylePreferenceParser.parse(userInput)
         val memoryCommand = MemoryCommandParser.parse(userInput)
         val arithmetic = ArithmeticParser.evaluate(userInput)
-        val response = when {
+        val shortcut = when {
             contactName != null -> handleCallRequest(contactName)
             mapQuery != null -> handleMapSearch(mapQuery, context.currentLocation)
             mediaApp != null -> handleMediaRequest(mediaApp)
@@ -111,11 +118,66 @@ class GenerateResponseUseCase @Inject constructor(
             memoryCommand != null -> handleMemoryCommand(memoryCommand, context)
             WeatherIntentParser.isWeatherQuestion(userInput) -> handleWeather(context)
             arithmetic != null -> arithmetic
-            else -> askGemini(context, userInput)
+            else -> null
         }
-        speechSynthesisRepository.speak(response)
-        emit(response)
+
+        if (shortcut != null) {
+            // Shortcuts are fixed, one-line replies — speak and emit as one.
+            speechSynthesisRepository.speak(shortcut)
+            emit(shortcut)
+            return@flow
+        }
+
+        // A real question: stream the model's answer, speaking each sentence
+        // the moment it lands instead of after the whole reply.
+        streamGeminiAnswer(context, userInput)
     }
+
+    /**
+     * Collects the streamed answer, speaking every sentence as soon as it is
+     * complete so TTS starts within a second or two rather than after the full
+     * generation. The UI still gets the cumulative text on each emission, and
+     * the finished answer is written to memory as a single exchange.
+     */
+    private suspend fun FlowCollector<String>.streamGeminiAnswer(
+        context: TravelContext,
+        userInput: String,
+    ) {
+        val prompt = buildGeminiPrompt(context, userInput)
+        val chunker = SentenceChunker()
+        var full = ""
+        geminiRepository.getResponseStream(prompt).collect { cumulative ->
+            full = cumulative
+            chunker.consume(cumulative).forEach { speechSynthesisRepository.speak(it) }
+            emit(cumulative)
+        }
+        chunker.flush()?.let { speechSynthesisRepository.speak(it) }
+        if (full.isNotBlank()) {
+            memoryRepository.recordExchange(userInput, full)
+        }
+    }
+
+    private suspend fun buildGeminiPrompt(context: TravelContext, userInput: String): String =
+        coroutineScope {
+            // Independent reads — fan them out so the prompt isn't gated by six
+            // sequential DataStore/Room round-trips on the answer's critical path.
+            val style = async { assistantPreferencesRepository.answerStyle.first() }
+            val recent = async { memoryRepository.recentExchanges(limit = 1) }
+            val preferences = async { memoryRepository.facts(FactType.PREFERENCE).map { it.value } }
+            val places = async { memoryRepository.frequentPlaces().map { it.value } }
+            val home = async { memoryRepository.facts(FactType.HOME).firstOrNull()?.value }
+            val work = async { memoryRepository.facts(FactType.WORK).firstOrNull()?.value }
+            PromptBuilder.buildPrompt(
+                context = context,
+                userInput = userInput,
+                style = style.await(),
+                recentExchanges = recent.await(),
+                driverPreferences = preferences.await(),
+                frequentPlaces = places.await(),
+                home = home.await(),
+                work = work.await(),
+            )
+        }
 
     private suspend fun handleMemoryCommand(
         command: MemoryCommandParser.Command,
@@ -159,22 +221,6 @@ class GenerateResponseUseCase @Inject constructor(
         memoryRepository.forget(type)
         memoryRepository.remember(UserFact(type, value = "${here.first},${here.second}"))
         return SpokenText.locationSaved(label)
-    }
-
-    private suspend fun askGemini(context: TravelContext, userInput: String): String {
-        val prompt = PromptBuilder.buildPrompt(
-            context = context,
-            userInput = userInput,
-            style = assistantPreferencesRepository.answerStyle.first(),
-            recentExchanges = memoryRepository.recentExchanges(limit = 1),
-            driverPreferences = memoryRepository.facts(FactType.PREFERENCE).map { it.value },
-            frequentPlaces = memoryRepository.frequentPlaces().map { it.value },
-            home = memoryRepository.facts(FactType.HOME).firstOrNull()?.value,
-            work = memoryRepository.facts(FactType.WORK).firstOrNull()?.value,
-        )
-        val answer = geminiRepository.getResponse(prompt)
-        memoryRepository.recordExchange(userInput, answer)
-        return answer
     }
 
     private suspend fun handleStyleChange(style: AnswerStyle): String {

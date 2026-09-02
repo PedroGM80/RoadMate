@@ -6,6 +6,7 @@ import dev.pgm.roadmate.ml.DebugTrace
 import dev.pgm.roadmate.ml.GeminiNanoManager
 import dev.pgm.roadmate.ml.LocalAiModelManager
 import dev.pgm.roadmate.ml.LocalLlmManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -39,6 +40,54 @@ class GeminiRepositoryImpl @Inject constructor(
         val response = generate(prompt)
         responseCache[prompt] = response
         return response
+    }
+
+    /**
+     * Streaming path. Only the downloaded MediaPipe model streams for real;
+     * AICore and the "modo básico" fallback emit a single cumulative value so
+     * every caller can treat this uniformly. A completed answer is cached the
+     * same as [getResponse]; a run that produced nothing ends on the fallback
+     * string.
+     */
+    override fun getResponseStream(prompt: String): Flow<String> = flow {
+        responseCache[prompt]?.let {
+            DebugTrace.log("GEMINI cache hit (stream)")
+            emit(it)
+            return@flow
+        }
+
+        if (geminiNanoManager.checkAvailability()) {
+            DebugTrace.log("GEMINI stream backend = AICore/Nano (one-shot)")
+            val full = geminiNanoManager.generateResponse(prompt)
+            responseCache[prompt] = full
+            emit(full)
+            return@flow
+        }
+
+        if (localLlmManager.isReady()) {
+            DebugTrace.log("GEMINI stream backend = LocalLlm (downloaded model)")
+            var last = ""
+            try {
+                localLlmManager.generateResponseStream(prompt).collect { cumulative ->
+                    last = cumulative
+                    emit(cumulative)
+                }
+            } catch (c: CancellationException) {
+                throw c
+            } catch (t: Throwable) {
+                DebugTrace.log("GEMINI stream error: ${t.message}")
+            }
+            if (last.isNotBlank()) {
+                responseCache[prompt] = last
+            } else {
+                DebugTrace.log("GEMINI stream produced nothing -> FALLBACK")
+                emit(GeminiNanoManager.FALLBACK_RESPONSE)
+            }
+            return@flow
+        }
+
+        DebugTrace.log("GEMINI stream backend = FALLBACK (no AICore, model not ready)")
+        emit(GeminiNanoManager.FALLBACK_RESPONSE)
     }
 
     private suspend fun generate(prompt: String): String {
