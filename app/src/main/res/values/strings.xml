@@ -81,6 +81,8 @@
     <string name="map_poi_hotel_one">Alojamiento</string>
     <string name="map_poi_food_one">Restaurante</string>
     <string name="map_download_area">Descargar esta zona</string>
+    <string name="map_poi_loading">Buscando %1$s…</string>
+    <string name="map_poi_loading_generic">Buscando…</string>
     <string name="map_recenter">Centrar en mi posición</string>
     <string name="map_zoom_in">Acercar</string>
     <string name="map_zoom_out">Alejar</string>

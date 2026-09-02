@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
@@ -118,6 +119,7 @@ fun MapScreen(
     var circleManager by remember { mutableStateOf<CircleManager?>(null) }
     var selectedPoi by remember { mutableStateOf<Pair<String, LatLng>?>(null) }
     var centeredOnUser by remember { mutableStateOf(false) }
+    var poiLoading by remember { mutableStateOf(false) }
 
     LaunchedEffect(mapView) {
         mapView.getMapAsync { map ->
@@ -182,61 +184,66 @@ fun MapScreen(
         // always drop the old pins first. refreshPois keeps them on an empty
         // result only for the camera-idle path (zoom-out past the POI layer).
         runCatching { manager.deleteAll() }
-        if (!active) return@LaunchedEffect
-
-        // Right after a chip tap / voice search the current tiles' source
-        // features aren't queryable yet, so a single pass finds nothing until
-        // the map next idles (e.g. after "recenter"). Retry briefly.
-        var pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
-        repeat(6) {
-            if (pins.isNotEmpty()) return@repeat
-            delay(350)
-            pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
-        }
-
-        // Still nothing: the previous category's "fit to pins" likely zoomed
-        // out past the POI vector layer (min zoom ~14), so querySourceFeatures
-        // has no tiles to read. Zoom back in — onCameraIdle then re-queries.
-        if (pins.isEmpty() && (map.cameraPosition.zoom) < 14.0) {
-            runCatching {
-                map.animateCamera(CameraUpdateFactory.zoomTo(14.5), 300)
-            }
-            repeat(6) {
-                delay(400)
-                pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
-                if (pins.isNotEmpty()) return@repeat
-            }
-        }
-
-        // "llévame a…": route to the first match instead of just pinning it.
-        if (navigateToResult && pins.isNotEmpty()) {
-            viewModel.onNavigationTargetResolved(
-                from = map.currentLatLon(),
-                to = pins.first().let { it.latitude to it.longitude },
-            )
+        if (!active) {
+            poiLoading = false
             return@LaunchedEffect
         }
 
-        // Turning a filter/search on: frame the pins so they're actually
-        // visible. Clamp the zoom so a city-wide spread doesn't drop below the
-        // POI layer's min zoom — otherwise the *next* category switch queries
-        // tiles that aren't loaded and finds nothing.
-        if (pins.size >= 2) {
-            val b = LatLngBounds.Builder().includes(pins).build()
-            runCatching {
-                val cam = map.getCameraForLatLngBounds(b, intArrayOf(120, 120, 120, 120))
-                if (cam != null) {
-                    val z = cam.zoom.coerceIn(13.5, 16.5)
-                    map.animateCamera(
-                        CameraUpdateFactory.newCameraPosition(
-                            org.maplibre.android.camera.CameraPosition.Builder(cam).zoom(z).build(),
-                        ),
-                        400,
-                    )
+        poiLoading = true
+        try {
+            // Right after a chip tap / voice search the current tiles' source
+            // features aren't queryable yet, so a single pass finds nothing
+            // until the map next idles (e.g. after "recenter"). Retry briefly.
+            var pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
+            repeat(6) {
+                if (pins.isNotEmpty()) return@repeat
+                delay(350)
+                pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
+            }
+
+            // Still nothing: the previous category's "fit to pins" likely
+            // zoomed out past the POI vector layer (min zoom ~14), so
+            // querySourceFeatures has no tiles. Zoom back in and re-query.
+            if (pins.isEmpty() && map.cameraPosition.zoom < 14.0) {
+                runCatching { map.animateCamera(CameraUpdateFactory.zoomTo(14.5), 300) }
+                repeat(6) {
+                    delay(400)
+                    pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
+                    if (pins.isNotEmpty()) return@repeat
                 }
             }
-        } else if (pins.size == 1) {
-            map.animateCamera(CameraUpdateFactory.newLatLngZoom(pins.first(), 15.0), 400)
+
+            // "llévame a…": route to the first match instead of just pinning it.
+            if (navigateToResult && pins.isNotEmpty()) {
+                viewModel.onNavigationTargetResolved(
+                    from = map.currentLatLon(),
+                    to = pins.first().let { it.latitude to it.longitude },
+                )
+                return@LaunchedEffect
+            }
+
+            // Frame the pins. Clamp the zoom so a city-wide spread doesn't drop
+            // below the POI layer's min zoom — otherwise the *next* category
+            // switch queries tiles that aren't loaded and finds nothing.
+            if (pins.size >= 2) {
+                val b = LatLngBounds.Builder().includes(pins).build()
+                runCatching {
+                    val cam = map.getCameraForLatLngBounds(b, intArrayOf(120, 120, 120, 120))
+                    if (cam != null) {
+                        val z = cam.zoom.coerceIn(13.5, 16.5)
+                        map.animateCamera(
+                            CameraUpdateFactory.newCameraPosition(
+                                org.maplibre.android.camera.CameraPosition.Builder(cam).zoom(z).build(),
+                            ),
+                            400,
+                        )
+                    }
+                }
+            } else if (pins.size == 1) {
+                map.animateCamera(CameraUpdateFactory.newLatLngZoom(pins.first(), 15.0), 400)
+            }
+        } finally {
+            poiLoading = false
         }
     }
 
@@ -297,7 +304,32 @@ fun MapScreen(
                     showReady = false
                 }
             }
-            if (routeSummary != null) {
+            if (poiLoading) {
+                Surface(
+                    modifier = Modifier.align(Alignment.TopCenter),
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    tonalElevation = 3.dp,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(
+                            poiFilter?.let { stringResource(R.string.map_poi_loading, stringResource(it.labelRes)) }
+                                ?: stringResource(R.string.map_poi_loading_generic),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        )
+                    }
+                }
+            } else if (routeSummary != null) {
                 Surface(
                     modifier = Modifier.align(Alignment.TopCenter),
                     shape = CircleShape,
