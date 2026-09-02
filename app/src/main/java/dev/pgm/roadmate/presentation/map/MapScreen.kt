@@ -178,16 +178,20 @@ fun MapScreen(
         val manager = symbolManager ?: return@LaunchedEffect
         val active = poiFilter != null || nameQuery != null
 
+        // The selection changed (a chip tap / toggle-off / voice search) —
+        // always drop the old pins first. refreshPois keeps them on an empty
+        // result only for the camera-idle path (zoom-out past the POI layer).
+        runCatching { manager.deleteAll() }
+        if (!active) return@LaunchedEffect
+
         // Right after a chip tap / voice search the current tiles' source
         // features aren't queryable yet, so a single pass finds nothing until
         // the map next idles (e.g. after "recenter"). Retry briefly.
         var pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
-        if (active) {
-            repeat(6) {
-                if (pins.isNotEmpty()) return@repeat
-                delay(350)
-                pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
-            }
+        repeat(6) {
+            if (pins.isNotEmpty()) return@repeat
+            delay(350)
+            pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
         }
 
         // "llévame a…": route to the first match instead of just pinning it.
@@ -202,12 +206,12 @@ fun MapScreen(
         // Turning a filter/search on: frame the pins so they're actually
         // visible (they sit across the loaded tiles, not just the ~500 m in
         // view).
-        if (active && pins.size >= 2) {
+        if (pins.size >= 2) {
             val b = LatLngBounds.Builder().includes(pins).build()
             runCatching {
                 map.animateCamera(CameraUpdateFactory.newLatLngBounds(b, 120), 400)
             }
-        } else if (active && pins.size == 1) {
+        } else if (pins.size == 1) {
             map.animateCamera(CameraUpdateFactory.newLatLngZoom(pins.first(), 15.0), 400)
         }
     }
@@ -349,7 +353,13 @@ fun MapScreen(
                             FilterChip(
                                 selected = poiFilter == kind,
                                 onClick = { viewModel.togglePoiFilter(kind) },
-                                label = { Text(stringResource(kind.labelRes)) },
+                                label = {
+                                    Icon(
+                                        painterResource(kind.iconRes),
+                                        contentDescription = stringResource(kind.labelRes),
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                },
                             )
                         }
                     }
@@ -611,7 +621,7 @@ private fun refreshPois(
                 at to SymbolOptions()
                     .withLatLng(at)
                     .withIconImage(iconImage)
-                    .withIconSize(1.2f)
+                    .withIconSize(1.0f)
                     .withData(com.google.gson.JsonPrimitive(name))
             }
             .take(120)
@@ -635,39 +645,35 @@ private fun fallbackLabelFor(context: Context, kind: PoiKind): String = when (ki
 
 private fun registerPinIcons(style: Style, context: Context) {
     val density = context.resources.displayMetrics.density
-    val size = (26f * density).toInt()
+    val size = (32f * density).toInt()
     val cx = size / 2f
     val ring = 2.5f * density
 
-    PoiKind.entries.forEach { kind ->
+    fun pin(fill: Int, iconRes: Int): Bitmap {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        // soft drop shadow
-        paint.color = 0x33000000
+        paint.color = 0x33000000 // soft drop shadow
         canvas.drawCircle(cx, cx + 1f * density, cx - ring, paint)
-        // white ring
-        paint.color = 0xFFFFFFFF.toInt()
+        paint.color = 0xFFFFFFFF.toInt() // white ring
         canvas.drawCircle(cx, cx, cx - ring, paint)
-        // category fill
-        paint.color = kind.tint
+        paint.color = fill // category disc
         canvas.drawCircle(cx, cx, cx - ring * 2.2f, paint)
 
-        style.addImage(PIN_PREFIX + kind.name, bitmap)
+        ContextCompat.getDrawable(context, iconRes)?.mutate()?.let { d ->
+            d.setTint(0xFFFFFFFF.toInt())
+            val pad = (size * 0.27f).toInt()
+            d.setBounds(pad, pad, size - pad, size - pad)
+            d.draw(canvas)
+        }
+        return bitmap
     }
 
-    // Neutral pin for name searches ("busca el Mercadona") — no category tint.
-    val nameBitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-    Canvas(nameBitmap).apply {
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-        paint.color = 0x33000000
-        drawCircle(cx, cx + 1f * density, cx - ring, paint)
-        paint.color = 0xFFFFFFFF.toInt()
-        drawCircle(cx, cx, cx - ring, paint)
-        paint.color = 0xFF455A64.toInt()
-        drawCircle(cx, cx, cx - ring * 2.2f, paint)
+    PoiKind.entries.forEach { kind ->
+        style.addImage(PIN_PREFIX + kind.name, pin(kind.tint, kind.iconRes))
     }
-    style.addImage(PIN_PREFIX + NAME_PIN, nameBitmap)
+    // Neutral pin for name searches ("busca el Mercadona") — no category tint.
+    style.addImage(PIN_PREFIX + NAME_PIN, pin(0xFF455A64.toInt(), R.drawable.lucide_ic_map_pin))
 }
 

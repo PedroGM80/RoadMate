@@ -1,6 +1,7 @@
 package dev.pgm.roadmate.presentation.map
 
 import androidx.annotation.ColorInt
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.domain.model.PlaceCategory
@@ -12,18 +13,21 @@ import dev.pgm.roadmate.domain.model.PlaceCategory
  */
 enum class PoiKind(
     @StringRes val labelRes: Int,
+    @DrawableRes val iconRes: Int,
     val classes: Set<String>,
     @ColorInt val tint: Int,
 ) {
-    FUEL(R.string.map_poi_fuel, setOf("fuel"), 0xFF2E7D32.toInt()),
+    FUEL(R.string.map_poi_fuel, R.drawable.ic_gas_station, setOf("fuel"), 0xFF2E7D32.toInt()),
     // OpenFreeMap tags hotels/hostels as `lodging`.
     HOTEL(
         R.string.map_poi_hotel,
+        R.drawable.ic_hotel,
         setOf("lodging", "hotel", "hostel", "motel", "guest_house"),
         0xFF1565C0.toInt(),
     ),
     FOOD(
         R.string.map_poi_food,
+        R.drawable.ic_restaurant,
         setOf("restaurant", "fast_food", "cafe", "bar", "pub", "food_court"),
         0xFFE65100.toInt(),
     );
