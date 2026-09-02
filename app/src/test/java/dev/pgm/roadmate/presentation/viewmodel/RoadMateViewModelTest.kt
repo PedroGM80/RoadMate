@@ -302,6 +302,9 @@ class RoadMateViewModelTest {
                 greetingSpeechSynthesisRepository = spoken,
             )
 
+            // Let the hands-free setting land first — HomeScreen re-runs
+            // startAmbientListening() once it does.
+            advanceUntilIdle()
             viewModel.startAmbientListening()
             advanceUntilIdle()
             wakeWord.emissions.tryEmit(Unit)
@@ -338,6 +341,7 @@ class RoadMateViewModelTest {
             val wakeWord = FakeWakeWordRepository(available = true)
             val viewModel = buildViewModel(wakeWordRepository = wakeWord)
 
+            advanceUntilIdle() // hands-free setting resolves
             viewModel.startAmbientListening()
             advanceUntilIdle()
             viewModel.stopAmbientListening()

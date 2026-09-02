@@ -34,6 +34,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 
 /**
@@ -208,7 +210,14 @@ class FakeAssistantPreferencesRepository : AssistantPreferencesRepository {
     }
 
     private val handsFreeFlow = MutableStateFlow(true)
-    override val handsFreeEnabled: StateFlow<Boolean> = handsFreeFlow
+    // Cold and one tick late, like the DataStore-backed real thing: a
+    // ViewModel that seeds `null` really does observe `null` first, until the
+    // scheduler advances. Tests that need the setting live call
+    // advanceUntilIdle() before relying on it.
+    override val handsFreeEnabled: Flow<Boolean> = flow {
+        delay(1)
+        emitAll(handsFreeFlow)
+    }
     override suspend fun setHandsFreeEnabled(enabled: Boolean) {
         handsFreeFlow.value = enabled
     }
