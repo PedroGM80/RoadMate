@@ -31,6 +31,16 @@ This file is now the running state, not the original bring-up plan.
   the question). Identity, "don't invent trip data", question-mark
   punctuation, arithmetic shortcut, weather shortcut all verified.
 - Model **warm-up at startup** — first question ~4 s instead of ~11 s.
+  (Aside: warm-up prompt "Di \"listo\"." makes the model ramble ~40 English
+  words, ~3 s wasted — harmless, background, but could be a 1-token dummy.)
+- **Streaming answer → TTS** (verified 2026-09-02, 3 rounds): speaks each
+  sentence as it is generated. 3-sentence reply → first audio 2.8 s before
+  generation finished; no dropped / duplicated / overlapping sentences.
+  First-audio latency itself is **~4.5–4.9 s** (prompt prefill + ~6 tok/s on
+  this CPU), so the ~1.5 s target needs the shorter prompt in item 4.
+  Mojibake in speech fixed — the corruption is *partial* (mixed intact and
+  double-encoded accents in one reply), so `fixMojibake` now rewrites only
+  the `Ã`/`Â`+continuation pattern instead of round-tripping the whole string.
 - Map: renders, street zoom, blue dot, GPS-fix poll, +/- and recenter
   buttons, "Descargar" hides when a region is saved, "Mapa offline listo"
   auto-dismisses, **POI filter pins work** (querySourceFeatures on the
@@ -38,24 +48,20 @@ This file is now the running state, not the original bring-up plan.
 
 ## Open — priority order
 
-1. **Streaming answer → TTS per sentence** — *code done 2026-09-02, needs
-   on-device verification.* `LocalLlmManager.generateResponseStream`
-   (`generateResponseAsync` + `ProgressListener` wrapped in `callbackFlow`,
-   own inference thread); `GeminiRepository.getResponseStream` streams for
-   the MediaPipe backend only (AICore/fallback still one-shot);
-   `GenerateResponseUseCase.streamGeminiAnswer` speaks each sentence via the
-   new `SentenceChunker` as it lands, still emits cumulative text to the UI.
-   **Verify on device:** first audio latency (target ~1.5 s vs ~6 s), no
-   dropped/duplicated sentences, mojibake-free speech, timeout still lands on
-   "modo básico". Also folded in: `buildGeminiPrompt` fans out its 6 memory
-   reads with `async` instead of running them sequentially.
+1. ~~**Streaming answer → TTS per sentence**~~ — *done + verified on device
+   2026-09-02.* `LocalLlmManager.generateResponseStream` (`generateResponseAsync`
+   + `ProgressListener` in `callbackFlow`, own inference thread, guaranteed
+   final `send()` before `close()`); `GeminiRepository.getResponseStream`
+   streams for the MediaPipe backend only; `GenerateResponseUseCase`
+   `.streamGeminiAnswer` speaks each `SentenceChunker` sentence as it lands
+   and still emits cumulative text to the UI. `buildGeminiPrompt` also fans
+   its 6 memory reads out with `async`. Remaining latency work is item 4.
 2. **Strip the debug tracing** — do this LAST, right before a release build /
-   R8 verification (the new streaming traces are useful for step 1's
-   on-device check): `DebugTrace.kt`, all `dbg(...)` / `DebugTrace.log(...)`
-   in `LocalLlmManager`,
-   all `dbg(...)` / `DebugTrace.log(...)` calls in `LocalLlmManager`,
-   `GeminiNanoManager`, `GeminiRepositoryImpl`, `VoskSpeechRecognizer`,
-   `MapScreen.refreshPois`. Grep `DebugTrace`.
+   R8 verification: `DebugTrace.kt`, all `dbg(...)` / `DebugTrace.log(...)`
+   calls in `LocalLlmManager` (incl. the `stream …` lines), `GeminiNanoManager`,
+   `GeminiRepositoryImpl`, `VoskSpeechRecognizer`, `MapScreen.refreshPois`,
+   and the **TEMP `DebugTrace.log("TTS speak …")` in `TextToSpeechManager`**
+   (added for the streaming-latency check). Grep `DebugTrace`.
 3. **Bigger Vosk model** for accuracy — `vosk-model-es-0.42` (~1.4 GB) as a
    runtime download (the small one is bundled in assets; this needs a
    download-manager path like the LLM has). Improves recognition, not
