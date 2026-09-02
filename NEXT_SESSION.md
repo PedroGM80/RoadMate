@@ -74,8 +74,10 @@ This file is now the running state, not the original bring-up plan.
      `LOCATION_QUESTION` / `WEATHER_QUESTION` keyword gates; coord + Clima
      lines emitted only for spatial / weather questions, bias to include).
      Device measurement of the first-audio latency still pending.
-   - Tighten Vosk end-of-speech (`RECORDING_END_SILENCE_MS = 5_000L` is
-     long) — still open.
+   - Tighten Vosk end-of-speech — still open. Note: `RECORDING_END_SILENCE_MS`
+     is a **dead constant**, nothing reads it; the real end-pointing is
+     Vosk's own (baked into the model's `conf/`). Tuning needs the model
+     config + device testing, not a Kotlin knob.
 5. Map polish: markers slightly big / overlap when clustered; MapLibre
    attribution overlaps the chip row's corner; consider a "N cerca" count.
 6. ~~Verify the OpenWeather key once it activates~~ — key is live (see
@@ -117,17 +119,23 @@ This file is now the running state, not the original bring-up plan.
    fanning one `AudioRecord` PCM stream to both the wake recognizer and the
    dB check instead of running two mic owners.
 
+   ~~Settings toggle~~ / ~~earcon on detection~~ — *done 2026-09-03*
+   ("Manos libres" switch under a "Voz" header; `Earcon.start()` on a
+   hands-free hit).
+
    **Still TODO / device bring-up:**
    - The wake recognizer runs a full (if tiny-grammar) Kaldi decode
      continuously — add a **volume gate** (own AudioRecord + RMS, only
      `acceptWaveForm` above threshold, or `SpeechService.setPause`) to cut
      idle CPU/battery. Profile on device first; the 2-word grammar graph is
      small so it may be fine as-is.
-   - Settings toggle to disable hands-free; earcon on detection.
    - Verify on device: does the small ES model spot "oye copiloto"
      reliably? Tune with a second phrasing in the grammar or the trigger
      token if not. Check for self-triggering on the assistant's own TTS
      (already guarded by the `isSpeaking` check, but confirm).
+   - Background earcon: `Earcon` lives in `:app`; `WakeWordForegroundService`
+     (`:data`) has no cue. Move `Earcon` to `:data` if a background blip is
+     wanted.
 
 10. **Offline routing (BRouter).** *Code landed 2026-09-03* — compiles,
     dexes, unit-tested at the seams; the **engine itself is unverified on
@@ -147,14 +155,15 @@ This file is now the running state, not the original bring-up plan.
       needs from `brouter.de/brouter/segments4/`, **Wi-Fi-only**, resumable;
       `SegmentTiles.nameFor(lat,lon)` gives the 5° tile name.
     - `MapViewModel.routeTo` / `route` / `routeSummary`; `MapScreen` draws it
-      with a `LineManager` + a "12,3 km · 18 min" chip. "llévame a X"
-      resolves the destination to the first offline POI match, then routes
-      from the current fix.
+      with a `LineManager` + a chip that shows "12,3 km · 18 min", or the
+      live tile-download progress / "Necesito Wi-Fi…" while it fetches.
+      "llévame a X" resolves the destination to the first offline POI match,
+      then routes from the current fix. R8 keep/`-dontwarn` rules for
+      `btools.*` are already in `app/proguard-rules.pro`.
     - **Device bring-up:** does `RoutingEngine` run on arm64 with a real
       `.rd5` (Madrid = `W5_N40.rd5`)? Check `doRun` timing, the tile download
       over the app's network, and that the polyline renders. If the engine
-      throws, log `getErrorMessage()`. R8: `btools.server.*` is unused — add
-      keep/`-dontwarn` rules when R8 comes on.
+      throws, log `getErrorMessage()`.
     - Still no spoken turn-by-turn (route line + distance only).
 
 ## Not for a device — still open from before

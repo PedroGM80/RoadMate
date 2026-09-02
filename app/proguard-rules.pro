@@ -35,6 +35,18 @@
 -keep class org.maplibre.geojson.** { *; }
 -dontwarn org.maplibre.**
 
+# --- BRouter offline routing (vendored brouter-<v>-ro.jar) --------------
+# Pure Java, but the `.brf` profile expression VM (btools.expressions) loads
+# classes reflectively, and the jar bundles an unused HTTP server plus
+# protobuf/osmosis references R8 warns about. Keep routing, silence the rest.
+-keep class btools.router.** { *; }
+-keep class btools.mapaccess.** { *; }
+-keep class btools.expressions.** { *; }
+-dontwarn btools.server.**
+-dontwarn btools.mapcreator.**
+-dontwarn crosby.binary.**
+-dontwarn org.openstreetmap.osmosis.**
+
 # --- Firebase Crashlytics -----------------------------------------------
 # Keep line numbers / source file so stack traces stay readable, and don't
 # strip the Crashlytics-tagged exception types.
