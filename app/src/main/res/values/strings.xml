@@ -84,7 +84,7 @@
     <string name="map_recenter">Centrar en mi posición</string>
     <string name="map_zoom_in">Acercar</string>
     <string name="map_zoom_out">Alejar</string>
-    <string name="map_navigate">Ir con Google Maps</string>
+    <string name="map_navigate">Trazar ruta</string>
     <string name="map_offline_idle">Mapa online · pulsa “Descargar esta zona” para usarlo sin conexión</string>
     <string name="map_offline_downloading">Descargando mapa offline… %1$d %%</string>
     <string name="map_offline_ready">Mapa offline listo</string>

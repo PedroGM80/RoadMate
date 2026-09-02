@@ -1,7 +1,6 @@
 package dev.pgm.roadmate.routing
 
 import android.content.Context
-import android.util.Log
 import btools.router.OsmPathElement
 import btools.router.ProfileCache
 import btools.router.RoutingContext
@@ -11,6 +10,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.domain.model.RouteResult
 import dev.pgm.roadmate.domain.model.RoutingDataStatus
 import dev.pgm.roadmate.domain.repository.RoutingRepository
+import dev.pgm.roadmate.ml.DebugTrace
 import dev.pgm.roadmate.utils.SegmentTiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
@@ -35,6 +35,10 @@ class BRouterRouter @Inject constructor(
     private val dataManager: RoutingDataManager,
 ) : RoutingRepository {
 
+    init {
+        DebugTrace.init(File(context.filesDir, "aicore_debug.log"))
+    }
+
     override val dataStatus: StateFlow<RoutingDataStatus> = dataManager.status
 
     private val profileDir: File by lazy {
@@ -46,14 +50,24 @@ class BRouterRouter @Inject constructor(
         to: Pair<Double, Double>,
     ): RouteResult? = withContext(Dispatchers.IO) {
         val tiles = SegmentTiles.namesFor(from, to)
-        if (!dataManager.ensureTiles(tiles)) return@withContext null
+        DebugTrace.log("route: $from -> $to, tiles=$tiles")
+        if (!dataManager.ensureTiles(tiles)) {
+            DebugTrace.log("route: ensureTiles false (no data / no wifi)")
+            return@withContext null
+        }
 
-        val profile = runCatching { ensureProfile() }.getOrNull() ?: return@withContext null
+        val profile = runCatching { ensureProfile() }
+            .onFailure { DebugTrace.log("route: profile unpack failed: ${it.message}") }
+            .getOrNull() ?: return@withContext null
 
         runCatching {
             val rc = RoutingContext().apply { localFunction = profile.absolutePath }
-            if (!ProfileCache.parseProfile(rc)) {
-                Log.w(TAG, "profile parse failed")
+            // parseProfile's boolean is "reused from cache?", NOT success —
+            // the first parse returns false. It throws on a real failure and
+            // populates rc.expctxWay on success; check that instead.
+            ProfileCache.parseProfile(rc)
+            if (rc.expctxWay == null) {
+                DebugTrace.log("route: profile not loaded (expctxWay null)")
                 return@runCatching null
             }
 
@@ -63,23 +77,32 @@ class BRouterRouter @Inject constructor(
             )
             val waypoints = RoutingParamCollector().getWayPointList(wpString)
 
+            val startedAt = System.currentTimeMillis()
             val engine = RoutingEngine(null, null, dataManager.segmentDir, waypoints, rc)
             engine.doRun(ROUTE_TIMEOUT_MS)
+            val took = System.currentTimeMillis() - startedAt
 
             if (engine.errorMessage != null) {
-                Log.w(TAG, "no route: ${engine.errorMessage}")
+                DebugTrace.log("route: no route (${took} ms): ${engine.errorMessage}")
                 return@runCatching null
             }
-            val track = engine.foundTrack ?: return@runCatching null
+            val track = engine.foundTrack ?: run {
+                DebugTrace.log("route: foundTrack null (${took} ms)")
+                return@runCatching null
+            }
             val nodes: List<OsmPathElement> = track.nodes
-            if (nodes.size < 2) return@runCatching null
+            if (nodes.size < 2) {
+                DebugTrace.log("route: only ${nodes.size} nodes (${took} ms)")
+                return@runCatching null
+            }
 
+            DebugTrace.log("route: OK ${took} ms, ${nodes.size} pts, ${track.distance} m, ${track.totalSeconds} s")
             RouteResult(
                 points = nodes.map { it.iLat / 1e6 - 90.0 to it.iLon / 1e6 - 180.0 },
                 distanceMeters = track.distance,
                 durationSeconds = track.totalSeconds,
             )
-        }.onFailure { Log.w(TAG, "routing failed", it) }.getOrNull()
+        }.onFailure { DebugTrace.log("route: threw ${it::class.simpleName}: ${it.message}") }.getOrNull()
     }
 
     /** Copies `car.brf` + `lookups.dat` out of assets once; returns the profile file. */
@@ -98,7 +121,6 @@ class BRouterRouter @Inject constructor(
     }
 
     private companion object {
-        const val TAG = "BRouterRouter"
         const val ROUTE_TIMEOUT_MS = 25_000L
     }
 }
