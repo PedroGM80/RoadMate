@@ -36,5 +36,23 @@ class PlaceCategoryParserTest {
         assertNull(PlaceCategoryParser.parse("la Sagrada Familia"))
         assertNull(PlaceCategoryParser.parse("calle Mayor 5"))
         assertNull(PlaceCategoryParser.parse("el hospital de la Paz"))
+        assertNull(PlaceCategoryParser.parse("casa"))
+        assertNull(PlaceCategoryParser.parse("el aeropuerto"))
+    }
+
+    @Test
+    fun `picks the first category when a query could touch two`() {
+        // "restaurante" + "hotel" — FUEL check runs first but doesn't match,
+        // then HOTEL wins over FOOD by order.
+        assertEquals(
+            PlaceCategory.HOTEL,
+            PlaceCategoryParser.parse("un hotel con restaurante"),
+        )
+    }
+
+    @Test
+    fun `is case- and article-insensitive`() {
+        assertEquals(PlaceCategory.FUEL, PlaceCategoryParser.parse("GASOLINERA"))
+        assertEquals(PlaceCategory.FOOD, PlaceCategoryParser.parse("Una Cafetería"))
     }
 }
