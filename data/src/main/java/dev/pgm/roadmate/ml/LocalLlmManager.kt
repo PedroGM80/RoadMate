@@ -109,7 +109,11 @@ class LocalLlmManager @Inject constructor(
         LlmInference.createFromOptions(context, options).also {
             dbg("engine ready (${System.currentTimeMillis() - t0} ms)")
         }
-    }.onFailure { dbg("engine build failed: ${it.message}") }
+    }.onFailure {
+        dbg("engine build failed: ${it.message}")
+        // Downloaded but unrunnable here — let the driver see it and switch.
+        modelManager.reportModelUnusable()
+    }
         .getOrNull()
         ?.also { engine = it }
 

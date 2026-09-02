@@ -30,11 +30,13 @@ data class LocalAiModel(
  */
 object LocalAiCatalog {
 
+    private const val HF = "https://huggingface.co/litert-community"
+
     val models: List<LocalAiModel> = listOf(
         LocalAiModel(
             id = "qwen2.5-0.5b",
             name = "Qwen2.5 0.5B",
-            url = "https://huggingface.co/litert-community/Qwen2.5-0.5B-Instruct/resolve/main/" +
+            url = "$HF/Qwen2.5-0.5B-Instruct/resolve/main/" +
                 "Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
             fileName = "qwen2.5-0.5b-instruct-q8.task",
             sizeBytes = 546_660_344L,
@@ -42,9 +44,25 @@ object LocalAiCatalog {
             recommended = true,
         ),
         LocalAiModel(
+            id = "qwen3-0.6b",
+            name = "Qwen3 0.6B",
+            url = "$HF/Qwen3-0.6B/resolve/main/qwen3_0_6b_mixed_int4.litertlm",
+            fileName = "qwen3-0.6b-int4.litertlm",
+            sizeBytes = 497_664_000L,
+            note = "El más nuevo y el que menos ocupa. Buen equilibrio.",
+        ),
+        LocalAiModel(
+            id = "olmo2-1b",
+            name = "OLMo-2 1B",
+            url = "$HF/OLMo-2-1B-Instruct/resolve/main/OLMo-2-1B-Instruct_q4_block32_ekv4096.litertlm",
+            fileName = "olmo2-1b-instruct-q4.litertlm",
+            sizeBytes = 931_241_056L,
+            note = "Modelo 100% abierto (AllenAI). Otra familia, otro estilo.",
+        ),
+        LocalAiModel(
             id = "qwen2.5-1.5b",
             name = "Qwen2.5 1.5B",
-            url = "https://huggingface.co/litert-community/Qwen2.5-1.5B-Instruct/resolve/main/" +
+            url = "$HF/Qwen2.5-1.5B-Instruct/resolve/main/" +
                 "Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task",
             fileName = "qwen2.5-1.5b-instruct-q8.task",
             sizeBytes = 1_597_913_616L,

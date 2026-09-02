@@ -112,6 +112,16 @@ class LocalAiModelManager @Inject constructor(
         if (LocalAiCatalog.byId(id) != null) preferences.setLocalAiModelId(id)
     }
 
+    /**
+     * The file downloaded fine but MediaPipe couldn't load it on this device
+     * (a `.litertlm` an older runtime doesn't understand, a corrupt file).
+     * Surface it so the driver picks another model instead of getting silent
+     * "modo básico" answers.
+     */
+    fun reportModelUnusable() {
+        _status.value = LocalAiStatus.DownloadFailed("Este modelo no funciona en tu móvil. Prueba otro.")
+    }
+
     private fun applyModel(target: LocalAiModel, announce: Boolean) {
         if (announce && target.id == model.id) return
         downloadJob?.cancel()
