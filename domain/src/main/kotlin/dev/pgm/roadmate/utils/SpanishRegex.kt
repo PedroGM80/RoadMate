@@ -27,12 +27,26 @@ package dev.pgm.roadmate.utils
  * So probe once for `(?U)` support and only prepend it where it's both needed
  * and accepted. Prefer this over `Regex(...)` for anything that reads what the
  * driver said.
+ *
+ * This function never throws. A pattern that the running engine won't compile
+ * (the `(?U)` prefix on ICU was exactly this — an `ExceptionInInitializerError`
+ * that took the whole app down at launch) falls back to the bare pattern, then
+ * to a matches-nothing regex. A parser that quietly stops recognising one
+ * phrasing is a bug; a parser that crashes the copilot mid-drive is a hazard.
  */
 private val UNICODE_CLASS_PREFIX: String =
     runCatching { Regex("(?U)x"); "(?U)" }.getOrDefault("")
 
-fun spanishRegex(pattern: String, ignoreCase: Boolean = true): Regex =
-    Regex(
-        UNICODE_CLASS_PREFIX + pattern,
-        if (ignoreCase) setOf(RegexOption.IGNORE_CASE) else emptySet(),
-    )
+/** Compiles to nothing a real utterance can contain, so a failed pattern is inert. */
+private const val MATCHES_NOTHING = "(?!x)x"
+
+fun spanishRegex(pattern: String, ignoreCase: Boolean = true): Regex {
+    val opts = if (ignoreCase) setOf(RegexOption.IGNORE_CASE) else emptySet()
+    return runCatching { Regex(UNICODE_CLASS_PREFIX + pattern, opts) }
+        .recoverCatching { Regex(pattern, opts) }
+        .recoverCatching {
+            System.err.println("spanishRegex: pattern won't compile on this engine: $pattern")
+            Regex(MATCHES_NOTHING)
+        }
+        .getOrThrow()
+}
