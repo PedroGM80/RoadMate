@@ -85,43 +85,43 @@ This file is now the running state, not the original bring-up plan.
    the POI query works.
 8. GPU backend for MediaPipe: dead end on this MediaTek (silent hang);
    could be made opt-in for devices where it works.
-9. **Hands-free wake word "RoadMate".** *Code landed 2026-09-03* (user
-   picked Picovoice Porcupine). Foreground + background, mic button kept as
-   fallback:
-   - `WakeWordDetector` (data/ml) wraps `PorcupineManager` in a callbackFlow;
-     `WakeWordRepository` (domain) / `…Impl` (data). No-ops unless a key +
-     both model files are present.
+9. **Hands-free wake phrase "oye copiloto".** *Code landed 2026-09-03.*
+   Foreground + background, mic button kept as fallback. **No paid parts** —
+   ruled out Porcupine (Picovoice free tier is personal-use only; custom
+   keywords also expire). Runs on the Vosk model already bundled for
+   dictation: zero new deps, no account.
+   - `WakeWordDetector` (data/ml): a Vosk `Recognizer` locked to the grammar
+     `["oye copiloto", "[unk]"]` via a `SpeechService`; a partial/result
+     containing "copiloto" fires. Shares the one `Model` through the new
+     `VoskModelProvider`. `isAvailable()` is always true (model ships in the
+     app) → hands-free replaces the silence monitor on every device.
+   - `WakeWordRepository` (domain) / `…Impl` (data) — the engine stayed
+     behind this seam, so the Porcupine→Vosk swap didn't touch the wiring.
    - `RoadMateViewModel`: `startWakeWordListening()` → on detection runs the
-     same `startListening()` cycle; `startAmbientListening()` picks wake word
-     **or** the rest-silence monitor (mutually exclusive — one mic owner).
-     `startListening()` pauses/resumes the wake job around the Vosk capture.
+     same `startListening()` cycle; `startAmbientListening()` picks wake
+     phrase **or** the rest-silence monitor (mutually exclusive — one mic
+     owner). `startListening()` pauses/resumes the wake job around the Vosk
+     capture, gated on a `wakeWordDesired` intent flag.
    - `WakeWordForegroundService` (data/service, `foregroundServiceType=
-     microphone`): background detection → headless STT + answer. Started from
-     `MainActivity.onPause` when configured.
-   - `libs.porcupine.android` = `ai.picovoice:porcupine-android:4.0.2`;
-     `PICOVOICE_ACCESS_KEY` from `local.properties` → `BuildConfig`.
-
-   **To actually turn it on (device prereqs, not code):**
-   1. Free AccessKey from console.picovoice.ai → `local.properties`:
-      `PICOVOICE_ACCESS_KEY=...`
-   2. Train a "RoadMate" wake word (console → Porcupine, platform **Android**,
-      pick the language) → save as `data/src/main/assets/wake/roadmate.ppn`.
-   3. Grab the matching `porcupine_params_<lang>.pv` from the porcupine repo
-      (`lib/common/`), rename to
-      `data/src/main/assets/wake/porcupine_params.pv`.
-   (`.ppn`/`.pv` are gitignored; see `assets/wake/README.md`.)
-
-   **Licensing:** free-plan custom `.ppn` is time-limited and needs
-   periodic regeneration — fine for dev, a shipped build needs a paid
-   Picovoice plan or the Vosk restricted-grammar fallback.
+     microphone`): background detection → headless STT + answer, no activity
+     launch. Started from `MainActivity.onPause`.
 
    **Known limitation:** the 30-min rest-reminder is suspended whenever
    hands-free is active (both want the mic continuously). Fix later by
-   fanning one `AudioRecord` PCM stream to both Porcupine and the dB check
-   instead of running two mic owners.
+   fanning one `AudioRecord` PCM stream to both the wake recognizer and the
+   dB check instead of running two mic owners.
 
-   **Still TODO:** settings toggle to disable hands-free; earcon on
-   detection; device bring-up (needs the prereqs above).
+   **Still TODO / device bring-up:**
+   - The wake recognizer runs a full (if tiny-grammar) Kaldi decode
+     continuously — add a **volume gate** (own AudioRecord + RMS, only
+     `acceptWaveForm` above threshold, or `SpeechService.setPause`) to cut
+     idle CPU/battery. Profile on device first; the 2-word grammar graph is
+     small so it may be fine as-is.
+   - Settings toggle to disable hands-free; earcon on detection.
+   - Verify on device: does the small ES model spot "oye copiloto"
+     reliably? Tune with a second phrasing in the grammar or the trigger
+     token if not. Check for self-triggering on the assistant's own TTS
+     (already guarded by the `isSpeaking` check, but confirm).
 
 ## Not for a device — still open from before
 
