@@ -19,14 +19,24 @@ builds without a `google-services.json` have no crash reporting.
   MediaPipe. It only drops to an honest "modo básico" canned reply while
   that download hasn't finished (or can't happen at all).
 - **"Llama a X"** — places a call directly, no dial-pad confirmation, by
-  design: hands-free while driving. Several people with that name? It asks,
-  and you finish with "la segunda" or a surname. One person with two
-  numbers? It asks which, and you answer "el móvil" / "la del trabajo".
-  Missing contact → a spoken explanation, not a guess.
+  design: hands-free while driving. Also "marca el número de X", "ponme con
+  X", "quiero hablar con X". Several people with that name? It asks, and you
+  finish with "la segunda" or a surname. One person with two numbers? It asks
+  which, and you answer "el móvil" / "la del trabajo" — or whatever *you*
+  called it in your contacts ("el coche"). Missing contact → a spoken
+  explanation, not a guess.
+
+  Because this is the one thing RoadMate does that can't be undone, the rule
+  for *when* it's allowed to decide by itself is deliberately narrow and
+  lives on its own in `:domain` (`ContactMatching`, with tests): an exact
+  name beats a word-prefix beats a substring, only the best tier counts, and
+  more than one person in that tier is always a question, never a guess.
 - **"Busca gasolineras", "hoteles cerca", "dónde hay un restaurante"** —
-  hands the query straight to whatever Maps app is installed via a `geo:`
-  intent, biased to the current location. RoadMate never queries a places
-  API itself.
+  pinned on RoadMate's own downloaded map (see below), never handed to an
+  external Maps app and never through a places API. **A need works too**:
+  "tengo hambre", "necesito echar gasolina", "me estoy quedando sin
+  gasolina", "quiero parar a descansar" find the same thing without having
+  to phrase it as a search.
 - **"Cuéntame un chiste"** — answered from a small local bank of original
   road-themed jokes, no network, no AI call.
 - **"¿Qué tiempo hace?" / "¿va a llover?"** — answered straight from the
@@ -35,10 +45,11 @@ builds without a `google-services.json` have no crash reporting.
   says plainly it can't check rather than guessing.
 - **"Abre Spotify" / "pon música en YouTube Music"** — brings the music app
   to the foreground. Just opens it (no playback control) and says so; an
-  app that isn't installed gets a spoken explanation.
-- **"Respuestas cortas" / "con más detalle" / "normales"** — RoadMate
-  remembers how long you like answers (across trips) and shapes every
-  Gemini reply to match.
+  app that isn't installed gets a spoken explanation. A bare **"pon música"**
+  that names no app opens whichever known one you actually have.
+- **"Respuestas cortas" / "con más detalle" / "sé más breve" / "normales"** —
+  RoadMate remembers how long you like answers (across trips) and shapes
+  every reply to match.
 - **It remembers.** Replies build on the last few things said this trip.
   **"Recuerda que no me gustan las autovías"**, **"prefiero las
   nacionales"** → stored on-device and fed into every future answer;
@@ -77,6 +88,11 @@ needs no login.
 
 The full data story — what stays on the device, the two times anything
 leaves it, and every permission — is in [`PRIVACY.md`](PRIVACY.md).
+
+That promise extends to Android's own backup: the memory database, the debug
+trace and the model/tile caches are explicitly excluded from Auto Backup and
+device-to-device transfer (`app/src/main/res/xml/backup_rules.xml` and
+`data_extraction_rules.xml`). Only the harmless UI preferences restore.
 
 ## Architecture
 
@@ -160,6 +176,7 @@ Dependency injection is Hilt end to end (`@HiltAndroidApp`, `@AndroidEntryPoint`
 ```
 ./gradlew :app:installDebug          # build and install on a connected device/emulator
 ./gradlew :domain:test :app:testDebugUnitTest   # unit tests (both use hand-rolled fakes)
+./gradlew :app:lintDebug             # Android Lint, checkDependencies covers :data and :domain
 ```
 
 That's the whole setup — the model download happens at runtime, so a plain

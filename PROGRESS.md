@@ -114,11 +114,13 @@ without reading the full git log.
   Verified: full permission cascade (location → mic → notifications →
   contacts → call) live on-device, all four permissions ending up granted,
   no crash.
-- **Map search ("busca gasolineras", "hoteles cerca")**: hands the query to
-  the on-device Maps app via a `geo:` intent instead of RoadMate querying a
-  places API — keeps the "your voice and questions never leave the phone"
-  promise intact. Verified the intent resolves and hands off to Google Maps
-  live on the emulator.
+- **Map search ("busca gasolineras", "hoteles cerca")**: shown on RoadMate's
+  own downloaded offline map. (This used to hand off to the device's Maps app
+  via a `geo:` intent; all external-Maps handoffs were removed on 2026-09-03
+  at the user's request — "el mapa de Google no debe usarlo". A category
+  becomes a POI filter, anything else is matched by name against the
+  downloaded tiles, and with no region downloaded RoadMate says so rather
+  than falling back to another app.)
 - **Android Auto integration**: Car App Library service registered under
   the `POI` category (changed from an earlier, less honest `IOT` choice).
   `HomeCarScreen` compiles against real `androidx.car.app` 1.7.0 APIs
@@ -167,6 +169,110 @@ without reading the full git log.
   street-level default zoom. Debug tracing to a file (`DebugTrace`) is in
   place on `develop` and must be stripped before merge. See `NEXT_SESSION.md`.
 
+
+## Audit + hardening pass, 2026-09-02
+
+A full read of every file, with fixes applied on `fix/audit-2026-09-02`.
+Nothing here was found by running the app — there was no device in the loop —
+so all of it still wants a device pass. What made it possible to be confident
+anyway: `:domain` was compiled and its tests actually run (114 passing), and
+every file was checked with a Kotlin parser and a missing-import pass.
+
+### The one that mattered most
+
+**Spanish never matched the parsers.** Java's regex engine defines `\b`, `\w`
+and `\W` over ASCII unless told otherwise, so any pattern touching an accented
+letter silently failed:
+
+- `qu[eé]\b` never matched "qué hora es" — the most common way a Spanish
+  driver starts a question. Nor "por qué", "quién", "cómo", "cuándo".
+- `\b[uú]ltim[oa]\b` never matched "la última", so the call follow-up
+  ("¿cuál?" → "la última") did nothing.
+- `split(Regex("\\W+"))` turned "Ana García" into "ana", "garc", "a" — so
+  picking a contact by an accented surname failed, as did recalling a place.
+- `IGNORE_CASE` alone is ASCII-only case folding, so "QUÉ" ≠ "qué".
+
+Three `:domain` tests were already failing on `develop` for exactly this.
+Every pattern that reads the driver now goes through `spanishRegex()`, which
+prepends Java's `(?U)`; `SpanishRegexTest` locks it down.
+
+### Privacy
+
+`backup_rules.xml` / `data_extraction_rules.xml` were the empty Android Studio
+templates, so with `allowBackup="true"` the memory DB (conversation history,
+home/work coordinates, relationships) and the `DebugTrace` file (full
+transcripts) were eligible for Google Drive backup and phone-to-phone
+transfer. Both now exclude them, along with the model and tile caches.
+
+### Correctness
+
+- One "oye copiloto" fired the wake handler repeatedly — Vosk keeps the
+  hypothesis across partials, so every following partial still contained it.
+- The mic was handed from the wake recognizer to Vosk with `cancel()` rather
+  than `cancelAndJoin()`, so both briefly owned it.
+- `AudioLevelDetector.stop()` released the `AudioRecord` from the caller's
+  thread while `read()` was still blocked inside the native call.
+- `SilenceDetectionForegroundService` went on to open the mic after a failed
+  `startForeground` (a missing `return`).
+- `MapView.onDestroy()` ran twice on activity finish.
+- The Android Auto screen could hang on the host's loading spinner forever —
+  the only thing that cleared it was the happy path.
+- `TextToSpeechManager` mutated a plain list/map/flag from three threads, and
+  followed the device locale, so an English-locale phone read Spanish text
+  with an English voice.
+- `GeminiRepositoryImpl`'s answer cache was unsynchronised and unbounded, with
+  a key that changes on every question (the prompt embeds clock + GPS).
+- `GeminiNanoManager` cached a single timeout as "AICore absent", permanently
+  demoting a capable phone to "modo básico" for the session.
+- A failed answer left the driver in silence.
+
+### Latency, memory, battery
+
+- Weather was fetched on the critical path of *every* answer, with OkHttp's
+  default 10s/10s/10s timeouts and no cache. Now 4s-capped and cached for
+  10 minutes / ~5 km.
+- `onTrimMemory` / `onLowMemory` now release the local model (0.5–1.6 GB, by
+  far the largest thing in the process) instead of waiting to be killed.
+- `LocalLlmManager.isReady()` ran on the single inference thread, queueing
+  behind whatever generation held it.
+- `AudioLevelDetector` ran at 44.1 kHz to compute one RMS figure per buffer,
+  for the whole trip. Now 16 kHz, matching Vosk and the wake word.
+- The `MapView` was destroyed and rebuilt on every Voz/Mapa switch — GL
+  context torn down, style re-fetched. It's now held above the Crossfade.
+
+### Calls — the one irreversible thing RoadMate does
+
+`ACTION_CALL` dials with no confirmation, by design. The lookup pasted the
+transcript into a `DISPLAY_NAME LIKE '%name%'` pattern, so a stray `%` matched
+every contact and the first row was dialled. It now uses the platform's own
+`Phone.CONTENT_FILTER_URI`, ranks matches (exact > word-prefix > substring),
+and only dials by itself when the best tier names one person. That rule lives
+in `:domain` as `ContactMatching`, with tests. `Phone.LABEL` is read too, so a
+number the contact named themselves ("Coche") can be offered and picked.
+
+### Phrasings that were advertised but didn't work
+
+Found by running every parser over a battery of realistic driver utterances:
+"con más detalle" / "sé más breve" (the answer-length setting only matched if
+the sentence contained the word "respuestas"), "pon música" with no app named,
+"marca el número de X" / "ponme con X", and needs stated as needs ("tengo
+hambre", "necesito echar gasolina").
+
+### Accessibility
+
+Contrast computed for every scheme pair. The signal amber was 4.18:1 on white
+— under AA, and it's the mic CTA's fill and the "Escuchando…" line. `outline`
+(chip/radio/switch boundaries) was 1.69:1 light and 1.72:1 dark against
+WCAG 1.4.11's 3:1. All fixed; everything else already passed. The mic button
+also used to move ~30dp down the moment it was tapped.
+
+### Still not verified here
+
+`:data` and `:app` were never compiled — Maven Central is unreachable from
+that environment, so only `:domain` could be built and run. **Run
+`./gradlew :domain:test :app:testDebugUnitTest` and a device pass before
+trusting any of it.**
+
 ## Explicitly unverified / open
 
 - **Real Android Auto head unit / DHU**: never actually driven in this
@@ -184,11 +290,11 @@ without reading the full git log.
   pedro13087@gmail.com), grounded in what the code actually does. Still
   needs to be *published* somewhere linkable (GitHub Pages / the Play
   Console listing) and kept in sync if data flows change.
-- **Map search query parsing**: `MapSearchIntentParser` is a simple
-  free-text regex match on "busca/encuentra X" and "dónde hay X". It hasn't
-  been checked against a wide range of real phrasing — worth revisiting if
-  false positives/negatives show up in practice (e.g. "busca información
-  sobre..." would currently also match and get sent to Maps).
+- **Intent parsing against real phrasing**: now probed systematically (see
+  the 2026-09-02 audit below) rather than assumed, and the gaps that pass
+  found are closed and tested. Still hand-written regex, and still only
+  checked against phrasings someone thought of — a real device session with a
+  real voice will find more.
 
 ## Deliberate constraints (not gaps)
 

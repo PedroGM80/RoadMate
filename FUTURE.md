@@ -7,19 +7,24 @@ commitment, just a starting point for the next session. See
 
 ## Quick wins (small effort, real impact)
 
-- **Wider `MapSearchIntentParser` coverage.** Now handles navigation
-  phrasings ("llévame a…", "cómo llego a…", "guíame hasta…") separately from
-  the "busca/encuentra/dónde hay/dónde está/hay alguna" find family, strips
-  more proximity filler ("por aquí", "en la zona", bare "cercana"), and the
-  fact-lookup guard covers "quién/cuánto/cuándo/qué significa". Still
-  hand-written regex — revisit against real spoken phrasing on a device.
-- **Voice search → in-app offline map for known categories.** "busca
-  gasolineras" currently always fires a `geo:` intent (external Maps). For
-  the categories the offline map can pin (fuel / hotel / food) it should
-  switch to the Mapa tab and apply that filter instead, falling back to
-  `geo:` for everything else or when no region is downloaded. Blocked on
-  verifying the offline POI layer query on hardware first — full design in
-  `NEXT_SESSION.md`.
+- **Wider intent coverage — a round done 2026-09-02.** Every parser was run
+  over a battery of realistic driver utterances rather than the phrasings it
+  was written against, which turned up four gaps (three of them advertised in
+  the README): "con más detalle" / "sé más breve", a bare "pon música" with
+  no app named, "marca el número de X" / "ponme con X", and needs stated as
+  needs ("tengo hambre", "necesito echar gasolina"). All closed and tested.
+
+  Also fixed the reason most of the accented phrasings never matched at all:
+  Java's `\b` and `\W` are ASCII-only, so "qué", "última" and "García" fell
+  through everywhere. See `SpanishRegex.kt`.
+
+  Still hand-written regex, and still only checked against phrasings someone
+  thought of — a device session with a real voice will find more.
+- **Voice search → in-app offline map — done 2026-09-03.** All external-Maps
+  (`geo:` / `google.navigation:`) handoffs were removed; a category becomes a
+  POI filter on RoadMate's own downloaded tiles, anything else is matched by
+  name, and no downloaded region gets an honest "no tengo un mapa descargado
+  de esta zona" rather than a fallback to another app.
 - **Contact follow-up: label-aware — done.** `ContactMatch` now carries a
   `PhoneLabel` (mobile / work / home / main / other) read from
   `Phone.TYPE`. One contact with two labelled numbers is treated as
@@ -63,9 +68,16 @@ commitment, just a starting point for the next session. See
   facts fold into the prompt. Still open:
   - *STT vocabulary.* Vosk takes a phrase-list grammar at `Recognizer(...)`;
     feeding it contact names + frequent place names sharply improves
-    recognition of exactly those.
-  - *Feedback → few-shot.* Let the driver react ("más corto", "no era eso");
-    store corrections locally and prepend a couple as guidance.
+    recognition of exactly those. **Careful:** a phrase-list grammar
+    *restricts* the decoder to those phrases, so it can't be used for the
+    dictation path without breaking free-form questions. It would need a
+    second, command-only recognizer, or a post-hoc fuzzy match of the
+    transcript against the driver's actual contacts. The latter is testable
+    without a device and is probably where to start.
+  - *Feedback → few-shot.* Let the driver react ("no era eso"); store
+    corrections locally and prepend a couple as guidance. (The length half —
+    "más corto" — now works as a persisted setting, see
+    `StylePreferenceParser`.)
   - *Better base model (build-time).* `LOCAL_AI_MODEL_URL` is overridable —
     LoRA-finetune Qwen2.5-0.5B on a driving-assistant set offline, merge,
     convert to `.task`, ship that URL.
@@ -75,11 +87,15 @@ commitment, just a starting point for the next session. See
   "Preguntar", resizable, `updatePeriodMillis=0` (nothing to refresh). Taps
   fire `MainActivity` with `EXTRA_START_LISTENING`, same path as the tile.
   Not yet checked on a device.
-- **Accessibility audit beyond the current pass.** TalkBack live regions
-  and merged semantics exist on the core screens, and the design pass added
-  reduce-motion handling + 48dp targets, but there's been no dedicated
-  Switch Access or measured contrast-ratio pass, no font-scale check, and
-  Android Auto's own accessibility surface hasn't been touched.
+- **Accessibility — contrast measured 2026-09-02, the rest still open.**
+  Every colour-scheme pair was computed against WCAG 2.1 and three failures
+  fixed (the signal amber at 4.18:1, and `outline` at 1.69:1 light / 1.72:1
+  dark against 1.4.11's 3:1). The mic button also used to shift ~30dp the
+  moment it was tapped, which is a moving target for a driver's thumb.
+
+  Still open: no Switch Access pass, no font-scale check (the layout uses
+  fixed `dp` heights in places and has never been seen at 200% text), and
+  Android Auto's own accessibility surface is untouched.
 - **Settings surface — extend it.** The `TopAppBar` overflow now covers
   theme (system / light / dark / auto-night), answer length, "borrar mapas
   descargados" and "borrar lo aprendido". If it grows further it wants a
@@ -149,9 +165,14 @@ commitment, just a starting point for the next session. See
   `LlmInference` close/reload on `onTrimMemory`. (ABI splits and the
   `com.google.mediapipe.**` keep rules are now in place — see "APK size"
   below; R8 itself is still off pending a device check.)
-- **CI pipeline — done.** `.github/workflows/ci.yml` runs
-  `:domain:test :app:testDebugUnitTest` on push / PR / manual dispatch
-  (JDK 21 Temurin, `gradle/actions/setup-gradle`, Vosk model cached).
+- **CI pipeline — done, plus lint 2026-09-02.** `.github/workflows/ci.yml`
+  runs `:domain:test :app:testDebugUnitTest` on push / PR / manual dispatch
+  (JDK 21 Temurin, `gradle/actions/setup-gradle`, Vosk model cached), and now
+  `:app:lintDebug` with the report uploaded. Lint is **non-gating** for a
+  first pass (`lint.abortOnError = false` in `app/build.gradle.kts`): read the
+  report, fix or baseline what's there, then flip it to `true` so a regression
+  fails CI instead of scrolling past in a log.
+
   Open: no instrumented-test or `assembleRelease` job yet (the latter needs
   signing config + a device to be meaningful).
 - **Crash reporting — finish it.** Firebase Crashlytics is now wired
@@ -161,6 +182,27 @@ commitment, just a starting point for the next session. See
   upload would be needed to see those. Also worth an explicit opt-out
   toggle, and deciding whether the shipped build should carry a Firebase
   config at all vs. keeping it dev-only.
+
+## Left open by the 2026-09-02 audit
+
+- **Nothing outside `:domain` was compiled.** That environment had no Android
+  SDK and no Maven Central. `:data` and `:app` were checked with a Kotlin
+  parser and a missing-import pass only. Run the real build first.
+- **Main-thread tile work.** `placeFromTiles` and `refreshPois` both run
+  `querySourceFeatures` plus a geometry scan on the main thread on every
+  camera idle. The arithmetic is cheap; the JNI feature query may not be, and
+  it has to stay on the GL thread. Profile before restructuring.
+- **The model download doesn't survive being swiped away.** It resumes from
+  the `.part` next launch, which is correct but slow for a 1.5 GB file. A
+  foreground service or `WorkManager` job would let it finish in the
+  background. (`LocalLlmManager` now releases the engine under memory
+  pressure, so the other half of that item is done.)
+- **No checksum on the downloaded model** — size only. Fine against a
+  truncated download, not against a corrupted one.
+- **No index on `trip_exchange.at`**, so `recentExchanges` / `latestExchanges`
+  full-scan and sort. The 7-day retention keeps the table tiny, so this is
+  noted rather than fixed — it would cost a schema migration for no
+  measurable gain today.
 
 ## Blocking real-world launch (not code — decisions/content needed)
 
