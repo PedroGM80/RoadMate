@@ -240,6 +240,32 @@ class GenerateResponseUseCaseTest {
     }
 
     @Test
+    fun `take me home routes straight to the saved HOME coordinate`() = runTest {
+        val coordinator = FakeMapSearchCoordinator()
+        val memory = FakeMemoryRepository(
+            initialFacts = listOf(UserFact(FactType.HOME, value = "40.4168,-3.7038")),
+        )
+
+        val emitted = useCase(mapSearchCoordinator = coordinator, memoryRepository = memory)(
+            context, "llévame a casa",
+        ).toList()
+
+        assertEquals(40.4168 to -3.7038, coordinator.lastRequest?.destination)
+        assertEquals(true, coordinator.lastRequest?.navigate)
+        assertTrue(emitted.first().contains("Te llevo a casa"))
+    }
+
+    @Test
+    fun `take me to work with nothing saved asks the driver to set it first`() = runTest {
+        val coordinator = FakeMapSearchCoordinator()
+
+        val emitted = useCase(mapSearchCoordinator = coordinator)(context, "llévame al trabajo").toList()
+
+        assertTrue(coordinator.submitted.isEmpty())
+        assertTrue(emitted.first().contains("No sé dónde está tu trabajo"))
+    }
+
+    @Test
     fun `a named place with no category is still submitted, category null`() = runTest {
         val coordinator = FakeMapSearchCoordinator()
 

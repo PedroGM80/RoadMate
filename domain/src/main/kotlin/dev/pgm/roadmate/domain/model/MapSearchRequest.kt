@@ -13,4 +13,10 @@ data class MapSearchRequest(
     val origin: Pair<Double, Double>?,
     /** true → the driver asked to be taken there; draw a route, not just a pin. */
     val navigate: Boolean = false,
+    /**
+     * A coordinate already resolved from memory (home / work) to route
+     * straight to — when set, the map skips POI search and just routes
+     * [origin] → [destination].
+     */
+    val destination: Pair<Double, Double>? = null,
 )

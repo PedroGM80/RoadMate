@@ -72,11 +72,23 @@ class MapViewModel @Inject constructor(
 
     private fun applyVoiceSearch(request: MapSearchRequest) {
         clearRoute()
+        _showMap.tryEmit(Unit)
+
+        // Home/work: a coordinate is already resolved — route straight there,
+        // no POI search.
+        val fixedDestination = request.destination
+        if (fixedDestination != null) {
+            _poiFilter.value = null
+            _nameQuery.value = null
+            _navigateToResult.value = false
+            routeTo(request.origin, fixedDestination)
+            return
+        }
+
         val kind = request.category?.let(PoiKind::from)
         _poiFilter.value = kind
         _nameQuery.value = if (kind == null) request.rawQuery.trim().ifBlank { null } else null
         _navigateToResult.value = request.navigate
-        _showMap.tryEmit(Unit)
     }
 
     fun togglePoiFilter(kind: PoiKind) {

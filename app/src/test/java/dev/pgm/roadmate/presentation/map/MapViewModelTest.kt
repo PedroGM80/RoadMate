@@ -114,6 +114,29 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `a request with a fixed destination routes straight there, no POI search`() = runTest {
+        val coordinator = FakeMapSearchCoordinator()
+        val routing = FakeRoutingRepository()
+        val vm = mapViewModel(FakeOfflineMap(), coordinator, routing)
+
+        coordinator.submit(
+            MapSearchRequest(
+                rawQuery = "casa",
+                category = null,
+                origin = 40.0 to -3.7,
+                navigate = true,
+                destination = 40.4 to -3.7,
+            ),
+        )
+        advanceUntilIdle()
+
+        assertNull(vm.poiFilter.value)
+        assertNull(vm.nameQuery.value)
+        assertEquals(1, routing.requests.size)
+        assertEquals((40.0 to -3.7) to (40.4 to -3.7), routing.requests.first())
+    }
+
+    @Test
     fun `routeTo draws the route and summarises distance and time`() = runTest {
         val routing = FakeRoutingRepository()
         val vm = mapViewModel(FakeOfflineMap(), routing = routing)

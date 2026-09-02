@@ -72,6 +72,8 @@ import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.plugins.annotation.CircleManager
+import org.maplibre.android.plugins.annotation.CircleOptions
 import org.maplibre.android.plugins.annotation.LineManager
 import org.maplibre.android.plugins.annotation.LineOptions
 import org.maplibre.android.plugins.annotation.SymbolManager
@@ -113,6 +115,7 @@ fun MapScreen(
     var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var symbolManager by remember { mutableStateOf<SymbolManager?>(null) }
     var lineManager by remember { mutableStateOf<LineManager?>(null) }
+    var circleManager by remember { mutableStateOf<CircleManager?>(null) }
     var selectedPoi by remember { mutableStateOf<Pair<String, LatLng>?>(null) }
     var centeredOnUser by remember { mutableStateOf(false) }
 
@@ -121,8 +124,10 @@ fun MapScreen(
             mapLibreMap = map
             map.setStyle(Style.Builder().fromUri(viewModel.styleUrl)) { style ->
                 registerPinIcons(style, context)
-                // Created before the SymbolManager so the route line sits under the pins.
+                // Created before the SymbolManager so the route line + its
+                // destination dot sit under the pins.
                 lineManager = LineManager(mapView, map, style)
+                circleManager = CircleManager(mapView, map, style)
                 val manager = SymbolManager(mapView, map, style).apply {
                     iconAllowOverlap = true
                     textAllowOverlap = false
@@ -199,10 +204,11 @@ fun MapScreen(
         }
     }
 
-    // Draw (or clear) the offline route line.
+    // Draw (or clear) the offline route line + its destination dot.
     LaunchedEffect(route, lineManager) {
         val manager = lineManager ?: return@LaunchedEffect
         runCatching { manager.deleteAll() }
+        runCatching { circleManager?.deleteAll() }
         if (route.size < 2) return@LaunchedEffect
         val pts = route.map { LatLng(it.first, it.second) }
         runCatching {
@@ -211,6 +217,16 @@ fun MapScreen(
                     .withLatLngs(pts)
                     .withLineColor("#1565C0")
                     .withLineWidth(5f),
+            )
+        }
+        runCatching {
+            circleManager?.create(
+                CircleOptions()
+                    .withLatLng(pts.last())
+                    .withCircleRadius(7f)
+                    .withCircleColor("#1565C0")
+                    .withCircleStrokeColor("#FFFFFF")
+                    .withCircleStrokeWidth(2.5f),
             )
         }
         mapLibreMap?.let { m ->

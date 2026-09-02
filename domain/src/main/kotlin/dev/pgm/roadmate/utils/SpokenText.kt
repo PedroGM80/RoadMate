@@ -24,6 +24,8 @@ object SpokenText {
     fun searchingMap(query: String) = "Busco $query en el mapa."
     fun showingCategoryOnMap(query: String) = "Te enseño $query en el mapa."
     fun navigatingTo(query: String) = "Te llevo a $query. Mira el mapa."
+    fun placeNotSet(label: String) =
+        "No sé dónde está tu $label. Dime antes «esta es mi $label»."
     const val NO_OFFLINE_MAP =
         "No tengo un mapa descargado de esta zona. Descárgalo desde la pestaña Mapa."
     fun notOnOfflineMap(query: String) =

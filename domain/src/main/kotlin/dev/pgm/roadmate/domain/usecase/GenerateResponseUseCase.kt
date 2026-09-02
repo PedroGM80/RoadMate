@@ -299,6 +299,25 @@ class GenerateResponseUseCase @Inject constructor(
     ): String {
         if (!mapSearchCoordinator.hasOfflineMap()) return SpokenText.NO_OFFLINE_MAP
 
+        // "llévame a casa / al trabajo" — route straight to the saved
+        // coordinate instead of searching the tiles for a place named "casa".
+        if (navigate) {
+            savedPlaceFor(query)?.let { (type, label) ->
+                val coords = memoryRepository.facts(type).firstOrNull()?.value?.toCoords()
+                    ?: return SpokenText.placeNotSet(label)
+                mapSearchCoordinator.submit(
+                    MapSearchRequest(
+                        rawQuery = label,
+                        category = null,
+                        origin = location,
+                        navigate = true,
+                        destination = coords,
+                    ),
+                )
+                return SpokenText.navigatingTo(label)
+            }
+        }
+
         val category = PlaceCategoryParser.parse(query)
         mapSearchCoordinator.submit(
             MapSearchRequest(
@@ -313,6 +332,27 @@ class GenerateResponseUseCase @Inject constructor(
             navigate -> SpokenText.navigatingTo(query)
             category != null -> SpokenText.showingCategoryOnMap(query)
             else -> SpokenText.searchingMap(query)
+        }
+    }
+
+    /** "casa" / "mi trabajo" / "la oficina" → the memory fact to route to. */
+    private fun savedPlaceFor(query: String): Pair<FactType, String>? {
+        val q = query.trim().lowercase()
+        return when {
+            Regex("""^(?:mi\s+|a\s+|hacia\s+)?casa$""").matches(q) -> FactType.HOME to "casa"
+            Regex("""^(?:mi\s+|al\s+|el\s+|la\s+)?(?:trabajo|oficina|curro)$""").matches(q) ->
+                FactType.WORK to "trabajo"
+            else -> null
+        }
+    }
+
+    /** A `"lat,lon"` fact value → coordinate pair, or null if it doesn't parse. */
+    private fun String.toCoords(): Pair<Double, Double>? {
+        val parts = split(",").map { it.trim().toDoubleOrNull() }
+        return if (parts.size == 2 && parts[0] != null && parts[1] != null) {
+            parts[0]!! to parts[1]!!
+        } else {
+            null
         }
     }
 
