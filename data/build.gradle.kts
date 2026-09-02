@@ -123,9 +123,13 @@ dependencies {
     // limited Recognizer) both run on this — no extra engine, no account.
     implementation(libs.vosk.android)
     // Offline turn-by-turn routing (BRouter, MIT, pure Java, no NDK). The jar
-    // is fetched by the downloadBRouterJar task above; .rd5 segment data is
-    // downloaded per area at runtime, no account.
-    implementation(files(layout.projectDirectory.file("libs/brouter-$brouterVersion-ro.jar")))
+    // is fetched by downloadBRouterJar (builtBy wires the ordering so a clean
+    // build fetches it first); .rd5 segment data downloads per area at runtime.
+    implementation(
+        files(layout.projectDirectory.file("libs/brouter-$brouterVersion-ro.jar")) {
+            builtBy(downloadBRouter)
+        },
+    )
     implementation(libs.play.services.location)
 
     implementation(libs.retrofit)
