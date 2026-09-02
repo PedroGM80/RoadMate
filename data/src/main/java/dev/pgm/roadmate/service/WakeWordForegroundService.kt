@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
+import dev.pgm.roadmate.audio.Earcon
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.WakeWordRepository
@@ -57,6 +58,7 @@ class WakeWordForegroundService : Service() {
 
     private var scope: CoroutineScope? = null
     private var loopJob: Job? = null
+    private val earcon = Earcon()
 
     override fun onCreate() {
         super.onCreate()
@@ -87,14 +89,15 @@ class WakeWordForegroundService : Service() {
     override fun onDestroy() {
         loopJob?.cancel()
         scope?.cancel()
+        runCatching { earcon.release() }
         super.onDestroy()
     }
 
     private suspend fun wakeWordLoop() {
         val manager = getSystemService(NotificationManager::class.java)
         while (scope?.isActive == true) {
-            // Collect until the first detection, then the flow cancels and
-            // Porcupine releases the mic — leaving it free for Vosk below.
+            // Collect until the first detection, then the flow cancels and the
+            // wake recognizer releases the mic — leaving it free for Vosk below.
             val heard = wakeWordRepository.detections().firstOrNull()
             if (heard == null) {
                 // Engine closed without ever emitting — not configured or it
@@ -104,6 +107,7 @@ class WakeWordForegroundService : Service() {
                 return
             }
             manager?.notify(NOTIFICATION_ID, buildNotification(LISTENING_TEXT))
+            runCatching { earcon.start() } // audible "listening" cue, screen off
             runCatching { handleQuestion() }
                 .onFailure { Log.w(TAG, "background question failed", it) }
             manager?.notify(NOTIFICATION_ID, buildNotification())
