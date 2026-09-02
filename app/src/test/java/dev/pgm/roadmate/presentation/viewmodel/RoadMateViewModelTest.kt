@@ -16,6 +16,7 @@ import dev.pgm.roadmate.presentation.viewmodel.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeSilenceDetectionRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeSpeechRecognitionRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeSpeechSynthesisRepository
+import dev.pgm.roadmate.presentation.viewmodel.fake.FakeWakeWordRepository
 import dev.pgm.roadmate.presentation.viewmodel.fake.FakeWeatherRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -40,7 +41,8 @@ class RoadMateViewModelTest {
         greetingRepository: FakeGreetingRepository = FakeGreetingRepository(),
         greetingSpeechSynthesisRepository: FakeSpeechSynthesisRepository = FakeSpeechSynthesisRepository(),
         geminiRepository: FakeGeminiRepository = FakeGeminiRepository(geminiResponse),
-        speechEvents: List<SpeechRecognitionEvent>? = null
+        speechEvents: List<SpeechRecognitionEvent>? = null,
+        wakeWordRepository: FakeWakeWordRepository = FakeWakeWordRepository()
     ): RoadMateViewModel {
         val speechSynthesisRepository = FakeSpeechSynthesisRepository()
         val generateResponseUseCase = GenerateResponseUseCase(
@@ -69,7 +71,8 @@ class RoadMateViewModelTest {
             weatherRepository = FakeWeatherRepository(),
             geminiRepository = geminiRepository,
             speechSynthesisRepository = greetingSpeechSynthesisRepository,
-            greetingRepository = greetingRepository
+            greetingRepository = greetingRepository,
+            wakeWordRepository = wakeWordRepository
         )
     }
 
@@ -242,5 +245,50 @@ class RoadMateViewModelTest {
             advanceUntilIdle()
 
             assertEquals(1, geminiRepository.downloadRequestedCount)
+        }
+
+    @Test
+    fun `isWakeWordAvailable mirrors the repository`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            assertFalse(buildViewModel(wakeWordRepository = FakeWakeWordRepository(available = false)).isWakeWordAvailable())
+            assertTrue(buildViewModel(wakeWordRepository = FakeWakeWordRepository(available = true)).isWakeWordAvailable())
+        }
+
+    @Test
+    fun `a wake-word detection runs the same listen-and-answer cycle as a mic tap`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val wakeWord = FakeWakeWordRepository(available = true)
+            val viewModel = buildViewModel(
+                recognizedSpeech = "¿cuánto queda?",
+                geminiResponse = "quedan 10 km",
+                wakeWordRepository = wakeWord,
+            )
+
+            viewModel.startAmbientListening()
+            advanceUntilIdle()
+            wakeWord.emissions.tryEmit(Unit)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(RoadMateStatus.SPEAKING, state.status)
+            assertEquals("¿cuánto queda?", state.lastRecognizedInput)
+            assertEquals("quedan 10 km", state.currentResponse)
+        }
+
+    @Test
+    fun `stopAmbientListening keeps a later wake-word detection from starting a capture`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val wakeWord = FakeWakeWordRepository(available = true)
+            val viewModel = buildViewModel(wakeWordRepository = wakeWord)
+
+            viewModel.startAmbientListening()
+            advanceUntilIdle()
+            viewModel.stopAmbientListening()
+            advanceUntilIdle()
+            wakeWord.emissions.tryEmit(Unit)
+            advanceUntilIdle()
+
+            assertEquals(RoadMateStatus.IDLE, viewModel.uiState.value.status)
+            assertFalse(viewModel.uiState.value.isListening)
         }
 }

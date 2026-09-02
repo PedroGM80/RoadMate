@@ -68,7 +68,7 @@ fun HomeScreen(
 
     LaunchedEffect(corePermissions.allPermissionsGranted) {
         if (corePermissions.allPermissionsGranted) {
-            viewModel.startSilenceMonitoring()
+            viewModel.startAmbientListening()
             viewModel.refreshLocation()
             viewModel.greetIfNeeded()
             if (notificationPermission?.status?.isGranted == false) {

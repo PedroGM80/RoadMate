@@ -90,7 +90,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         SilenceDetectionForegroundService.stop(this)
         if (permissionManager.hasRecordAudioPermission()) {
-            viewModel.startSilenceMonitoring()
+            // Picks the wake-word listener or the silence monitor — one, not both.
+            viewModel.startAmbientListening()
             if (pendingStartListening) {
                 pendingStartListening = false
                 viewModel.startListening()
@@ -100,12 +101,14 @@ class MainActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        // Clear the caller's intent before cancelling the mic capture, so the
+        // capture's teardown doesn't revive wake-word listening we're stopping.
+        viewModel.stopAmbientListening()
         // Don't leave the mic recording once the app isn't in the foreground.
         viewModel.cancelListening()
 
         // Hand rest-reminder monitoring off to the foreground service instead of
         // just dropping it — only one of the two should hold the mic at a time.
-        viewModel.stopSilenceMonitoring()
         if (permissionManager.hasRecordAudioPermission()) {
             SilenceDetectionForegroundService.start(this)
         }

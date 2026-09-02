@@ -21,9 +21,11 @@ import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
+import dev.pgm.roadmate.domain.repository.WakeWordRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asFlow
@@ -107,6 +109,15 @@ class FakeSilenceDetectionRepository(
     private val events: Flow<SilenceEvent> = flowOf()
 ) : SilenceDetectionRepository {
     override fun observeSilence(durationMs: Long, thresholdDb: Double): Flow<SilenceEvent> = events
+}
+
+class FakeWakeWordRepository(
+    private val available: Boolean = false,
+) : WakeWordRepository {
+    /** Push a detection from a test with [tryEmit]; re-collected each restart. */
+    val emissions = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+    override fun isAvailable(): Boolean = available
+    override fun detections(): Flow<Unit> = emissions
 }
 
 class FakePhoneCallRepository(

@@ -10,6 +10,7 @@ import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
+import dev.pgm.roadmate.domain.repository.WakeWordRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.DetectSilenceUseCase
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
@@ -54,7 +55,8 @@ class RoadMateViewModel @Inject constructor(
     private val weatherRepository: WeatherRepository,
     private val geminiRepository: GeminiRepository,
     private val speechSynthesisRepository: SpeechSynthesisRepository,
-    private val greetingRepository: GreetingRepository
+    private val greetingRepository: GreetingRepository,
+    private val wakeWordRepository: WakeWordRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(RoadMateUiState())
@@ -62,6 +64,14 @@ class RoadMateViewModel @Inject constructor(
 
     private var listeningJob: Job? = null
     private var silenceMonitoringJob: Job? = null
+    private var wakeWordJob: Job? = null
+
+    /**
+     * Whether hands-free listening *should* be running — the caller's intent,
+     * kept separately from [wakeWordJob] so the internal pause/resume around a
+     * Vosk capture doesn't get confused with a real stop from onPause().
+     */
+    private var wakeWordDesired = false
 
     init {
         viewModelScope.launch {
@@ -167,9 +177,69 @@ class RoadMateViewModel @Inject constructor(
         silenceMonitoringJob = null
     }
 
+    /** True when the wake-word engine is configured — used to decide whether
+     *  hands-free replaces the mic-button-plus-silence-monitor path. */
+    fun isWakeWordAvailable(): Boolean = wakeWordRepository.isAvailable()
+
+    /**
+     * Starts whichever always-on mic consumer applies: the "RoadMate"
+     * wake-word listener when it's configured, otherwise the rest-reminder
+     * silence monitor. They can't both hold the mic, so this deliberately
+     * runs only one. Call once RECORD_AUDIO is granted (HomeScreen) and on
+     * every onResume() (MainActivity).
+     */
+    fun startAmbientListening() {
+        if (wakeWordRepository.isAvailable()) {
+            stopSilenceMonitoring()
+            startWakeWordListening()
+        } else {
+            startSilenceMonitoring()
+        }
+    }
+
+    /** Stops both, whichever was running. */
+    fun stopAmbientListening() {
+        stopWakeWordListening()
+        stopSilenceMonitoring()
+    }
+
+    /**
+     * Starts the hands-free wake-word listener ("RoadMate"). No-op when the
+     * engine isn't configured (the app then relies on the mic button). Holds
+     * the mic continuously, so it is mutually exclusive with the rest-reminder
+     * silence monitor — callers start one or the other, not both.
+     */
+    fun startWakeWordListening() {
+        wakeWordDesired = true
+        if (wakeWordJob?.isActive == true || !wakeWordRepository.isAvailable()) return
+        wakeWordJob = wakeWordRepository.detections()
+            .onEach {
+                // Ignore detections while we're already capturing a question or
+                // still speaking — Porcupine would otherwise trip on RoadMate's
+                // own "RoadMate".
+                if (listeningJob?.isActive != true && !speechSynthesisRepository.isSpeaking.value) {
+                    startListening()
+                }
+            }
+            .catch { /* an engine hiccup shouldn't take the app down */ }
+            .launchIn(viewModelScope)
+    }
+
+    fun stopWakeWordListening() {
+        wakeWordDesired = false
+        wakeWordJob?.cancel()
+        wakeWordJob = null
+    }
+
     fun startListening() {
         if (listeningJob?.isActive == true) return
+        // Free the mic for Vosk: pause wake detection without clearing the
+        // caller's intent, so the `finally` below can bring it back.
+        val resumeWakeWord = wakeWordJob?.isActive == true
+        wakeWordJob?.cancel()
+        wakeWordJob = null
         listeningJob = viewModelScope.launch {
+          try {
             _uiState.value = _uiState.value.copy(
                 status = RoadMateStatus.LISTENING,
                 isListening = true,
@@ -222,6 +292,11 @@ class RoadMateViewModel @Inject constructor(
                 lastRecognizedInput = recognized
             )
             respondTo(recognized)
+          } finally {
+              // Mic is free again — bring hands-free listening back, unless
+              // something (onPause) has since cleared the intent.
+              if (resumeWakeWord && wakeWordDesired) startWakeWordListening()
+          }
         }
     }
 
@@ -285,5 +360,6 @@ class RoadMateViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         cancelListening()
+        stopWakeWordListening()
     }
 }
