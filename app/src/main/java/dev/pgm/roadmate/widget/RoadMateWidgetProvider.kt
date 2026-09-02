@@ -23,7 +23,7 @@ class RoadMateWidgetProvider : AppWidgetProvider() {
         appWidgetIds: IntArray,
     ) {
         val launch = Intent(context, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             putExtra(MainActivity.EXTRA_START_LISTENING, true)
         }
         val pending = PendingIntent.getActivity(

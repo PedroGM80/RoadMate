@@ -22,6 +22,7 @@ import dev.pgm.roadmate.utils.SpokenText
 import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
 import dev.pgm.roadmate.utils.Constants
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -280,10 +281,15 @@ class RoadMateViewModel @Inject constructor(
         if (listeningJob?.isActive == true) return
         // Free the mic for Vosk: pause wake detection without clearing the
         // caller's intent, so the `finally` below can bring it back.
-        val resumeWakeWord = wakeWordJob?.isActive == true
-        wakeWordJob?.cancel()
+        val wakeJob = wakeWordJob
+        val resumeWakeWord = wakeJob?.isActive == true
         wakeWordJob = null
         listeningJob = viewModelScope.launch {
+            // cancelAndJoin, not cancel: the wake recognizer's AudioRecord is
+            // released in its awaitClose, and firing Vosk before that finished
+            // raced two owners for one mic (IOException "could not open
+            // microphone", or a capture that hears nothing).
+            wakeJob?.cancelAndJoin()
             try {
                 var followUp = false
                 while (isActive) {
@@ -388,6 +394,10 @@ class RoadMateViewModel @Inject constructor(
     fun cancelListening() {
         listeningJob?.cancel()
         listeningJob = null
+        // Cancelling the flow doesn't unqueue what TTS is already reading, so
+        // tapping the mic to stop left the assistant talking over the driver
+        // for the rest of a long answer.
+        speechSynthesisRepository.stop()
         _uiState.value = _uiState.value.copy(status = RoadMateStatus.IDLE, isListening = false)
     }
 
@@ -427,9 +437,6 @@ class RoadMateViewModel @Inject constructor(
 
     private suspend fun buildTravelContext(userInput: String): TravelContext {
         val location = locationRepository.getCurrentCoordinates()
-        if (location == null) {
-            dev.pgm.roadmate.ml.DebugTrace.log("ctx: no location fix -> weather will be skipped")
-        }
         val weatherDescription = location?.let { (lat, lon) ->
             weatherRepository.getCurrentWeatherDescription(lat, lon)
         }
@@ -448,7 +455,7 @@ class RoadMateViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         cancelListening()
-        stopWakeWordListening()
+        stopAmbientListening()
         runCatching { wakeEarcon.release() }
     }
 

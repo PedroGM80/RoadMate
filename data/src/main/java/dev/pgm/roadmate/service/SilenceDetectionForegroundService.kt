@@ -74,6 +74,9 @@ class SilenceDetectionForegroundService : Service() {
         }.onFailure {
             Log.e(TAG, "Failed to start in the foreground, stopping", it)
             stopSelf()
+            // Without this the service went on to open the mic and monitor
+            // anyway, with no foreground notification backing it.
+            return
         }
 
         val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())

@@ -34,6 +34,7 @@ class AudioLevelDetector(
     private val onSilenceDetected: (duration: Long) -> Unit = {}
 ) {
 
+    @Volatile
     private var audioRecord: AudioRecord? = null
     private var recordingJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -77,35 +78,53 @@ class AudioLevelDetector(
 
         record.startRecording()
 
+        // The record is stopped and released *on this thread*, in the reading
+        // loop's own finally. stop() used to release it from the caller's
+        // thread while read() was still blocked inside the native call, which
+        // is undefined behaviour and can take the process down.
         recordingJob = scope.launch {
             val buffer = ShortArray(bufferSize / 2)
-            while (isActive) {
-                val samplesRead = record.read(buffer, 0, buffer.size)
-                if (samplesRead > 0) {
-                    val db = amplitudeToDb(buffer, samplesRead)
-                    onLevelChanged(db)
-                    checkForSilence(db)
+            try {
+                while (isActive) {
+                    val samplesRead = record.read(buffer, 0, buffer.size)
+                    if (samplesRead > 0) {
+                        val db = amplitudeToDb(buffer, samplesRead)
+                        onLevelChanged(db)
+                        checkForSilence(db)
+                    } else if (samplesRead < 0) {
+                        break // ERROR_INVALID_OPERATION / ERROR_DEAD_OBJECT
+                    }
                 }
+            } finally {
+                releaseRecord(record)
             }
         }
     }
 
     fun stop() {
-        recordingJob?.cancel()
+        val job = recordingJob
         recordingJob = null
-
-        audioRecord?.let { record ->
+        if (job != null) {
+            // Unblocking read() so the loop's finally can run promptly; the
+            // release itself still happens there, never here.
             runCatching {
-                if (record.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
-                    record.stop()
-                }
+                audioRecord?.takeIf { it.recordingState == AudioRecord.RECORDSTATE_RECORDING }?.stop()
             }
-            record.release()
+            job.cancel()
+        } else {
+            audioRecord?.let(::releaseRecord)
         }
-        audioRecord = null
 
         silenceStartedAtMs = null
         silenceAlreadyReported = false
+    }
+
+    private fun releaseRecord(record: AudioRecord) {
+        runCatching {
+            if (record.recordingState == AudioRecord.RECORDSTATE_RECORDING) record.stop()
+        }
+        runCatching { record.release() }
+        if (audioRecord === record) audioRecord = null
     }
 
     private fun amplitudeToDb(buffer: ShortArray, samplesRead: Int): Double {

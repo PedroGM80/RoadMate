@@ -1,13 +1,31 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample backup rules file; uncomment and customize as necessary.
-   See https://developer.android.com/guide/topics/data/autobackup
-   for details.
-   Note: This file is ignored for devices older than API 31
-   See https://developer.android.com/about/versions/12/backup-restore
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Auto Backup (API < 31). RoadMate's promise is that nothing leaves the
+  device except the weather lookup and the one-time model download, so the
+  private data that Auto Backup would otherwise copy to the user's Google
+  Drive is excluded here:
+
+  - databases/roadmate.db      the on-device memory DB (conversation history
+                               and driver facts: home/work coordinates,
+                               relationships, preferences)
+  - files/aicore_debug.log     the trace file — carries full transcripts
+  - files/models/              the downloaded LLM (0.5–1.5 GB; way over the
+                               25 MB backup quota, so it would only ever make
+                               backups fail)
+  - files/vosk-es/             the unpacked speech model (~40 MB, re-derived
+                               from assets on first run)
+  - files/brouter/             unpacked routing profile + downloaded .rd5
+                               segment tiles
+
+  Onboarding/theme/answer-style preferences (DataStore) are still backed up:
+  they carry no personal content and restoring them is a nicety.
 -->
 <full-backup-content>
-    <!--
-   <include domain="sharedpref" path="."/>
-   <exclude domain="sharedpref" path="device.xml"/>
--->
+    <exclude domain="database" path="roadmate.db" />
+    <exclude domain="database" path="roadmate.db-shm" />
+    <exclude domain="database" path="roadmate.db-wal" />
+    <exclude domain="file" path="aicore_debug.log" />
+    <exclude domain="file" path="models" />
+    <exclude domain="file" path="vosk-es" />
+    <exclude domain="file" path="brouter" />
 </full-backup-content>

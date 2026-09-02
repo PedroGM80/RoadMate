@@ -63,17 +63,26 @@ class WakeWordDetector @Inject constructor(
             return@callbackFlow
         }
 
+        // Vosk keeps the accumulated hypothesis across partials, so once
+        // "copiloto" appears every subsequent partial still contains it. Without
+        // this guard one spoken phrase fired the wake handler several times in a
+        // row (earcon, "Sí, dime.", mic open — repeatedly). Re-arm only after a
+        // quiet gap, i.e. a hypothesis that no longer mentions the phrase.
+        var armed = true
         val listener = object : RecognitionListener {
             override fun onPartialResult(hypothesis: String?) {
-                if (hypothesis.mentionsWakePhrase("partial")) fire()
+                update(hypothesis.mentionsWakePhrase("partial"))
             }
 
             override fun onResult(hypothesis: String?) {
-                if (hypothesis.mentionsWakePhrase("text")) fire()
+                update(hypothesis.mentionsWakePhrase("text"))
+                // A final result ends the utterance: the next one starts clean.
+                armed = true
             }
 
             override fun onFinalResult(hypothesis: String?) {
-                if (hypothesis.mentionsWakePhrase("text")) fire()
+                update(hypothesis.mentionsWakePhrase("text"))
+                armed = true
             }
 
             override fun onError(exception: Exception?) {
@@ -82,9 +91,14 @@ class WakeWordDetector @Inject constructor(
                 close()
             }
 
-            override fun onTimeout() { /* keep listening */ }
+            override fun onTimeout() {
+                armed = true
+            }
 
-            private fun fire() {
+            private fun update(heard: Boolean) {
+                if (!heard) return
+                if (!armed) return
+                armed = false
                 DebugTrace.log("wake: heard the wake phrase")
                 trySend(Unit)
             }

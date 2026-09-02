@@ -8,8 +8,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.Collections
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,9 +26,15 @@ import javax.inject.Singleton
 @Singleton
 class TextToSpeechManager @Inject constructor(@ApplicationContext context: Context) {
 
+    // Touched from three threads: the caller (main), the TTS init callback and
+    // the UtteranceProgressListener (both binder threads). The plain
+    // list/map/flag here could drop a done-callback or throw a
+    // ConcurrentModificationException while flushing the queue.
+    @Volatile
     private var isReady = false
-    private val pendingUtterances = mutableListOf<Pair<String, () -> Unit>>()
-    private val doneCallbacks = mutableMapOf<String, () -> Unit>()
+    private val pendingUtterances: MutableList<Pair<String, () -> Unit>> =
+        Collections.synchronizedList(mutableListOf())
+    private val doneCallbacks = ConcurrentHashMap<String, () -> Unit>()
 
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
@@ -40,7 +48,14 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
     }
 
     private fun setupEngine() {
-        engine.language = Locale.getDefault()
+        // RoadMate speaks Spanish and nothing else — every string it utters is
+        // Spanish. Following the device locale made an English-locale phone
+        // read Spanish text with an English voice. Fall back to the device
+        // locale only if no Spanish voice is installed.
+        val spanish = engine.setLanguage(SPANISH)
+        if (spanish == TextToSpeech.LANG_MISSING_DATA || spanish == TextToSpeech.LANG_NOT_SUPPORTED) {
+            engine.language = Locale.getDefault()
+        }
         engine.setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_ASSISTANT)
@@ -69,8 +84,9 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
     }
 
     private fun flushPending() {
-        val queued = pendingUtterances.toList()
-        pendingUtterances.clear()
+        val queued = synchronized(pendingUtterances) {
+            pendingUtterances.toList().also { pendingUtterances.clear() }
+        }
         queued.forEach { (text, onDone) -> enqueue(text, onDone) }
     }
 
@@ -108,5 +124,9 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
     @Synchronized
     private fun refreshSpeakingState() {
         _isSpeaking.value = doneCallbacks.isNotEmpty() || pendingUtterances.isNotEmpty()
+    }
+
+    private companion object {
+        val SPANISH: Locale = Locale.forLanguageTag("es-ES")
     }
 }

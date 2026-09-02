@@ -562,6 +562,12 @@ private fun rememberMapViewWithLifecycle(): MapView {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val mapView = remember { MapView(context) }
+    // MapView.onDestroy() tears down the native renderer and is not
+    // idempotent — calling it twice (ON_DESTROY *and* onDispose, which both
+    // run when the activity finishes) trips MapLibre's native side. One flag,
+    // one destroy.
+    val destroyed = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    val destroyOnce = { if (destroyed.compareAndSet(false, true)) mapView.onDestroy() }
     DisposableEffect(lifecycleOwner) {
         mapView.onCreate(null)
         val observer = LifecycleEventObserver { _, event ->
@@ -570,14 +576,14 @@ private fun rememberMapViewWithLifecycle(): MapView {
                 Lifecycle.Event.ON_RESUME -> mapView.onResume()
                 Lifecycle.Event.ON_PAUSE -> mapView.onPause()
                 Lifecycle.Event.ON_STOP -> mapView.onStop()
-                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+                Lifecycle.Event.ON_DESTROY -> destroyOnce()
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            mapView.onDestroy()
+            destroyOnce()
         }
     }
     return mapView

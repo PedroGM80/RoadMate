@@ -4,10 +4,12 @@ import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
 import dev.pgm.roadmate.data.di.OpenWeatherApiKey
+import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Query
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -66,9 +68,26 @@ class WeatherDataSource @Inject constructor(
     @OpenWeatherApiKey private val apiKey: String
 ) {
 
+    /**
+     * Short timeouts on purpose. This call sits on the critical path of every
+     * spoken answer (the prompt carries the weather line), and OkHttp's
+     * defaults are 10 s connect + 10 s read + 10 s write — on a dead cell in
+     * the middle of nowhere that is up to 30 s of the driver waiting for a
+     * reply that never needed weather in the first place. Better to give up
+     * fast and answer without it.
+     */
+    private val client: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(CALL_TIMEOUT_S, TimeUnit.SECONDS)
+            .readTimeout(CALL_TIMEOUT_S, TimeUnit.SECONDS)
+            .callTimeout(CALL_TIMEOUT_S, TimeUnit.SECONDS)
+            .build()
+    }
+
     private val api: OpenWeatherApi by lazy {
         Retrofit.Builder()
             .baseUrl("https://api.openweathermap.org/")
+            .client(client)
             .addConverterFactory(MoshiConverterFactory.create(Moshi.Builder().build()))
             .build()
             .create(OpenWeatherApi::class.java)
@@ -139,5 +158,9 @@ class WeatherDataSource @Inject constructor(
             }
         }
         return sb.toString()
+    }
+
+    private companion object {
+        const val CALL_TIMEOUT_S = 4L
     }
 }

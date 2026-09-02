@@ -30,15 +30,37 @@ class GeminiRepositoryImpl @Inject constructor(
     private val localLlmManager: LocalLlmManager
 ) : GeminiRepository {
 
-    private val responseCache = mutableMapOf<String, String>()
+    /**
+     * Answer cache, keyed on the whole prompt.
+     *
+     * Bounded and synchronized on purpose. Prompts embed the clock and the GPS
+     * fix, so nearly every question produces a fresh key and the old unbounded
+     * map grew for the length of a trip. And it is read/written from at least
+     * two threads — the ViewModel's main-dispatcher loop and the background
+     * wake-word service's IO scope — where a plain `mutableMapOf` can corrupt
+     * or throw. Insertion-ordered, oldest evicted first.
+     */
+    private val responseCache = LinkedHashMap<String, String>()
+
+    private fun cachedAnswer(prompt: String): String? = synchronized(responseCache) {
+        responseCache[prompt]
+    }
+
+    private fun cacheAnswer(prompt: String, answer: String) = synchronized(responseCache) {
+        responseCache[prompt] = answer
+        while (responseCache.size > MAX_CACHED_ANSWERS) {
+            val oldest = responseCache.keys.firstOrNull() ?: break
+            responseCache.remove(oldest)
+        }
+    }
 
     override suspend fun getResponse(prompt: String): String {
-        responseCache[prompt]?.let {
+        cachedAnswer(prompt)?.let {
             DebugTrace.log("GEMINI cache hit")
             return it
         }
         val response = generate(prompt)
-        responseCache[prompt] = response
+        cacheAnswer(prompt, response)
         return response
     }
 
@@ -50,7 +72,7 @@ class GeminiRepositoryImpl @Inject constructor(
      * string.
      */
     override fun getResponseStream(prompt: String): Flow<String> = flow {
-        responseCache[prompt]?.let {
+        cachedAnswer(prompt)?.let {
             DebugTrace.log("GEMINI cache hit (stream)")
             emit(it)
             return@flow
@@ -59,7 +81,7 @@ class GeminiRepositoryImpl @Inject constructor(
         if (geminiNanoManager.checkAvailability()) {
             DebugTrace.log("GEMINI stream backend = AICore/Nano (one-shot)")
             val full = geminiNanoManager.generateResponse(prompt)
-            responseCache[prompt] = full
+            cacheAnswer(prompt, full)
             emit(full)
             return@flow
         }
@@ -78,7 +100,7 @@ class GeminiRepositoryImpl @Inject constructor(
                 DebugTrace.log("GEMINI stream error: ${t.message}")
             }
             if (last.isNotBlank()) {
-                responseCache[prompt] = last
+                cacheAnswer(prompt, last)
             } else {
                 DebugTrace.log("GEMINI stream produced nothing -> FALLBACK")
                 emit(GeminiNanoManager.FALLBACK_RESPONSE)
@@ -110,9 +132,7 @@ class GeminiRepositoryImpl @Inject constructor(
         localLlmManager.warmUp()
     }
 
-    override fun clearCache() {
-        responseCache.clear()
-    }
+    override fun clearCache() = synchronized(responseCache) { responseCache.clear() }
 
     override fun localAiStatus(): Flow<LocalAiStatus> = flow {
         emit(LocalAiStatus.Checking)
@@ -126,5 +146,10 @@ class GeminiRepositoryImpl @Inject constructor(
 
     override suspend fun requestLocalAiModelDownload() {
         localAiModelManager.fetch()
+    }
+
+    private companion object {
+        /** Enough to catch a repeated question in one trip, small enough to forget. */
+        const val MAX_CACHED_ANSWERS = 32
     }
 }
