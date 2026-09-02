@@ -79,4 +79,11 @@ object SpokenText {
     // Background rest reminder
     const val REST_NUDGE = "Llevas un buen rato al volante. ¿Paramos a descansar?"
     const val REST_MONITOR = "Atento por si necesitas un descanso."
+
+    // Speech playback controls ("repite", "más despacio"…)
+    const val NOTHING_TO_REPEAT = "Todavía no he dicho nada."
+    const val SPEECH_SLOWER = "Vale, hablo más despacio."
+    const val SPEECH_FASTER = "Vale, hablo más rápido."
+    const val SPEECH_NORMAL_SPEED = "Vuelvo a la velocidad normal."
+    const val SPEECH_RATE_LIMIT = "Ya voy todo lo que puedo por ahí."
 }

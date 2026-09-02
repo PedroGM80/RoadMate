@@ -14,6 +14,9 @@ interface SpeechSynthesisRepository {
 
     fun stop()
 
+    /** Sets how fast speech is read: 1.0 is normal, lower is slower. */
+    fun setSpeechRate(rate: Float) {}
+
     /** Suspends until nothing is being spoken. Returns at once if already quiet. */
     suspend fun awaitDoneSpeaking()
 }

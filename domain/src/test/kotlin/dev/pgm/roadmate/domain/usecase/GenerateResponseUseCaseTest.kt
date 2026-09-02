@@ -102,6 +102,33 @@ class GenerateResponseUseCaseTest {
     }
 
     @Test
+    fun `"repite" says the last answer again`() = runTest {
+        val speech = FakeSpeechSynthesisRepository()
+        val uc = useCase(FakeGeminiRepository(response = "quedan 12 kilómetros"), speech)
+
+        uc(context, "¿cuánto queda?").toList()
+        val repeated = uc(context, "repite").toList()
+
+        assertEquals(listOf("quedan 12 kilómetros"), repeated)
+        assertEquals("quedan 12 kilómetros", speech.lastSpoken)
+    }
+
+    @Test
+    fun `"repite" before anything was said explains that`() = runTest {
+        val emitted = useCase()(context, "repite eso").toList()
+        assertEquals(listOf("Todavía no he dicho nada."), emitted)
+    }
+
+    @Test
+    fun `"más despacio" lowers and persists the speech rate`() = runTest {
+        val prefs = FakeAssistantPreferencesRepository()
+        val emitted = useCase(assistantPreferencesRepository = prefs)(context, "habla más despacio").toList()
+
+        assertEquals(listOf("Vale, hablo más despacio."), emitted)
+        assertEquals(0.85f, prefs.speechRateFlow.value, 0.001f)
+    }
+
+    @Test
     fun `weather question with no data says so plainly instead of guessing`() = runTest {
         val gemini = FakeGeminiRepository(response = "no debería usarse")
 

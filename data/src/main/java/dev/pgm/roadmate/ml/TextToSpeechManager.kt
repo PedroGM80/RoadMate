@@ -39,6 +39,10 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
     private val _isSpeaking = MutableStateFlow(false)
     val isSpeaking: StateFlow<Boolean> = _isSpeaking.asStateFlow()
 
+    /** Speech rate to apply; kept so a call before the engine is ready still sticks. */
+    @Volatile
+    private var speechRate = 1.0f
+
     private val engine: TextToSpeech = TextToSpeech(context) { status ->
         if (status == TextToSpeech.SUCCESS) {
             isReady = true
@@ -62,6 +66,7 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                 .build()
         )
+        engine.setSpeechRate(speechRate)
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) = Unit
 
@@ -112,6 +117,12 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
         pendingUtterances.clear()
         doneCallbacks.clear()
         _isSpeaking.value = false
+    }
+
+    /** Sticky on the engine; a value set before init is applied in [setupEngine]. */
+    fun setRate(rate: Float) {
+        speechRate = rate
+        if (isReady) engine.setSpeechRate(rate)
     }
 
     private fun enqueue(text: String, onDone: () -> Unit) {

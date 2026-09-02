@@ -227,6 +227,12 @@ class FakeAssistantPreferencesRepository : AssistantPreferencesRepository {
     override suspend fun setLocalAiModelId(id: String) {
         localAiModelFlow.value = id
     }
+
+    private val speechRateFlow = MutableStateFlow(1.0f)
+    override val speechRate: Flow<Float> = speechRateFlow
+    override suspend fun setSpeechRate(rate: Float) {
+        speechRateFlow.value = rate
+    }
 }
 
 class FakeMemoryRepository : MemoryRepository {

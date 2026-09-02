@@ -23,4 +23,8 @@ interface AssistantPreferencesRepository {
     /** Id of the chosen downloadable local-AI model; null until the driver picks one. */
     val localAiModelId: Flow<String?>
     suspend fun setLocalAiModelId(id: String)
+
+    /** How fast the assistant speaks; 1.0 is normal. Adjusted by "más despacio" / "más rápido". */
+    val speechRate: Flow<Float>
+    suspend fun setSpeechRate(rate: Float)
 }

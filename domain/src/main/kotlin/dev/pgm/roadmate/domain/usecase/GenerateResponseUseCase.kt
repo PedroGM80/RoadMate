@@ -24,6 +24,7 @@ import dev.pgm.roadmate.utils.MapSearchIntentParser
 import dev.pgm.roadmate.utils.MediaIntentParser
 import dev.pgm.roadmate.utils.PlaceCategoryParser
 import dev.pgm.roadmate.utils.MemoryCommandParser
+import dev.pgm.roadmate.utils.PlaybackCommandParser
 import dev.pgm.roadmate.utils.PlaceName
 import dev.pgm.roadmate.utils.PromptBuilder
 import dev.pgm.roadmate.utils.SentenceChunker
@@ -38,6 +39,11 @@ import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
+
+/** Speech-rate bounds and per-nudge step for "más despacio" / "más rápido". */
+private const val MIN_RATE = 0.6f
+private const val MAX_RATE = 1.6f
+private const val RATE_STEP = 0.15f
 
 /**
  * Builds a prompt from [TravelContext], asks the on-device model for a
@@ -97,17 +103,29 @@ class GenerateResponseUseCase @Inject constructor(
     /** The candidates from an unresolved "llama a X" — awaiting "la segunda" etc. */
     private var pendingCall: List<ContactMatch>? = null
 
+    /** The last thing RoadMate said, so "repite" can say it again. */
+    private var lastAnswer: String? = null
+
     operator fun invoke(context: TravelContext, userInput: String): Flow<String> = flow {
         pendingCall?.let { pending ->
             val picked = CallFollowUpParser.resolve(userInput, pending)
             pendingCall = null
             if (picked != null) {
                 val followUp = placeResolvedCall(picked)
+                lastAnswer = followUp
                 speechSynthesisRepository.speak(followUp)
                 emit(followUp)
                 return@flow
             }
             // not a follow-up — fall through to normal handling
+        }
+
+        // "repite" / "más despacio" — controls how RoadMate speaks, not a question.
+        PlaybackCommandParser.parse(userInput)?.let { command ->
+            val reply = handlePlaybackCommand(command)
+            speechSynthesisRepository.speak(reply)
+            emit(reply)
+            return@flow
         }
 
         val contactName = CallIntentParser.extractContactName(userInput)
@@ -135,6 +153,7 @@ class GenerateResponseUseCase @Inject constructor(
 
         if (shortcut != null) {
             // Shortcuts are fixed, one-line replies — speak and emit as one.
+            lastAnswer = shortcut
             speechSynthesisRepository.speak(shortcut)
             emit(shortcut)
             return@flow
@@ -165,7 +184,37 @@ class GenerateResponseUseCase @Inject constructor(
         }
         chunker.flush()?.let { speechSynthesisRepository.speak(it) }
         if (full.isNotBlank()) {
+            lastAnswer = full
             memoryRepository.recordExchange(userInput, full)
+        }
+    }
+
+    /**
+     * "repite" says the last answer again; "más despacio" / "más rápido" /
+     * "voz normal" nudge the speech rate and persist it. All spoken and shown
+     * like any other one-line reply.
+     */
+    private suspend fun handlePlaybackCommand(command: PlaybackCommandParser.Command): String {
+        if (command == PlaybackCommandParser.Command.REPEAT) {
+            return lastAnswer ?: SpokenText.NOTHING_TO_REPEAT
+        }
+        val current = assistantPreferencesRepository.speechRate.first()
+        val target = when (command) {
+            PlaybackCommandParser.Command.SLOWER -> current - RATE_STEP
+            PlaybackCommandParser.Command.FASTER -> current + RATE_STEP
+            PlaybackCommandParser.Command.NORMAL_SPEED -> 1.0f
+            PlaybackCommandParser.Command.REPEAT -> current // unreachable
+        }.coerceIn(MIN_RATE, MAX_RATE)
+
+        if (target == current && command != PlaybackCommandParser.Command.NORMAL_SPEED) {
+            return SpokenText.SPEECH_RATE_LIMIT
+        }
+        assistantPreferencesRepository.setSpeechRate(target)
+        speechSynthesisRepository.setSpeechRate(target)
+        return when (command) {
+            PlaybackCommandParser.Command.SLOWER -> SpokenText.SPEECH_SLOWER
+            PlaybackCommandParser.Command.FASTER -> SpokenText.SPEECH_FASTER
+            else -> SpokenText.SPEECH_NORMAL_SPEED
         }
     }
 
