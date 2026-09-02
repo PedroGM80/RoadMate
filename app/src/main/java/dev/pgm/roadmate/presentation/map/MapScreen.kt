@@ -122,6 +122,14 @@ fun MapScreen(
     LaunchedEffect(mapView) {
         mapView.getMapAsync { map ->
             mapLibreMap = map
+            // Lift the MapLibre logo + (i) so they sit above the bottom
+            // filter-chip row instead of tucked behind its corner (still
+            // visible, as the OSM/MapLibre licence requires).
+            val d = context.resources.displayMetrics.density
+            val side = (8 * d).toInt()
+            val lift = (150 * d).toInt()
+            map.uiSettings.setLogoMargins(side, 0, 0, lift)
+            map.uiSettings.setAttributionMargins(side, 0, 0, lift)
             map.setStyle(Style.Builder().fromUri(viewModel.styleUrl)) { style ->
                 registerPinIcons(style, context)
                 // Created before the SymbolManager so the route line + its
