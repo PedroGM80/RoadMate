@@ -155,6 +155,10 @@ class FakeMessagingRepository : MessagingRepository {
     }
 }
 
+class FakeReminderRepository : dev.pgm.roadmate.domain.repository.ReminderRepository {
+    override suspend fun schedule(text: String, whenEpochMillis: Long) = Unit
+}
+
 class FakeCurrentPlaceRepository(initial: String? = null) : CurrentPlaceRepository {
     private val _label = MutableStateFlow(initial)
     override val label: StateFlow<String?> = _label

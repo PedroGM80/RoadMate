@@ -83,6 +83,9 @@ object SpokenText {
     // "¿dónde estoy?" answered from the offline map
     fun youAreAt(place: String) = "Estás en $place."
 
+    // Reminders ("recuérdame …")
+    fun reminderSet(whenPhrase: String) = "Vale, te aviso $whenPhrase."
+
     // Text messages ("dile a Ana que…")
     const val SMS_NO_PERMISSION =
         "No puedo enviar mensajes sin permiso. Actívalo en ajustes: SMS."

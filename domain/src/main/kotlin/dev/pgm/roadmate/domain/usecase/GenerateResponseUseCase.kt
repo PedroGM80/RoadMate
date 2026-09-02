@@ -15,6 +15,7 @@ import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.MessagingRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
+import dev.pgm.roadmate.domain.repository.ReminderRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.utils.ArithmeticParser
@@ -29,6 +30,7 @@ import dev.pgm.roadmate.utils.PlaceCategoryParser
 import dev.pgm.roadmate.utils.MemoryCommandParser
 import dev.pgm.roadmate.utils.ParkingIntentParser
 import dev.pgm.roadmate.utils.PlaybackCommandParser
+import dev.pgm.roadmate.utils.ReminderIntentParser
 import dev.pgm.roadmate.utils.PlaceName
 import dev.pgm.roadmate.utils.PromptBuilder
 import dev.pgm.roadmate.utils.SentenceChunker
@@ -118,7 +120,8 @@ class GenerateResponseUseCase @Inject constructor(
     private val assistantPreferencesRepository: AssistantPreferencesRepository,
     private val memoryRepository: MemoryRepository,
     private val weatherRepository: WeatherRepository,
-    private val messagingRepository: MessagingRepository
+    private val messagingRepository: MessagingRepository,
+    private val reminderRepository: ReminderRepository
 ) {
     /** The candidates from an unresolved "llama a X" — awaiting "la segunda" etc. */
     private var pendingCall: List<ContactMatch>? = null
@@ -157,11 +160,13 @@ class GenerateResponseUseCase @Inject constructor(
         val conversion = UnitConversionParser.convert(userInput)
         val parkingIntent = ParkingIntentParser.parse(userInput)
         val messageRequest = MessageIntentParser.parse(userInput)
+        val reminder = ReminderIntentParser.parse(userInput)
         val shortcut = when {
             // Before the map/call parsers — "llévame al coche" and "dónde está
             // el coche" would otherwise be read as a place search.
             parkingIntent != null -> handleParking(parkingIntent, context)
             messageRequest != null -> handleMessage(messageRequest)
+            reminder != null -> handleReminder(reminder, context)
             // "¿dónde estoy?" — answer from the map if it has a street resolved,
             // otherwise fall through to the model (it has the coordinates).
             LocationQuestionParser.matches(userInput) && !context.placeLabel.isNullOrBlank() ->
@@ -372,6 +377,48 @@ class GenerateResponseUseCase @Inject constructor(
             is ContactLookupResult.Ambiguous -> SpokenText.CALL_AMBIGUOUS
             ContactLookupResult.NotFound -> SpokenText.contactNotFound(request.recipient)
         }
+    }
+
+    /**
+     * "recuérdame X en media hora / a las 6" — schedules a local alarm and
+     * confirms when it will fire. A clock time already gone today rolls to
+     * this evening, then to tomorrow.
+     */
+    private suspend fun handleReminder(
+        r: ReminderIntentParser.Reminder,
+        context: TravelContext,
+    ): String {
+        val now = context.date.time
+        val whenMillis: Long
+        val phrase: String
+        if (r.delayMinutes != null) {
+            whenMillis = now + r.delayMinutes * 60_000L
+            phrase = when {
+                r.delayMinutes < 60 -> "en ${r.delayMinutes} minutos"
+                r.delayMinutes == 60 -> "en una hora"
+                r.delayMinutes == 90 -> "en una hora y media"
+                else -> "en ${r.delayMinutes / 60} horas"
+            }
+        } else {
+            val atHour = r.atHour ?: return SpokenText.ANSWER_FAILED
+            val cal = java.util.Calendar.getInstance().apply {
+                time = context.date
+                set(java.util.Calendar.SECOND, 0)
+                set(java.util.Calendar.MILLISECOND, 0)
+                set(java.util.Calendar.HOUR_OF_DAY, atHour)
+                set(java.util.Calendar.MINUTE, r.atMinute)
+            }
+            if (cal.timeInMillis <= now + 30_000L) {
+                if (atHour < 12) cal.add(java.util.Calendar.HOUR_OF_DAY, 12)
+                if (cal.timeInMillis <= now + 30_000L) cal.add(java.util.Calendar.DAY_OF_MONTH, 1)
+            }
+            whenMillis = cal.timeInMillis
+            phrase = "a las %02d:%02d".format(
+                cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE),
+            )
+        }
+        reminderRepository.schedule(r.text, whenMillis)
+        return SpokenText.reminderSet(phrase)
     }
 
     private fun placeResolvedCall(match: ContactMatch): String {

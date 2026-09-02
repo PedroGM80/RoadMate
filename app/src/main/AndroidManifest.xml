@@ -85,6 +85,10 @@
         </service>
 
         <receiver
+            android:name="dev.pgm.roadmate.reminder.ReminderReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name="dev.pgm.roadmate.widget.RoadMateWidgetProvider"
             android:exported="true">
             <intent-filter>

@@ -7,6 +7,7 @@ import dev.pgm.roadmate.domain.fake.FakeMediaRepository
 import dev.pgm.roadmate.domain.fake.FakeMemoryRepository
 import dev.pgm.roadmate.domain.fake.FakeMessagingRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
+import dev.pgm.roadmate.domain.fake.FakeReminderRepository
 import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
 import dev.pgm.roadmate.domain.fake.FakeWeatherRepository
 import dev.pgm.roadmate.domain.model.AnswerStyle
@@ -41,7 +42,8 @@ class GenerateResponseUseCaseTest {
         assistantPreferencesRepository: FakeAssistantPreferencesRepository = FakeAssistantPreferencesRepository(),
         memoryRepository: FakeMemoryRepository = FakeMemoryRepository(),
         weatherRepository: FakeWeatherRepository = FakeWeatherRepository(),
-        messagingRepository: FakeMessagingRepository = FakeMessagingRepository()
+        messagingRepository: FakeMessagingRepository = FakeMessagingRepository(),
+        reminderRepository: FakeReminderRepository = FakeReminderRepository()
     ) = GenerateResponseUseCase(
         geminiRepository,
         speechSynthesisRepository,
@@ -51,7 +53,8 @@ class GenerateResponseUseCaseTest {
         assistantPreferencesRepository,
         memoryRepository,
         weatherRepository,
-        messagingRepository
+        messagingRepository,
+        reminderRepository
     )
 
     @Test

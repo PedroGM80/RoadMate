@@ -19,6 +19,7 @@ import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.domain.repository.MessagingRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
+import dev.pgm.roadmate.domain.repository.ReminderRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
@@ -162,6 +163,15 @@ class FakeMessagingRepository(
         sentTo = phoneNumber
         sentBody = body
         return true
+    }
+}
+
+class FakeReminderRepository : ReminderRepository {
+    var scheduledText: String? = null
+    var scheduledAt: Long? = null
+    override suspend fun schedule(text: String, whenEpochMillis: Long) {
+        scheduledText = text
+        scheduledAt = whenEpochMillis
     }
 }
 
