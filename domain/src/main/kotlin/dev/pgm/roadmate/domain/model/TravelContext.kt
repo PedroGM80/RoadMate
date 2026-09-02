@@ -13,4 +13,6 @@ data class TravelContext(
     val userInput: String,
     val weatherDescription: String? = null,
     val minute: Int = 0,
+    /** "calle · localidad" resolved from the offline map, when the Mapa tab has been open. */
+    val placeLabel: String? = null,
 )

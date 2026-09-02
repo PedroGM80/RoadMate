@@ -102,6 +102,26 @@ class GenerateResponseUseCaseTest {
     }
 
     @Test
+    fun `"dónde estoy" is answered from the map label, not the model`() = runTest {
+        val gemini = FakeGeminiRepository(response = "no debería usarse")
+        val ctx = context.copy(placeLabel = "Calle Real · San Fernando")
+
+        val emitted = useCase(gemini)(ctx, "¿dónde estoy?").toList()
+
+        assertEquals(listOf("Estás en Calle Real, San Fernando."), emitted)
+        assertEquals(0, gemini.responseCount)
+    }
+
+    @Test
+    fun `"dónde estoy" with no map label falls through to the model`() = runTest {
+        val gemini = FakeGeminiRepository(response = "estás cerca de Cádiz")
+
+        val emitted = useCase(gemini)(context, "¿dónde estoy?").toList()
+
+        assertEquals(listOf("estás cerca de Cádiz"), emitted)
+    }
+
+    @Test
     fun `parking is saved, then found by distance and bearing`() = runTest {
         val mem = FakeMemoryRepository()
         val uc = useCase(memoryRepository = mem)

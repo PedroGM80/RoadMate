@@ -80,6 +80,9 @@ object SpokenText {
     const val REST_NUDGE = "Llevas un buen rato al volante. ¿Paramos a descansar?"
     const val REST_MONITOR = "Atento por si necesitas un descanso."
 
+    // "¿dónde estoy?" answered from the offline map
+    fun youAreAt(place: String) = "Estás en $place."
+
     // Parking ("he aparcado aquí" / "¿dónde aparqué?")
     const val PARKING_SAVED = "Vale, guardo dónde has aparcado."
     const val PARKING_NO_FIX_TO_SAVE = "No tengo tu ubicación ahora mismo. Prueba cuando haya señal."

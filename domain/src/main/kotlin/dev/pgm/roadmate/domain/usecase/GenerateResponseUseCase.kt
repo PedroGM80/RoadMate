@@ -20,6 +20,7 @@ import dev.pgm.roadmate.utils.ArithmeticParser
 import dev.pgm.roadmate.utils.CallFollowUpParser
 import dev.pgm.roadmate.utils.CallIntentParser
 import dev.pgm.roadmate.utils.JokeProvider
+import dev.pgm.roadmate.utils.LocationQuestionParser
 import dev.pgm.roadmate.utils.MapSearchIntentParser
 import dev.pgm.roadmate.utils.MediaIntentParser
 import dev.pgm.roadmate.utils.PlaceCategoryParser
@@ -154,6 +155,10 @@ class GenerateResponseUseCase @Inject constructor(
             // Before the map/call parsers — "llévame al coche" and "dónde está
             // el coche" would otherwise be read as a place search.
             parkingIntent != null -> handleParking(parkingIntent, context)
+            // "¿dónde estoy?" — answer from the map if it has a street resolved,
+            // otherwise fall through to the model (it has the coordinates).
+            LocationQuestionParser.matches(userInput) && !context.placeLabel.isNullOrBlank() ->
+                SpokenText.youAreAt(context.placeLabel!!.replace(" · ", ", "))
             contactName != null -> handleCallRequest(contactName)
             mapQuery != null -> handleMapSearch(
                 mapQuery,
