@@ -49,6 +49,15 @@ interface MemoryDao {
     @Query("DELETE FROM user_fact")
     suspend fun clearFacts()
 
-    @Query("DELETE FROM user_fact WHERE type = :type AND value LIKE '%' || :match || '%'")
+    /**
+     * "olvida lo de X". [match] is escaped by the caller and the pattern says
+     * so: it arrives straight from a speech transcript, and an unescaped `%`
+     * in a mis-heard word would match every fact of that type and delete the
+     * lot — the driver asked to forget one thing, not everything.
+     */
+    @Query(
+        "DELETE FROM user_fact WHERE type = :type " +
+            "AND value LIKE '%' || :match || '%' ESCAPE '\\'"
+    )
     suspend fun deleteFactsMatching(type: String, match: String): Int
 }

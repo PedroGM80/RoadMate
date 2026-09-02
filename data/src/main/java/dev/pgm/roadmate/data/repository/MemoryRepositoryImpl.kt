@@ -88,7 +88,15 @@ class MemoryRepositoryImpl @Inject constructor(
 
     override suspend fun forget(type: FactType, valueContains: String?): Int =
         if (valueContains.isNullOrBlank()) dao.deleteFactsByType(type.name)
-        else dao.deleteFactsMatching(type.name, valueContains)
+        else dao.deleteFactsMatching(type.name, escapeLike(valueContains))
+
+    /**
+     * The text comes from a speech transcript and goes into a SQL LIKE
+     * pattern. A stray `%` there means "everything", and this statement is a
+     * DELETE.
+     */
+    private fun escapeLike(raw: String): String =
+        raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
     override suspend fun clearAll() {
         dao.clearExchanges()

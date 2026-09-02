@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -73,9 +74,15 @@ fun MicButton(
     )
 
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        if (isListening) {
-            ListeningDot(reduceMotion, Modifier.padding(bottom = Spacing.lg - Spacing.xs))
-        }
+        // The dot's space is reserved whether or not it's showing. It used to
+        // be added to the layout only while listening, which pushed the button
+        // ~30dp down the instant it was tapped — a target that moves under the
+        // driver's thumb, right when they might want to tap it again to stop.
+        ListeningDot(
+            visible = isListening,
+            reduceMotion = reduceMotion,
+            modifier = Modifier.padding(bottom = Spacing.lg - Spacing.xs),
+        )
 
         Box(contentAlignment = Alignment.Center) {
             if (isListening && !reduceMotion) {
@@ -129,7 +136,11 @@ fun MicButton(
 }
 
 @Composable
-private fun ListeningDot(reduceMotion: Boolean, modifier: Modifier = Modifier) {
+private fun ListeningDot(
+    visible: Boolean,
+    reduceMotion: Boolean,
+    modifier: Modifier = Modifier,
+) {
     val transition = rememberInfiniteTransition(label = "listening-dot")
     val scale by transition.animateFloat(
         initialValue = if (reduceMotion) 1f else 0.7f,
@@ -143,8 +154,10 @@ private fun ListeningDot(reduceMotion: Boolean, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(10.dp)
-            .scale(scale)
+            .scale(if (visible) scale else 1f)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.secondary),
+            .background(
+                if (visible) MaterialTheme.colorScheme.secondary else Color.Transparent,
+            ),
     )
 }
