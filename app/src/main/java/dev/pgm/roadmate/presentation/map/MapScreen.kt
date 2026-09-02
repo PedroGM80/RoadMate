@@ -226,23 +226,44 @@ fun MapScreen(
                 pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
             }
 
-            // Still nothing: the previous category's "fit to pins" likely
-            // zoomed out past the POI vector layer (min zoom ~14), so
-            // querySourceFeatures has no tiles. Zoom back in and re-query.
-            if (pins.isEmpty() && map.cameraPosition.zoom < 14.0) {
-                runCatching { map.animateCamera(CameraUpdateFactory.zoomTo(14.5), 300) }
-                repeat(6) {
-                    delay(400)
-                    pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
-                    if (pins.isNotEmpty()) return@repeat
+            // Still nothing: the current zoom has no usable tiles for this
+            // query. A category (POIs, min zoom ~14) needs zooming *in*; a
+            // place name — likely a town some km away — needs zooming *out*
+            // so its "place" tile loads.
+            if (pins.isEmpty()) {
+                val z = map.cameraPosition.zoom
+                val jump = when {
+                    poiFilter != null && z < 14.0 -> 14.5
+                    poiFilter == null && z > 11.0 -> 10.5
+                    else -> null
+                }
+                if (jump != null) {
+                    runCatching { map.animateCamera(CameraUpdateFactory.zoomTo(jump), 300) }
+                    repeat(8) {
+                        delay(400)
+                        pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
+                        if (pins.isNotEmpty()) return@repeat
+                    }
                 }
             }
 
-            // "llévame a…": route to the *nearest* match, not just the first
-            // one the tile query happened to return.
-            if (navigateToResult && pins.isNotEmpty()) {
+            // Nothing at all — tell the driver instead of leaving them hanging.
+            if (pins.isEmpty()) {
+                if (navigateToResult || nameQuery != null) {
+                    val what = nameQuery
+                        ?: poiFilter?.let { context.getString(it.labelRes) }
+                        ?: ""
+                    viewModel.onSearchFoundNothing(what)
+                }
+                return@LaunchedEffect
+            }
+
+            // "llévame a…": for a category ("una gasolinera") route to the
+            // nearest pin; for a name ("Chiclana") refreshPois already put the
+            // best match first, so trust that.
+            if (navigateToResult) {
                 val here = map.currentLatLon()
-                val target = if (here != null) {
+                val target = if (poiFilter != null && here != null) {
                     pins.minByOrNull { metersBetween(here, it.latitude to it.longitude) } ?: pins.first()
                 } else {
                     pins.first()
@@ -765,8 +786,15 @@ private fun refreshPois(
         }
 
         val vectorSource = map.style?.sources?.firstOrNull { it is VectorSource } as? VectorSource
+        // A name search also looks at the "place" layer (towns, villages,
+        // neighbourhoods) — "llévame a Chiclana" is a place, not a POI.
+        val layers = if (kind == null) {
+            arrayOf("poi", "poi_label", "place")
+        } else {
+            arrayOf("poi", "poi_label")
+        }
         val points = vectorSource
-            ?.querySourceFeatures(arrayOf("poi", "poi_label"), null)
+            ?.querySourceFeatures(layers, null)
             .orEmpty()
             .filter { it.geometry() is Point }
 
@@ -775,11 +803,12 @@ private fun refreshPois(
         val matches = if (kind != null) {
             points.filter { it.getStringProperty("class") in kind.classes }
         } else {
-            points.filter { f ->
-                NAME_PROPS.any { prop ->
-                    f.getStringProperty(prop)?.let { foldForSearch(it).contains(needle!!) } == true
-                }
-            }
+            // Best match first: a place whose name *is* the query beats a shop
+            // that merely contains the word ("Chiclana" vs "Bahía de Chiclana").
+            points
+                .mapNotNull { f -> nameMatchScore(f, needle!!)?.let { f to it } }
+                .sortedByDescending { it.second }
+                .map { it.first }
         }
 
         dev.pgm.roadmate.ml.DebugTrace.log(
@@ -816,6 +845,33 @@ private fun refreshPois(
         }
         pins.map { it.first }
     }.getOrDefault(emptyList())
+}
+
+/** "place"-layer classes that count as somewhere you'd drive *to*. */
+private val PLACE_LAYER_CLASSES = setOf(
+    "city", "town", "village", "hamlet", "suburb", "neighbourhood", "quarter",
+    "municipality", "isolated_dwelling", "locality",
+)
+
+/**
+ * How well a tile feature's name matches the spoken query, or null if it
+ * doesn't. Exact match ranks highest, then prefix, then a whole-word hit,
+ * then a bare substring; a town/village gets a bump over a like-named shop.
+ */
+private fun nameMatchScore(feature: org.maplibre.geojson.Feature, needle: String): Int? {
+    val name = NAME_PROPS.firstNotNullOfOrNull { feature.getStringProperty(it) }
+        ?.let(::foldForSearch)
+        ?.takeIf { it.isNotBlank() }
+        ?: return null
+    var score = when {
+        name == needle -> 100
+        name.startsWith("$needle ") || name.startsWith("$needle,") -> 70
+        Regex("\\b${Regex.escape(needle)}\\b").containsMatchIn(name) -> 40
+        name.contains(needle) -> 10
+        else -> return null
+    }
+    if (feature.getStringProperty("class") in PLACE_LAYER_CLASSES) score += 25
+    return score
 }
 
 private fun fallbackLabelFor(context: Context, kind: PoiKind): String = when (kind) {

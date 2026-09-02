@@ -190,6 +190,21 @@ class MapViewModelTest {
     }
 
     @Test
+    fun `onSearchFoundNothing clears the search and says it out loud`() = runTest {
+        val speech = dev.pgm.roadmate.presentation.viewmodel.fake.FakeSpeechSynthesisRepository()
+        val coordinator = FakeMapSearchCoordinator()
+        val vm = mapViewModel(FakeOfflineMap(), coordinator, speech = speech)
+
+        coordinator.submit(MapSearchRequest("Chiclana", category = null, origin = null, navigate = true))
+        advanceUntilIdle()
+        vm.onSearchFoundNothing("Chiclana")
+
+        assertNull(vm.nameQuery.value)
+        assertEquals(false, vm.navigateToResult.value)
+        assertEquals(listOf("No encuentro Chiclana en el mapa descargado."), speech.spoken)
+    }
+
+    @Test
     fun `a null route with no Wi-Fi points the driver at Wi-Fi`() = runTest {
         val routing = FakeRoutingRepository(
             result = null,

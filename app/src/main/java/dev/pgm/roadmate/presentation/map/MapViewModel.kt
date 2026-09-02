@@ -108,6 +108,13 @@ class MapViewModel @Inject constructor(
         _navigateToResult.value = false
     }
 
+    /** [MapScreen] retried and the offline tiles have nothing for this search. */
+    fun onSearchFoundNothing(query: String) {
+        _navigateToResult.value = false
+        _nameQuery.value = null
+        speechSynthesisRepository.speak(SpokenText.notOnOfflineMap(query))
+    }
+
     /** [MapScreen] resolved the driver's street/locality from the offline tiles. */
     fun onPlaceResolved(label: String?) = currentPlaceRepository.update(label)
 
