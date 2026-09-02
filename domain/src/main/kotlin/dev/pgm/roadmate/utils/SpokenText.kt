@@ -51,6 +51,9 @@ object SpokenText {
 
     // Media
     fun openingApp(app: String) = "Abro $app."
+
+    /** "pon música" with no music app installed that RoadMate can open. */
+    const val NO_MUSIC_APP = "No encuentro ninguna app de música que pueda abrir."
     fun cantOpenApp(app: String) = "No puedo abrir $app. ¿La tienes instalada?"
 
     // Memory

@@ -56,7 +56,8 @@ import javax.inject.Inject
  *     against the downloaded tiles. With no region downloaded, RoadMate says
  *     so instead of falling back to another app.
  *  3. "abre/pon Spotify|YouTube Music" — launches that music app. Just opens
- *     it (no playback control), and says so.
+ *     it (no playback control), and says so. A bare "pon música" that names
+ *     no app opens whichever known one is installed.
  *  4. Joke requests — answered from JokeProvider's local bank.
  *  5. "respuestas cortas / normales / con más detalle" — persists an
  *     [AssistantPreferencesRepository] setting and acknowledges it; that
@@ -123,6 +124,7 @@ class GenerateResponseUseCase @Inject constructor(
                 navigate = MapSearchIntentParser.isNavigationRequest(userInput),
             )
             mediaApp != null -> handleMediaRequest(mediaApp)
+            MediaIntentParser.wantsMusicWithoutApp(userInput) -> handleAnyMusicRequest()
             JokeProvider.matchesJokeIntent(userInput) -> JokeProvider.randomJoke()
             styleChange != null -> handleStyleChange(styleChange)
             memoryCommand != null -> handleMemoryCommand(memoryCommand, context)
@@ -372,4 +374,10 @@ class GenerateResponseUseCase @Inject constructor(
         } else {
             SpokenText.cantOpenApp(app.displayName)
         }
+
+    /** "pon música" — no app named, so open whichever one the driver has. */
+    private fun handleAnyMusicRequest(): String =
+        mediaRepository.launchAnyMusicApp()
+            ?.let { SpokenText.openingApp(it.displayName) }
+            ?: SpokenText.NO_MUSIC_APP
 }

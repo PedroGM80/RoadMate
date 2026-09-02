@@ -24,11 +24,33 @@ object MediaIntentParser {
         spanishRegex("""\bspotify\b""") to MediaApp.SPOTIFY,
     )
 
+    /**
+     * "pon música", "pon algo de música", "quiero música" — a request for
+     * music that never names an app.
+     *
+     * This is how people actually ask, and it used to fall through to the
+     * model, which would answer *about* music instead of playing any. There
+     * is no app to name here, so the caller picks: see
+     * [dev.pgm.roadmate.domain.repository.MediaRepository.launchAnyMusicApp].
+     */
+    private val MUSIC_WITHOUT_APP = spanishRegex(
+        """(?:^|\s)(?:quiero\s+|ponme\s+|pon\s+|poner\s+|reproduce\s+|escuchar\s+)""" +
+            """(?:algo\s+de\s+|un\s+poco\s+de\s+|algo\s+)?""" +
+            """(?:m[uú]sica|canciones|una\s+canci[oó]n)\b""",
+    )
+
     fun extractMediaApp(userInput: String): MediaApp? {
         val text = userInput.trim()
         if (!TRIGGER.containsMatchIn(text)) return null
         // YouTube Music is matched before the bare "spotify" pattern so
         // "youtube music" can't be shadowed by an unrelated later rule.
         return APP_PATTERNS.firstOrNull { (pattern, _) -> pattern.containsMatchIn(text) }?.second
+    }
+
+    /** True for a music request that named no app at all. */
+    fun wantsMusicWithoutApp(userInput: String): Boolean {
+        val text = userInput.trim()
+        if (extractMediaApp(text) != null) return false
+        return MUSIC_WITHOUT_APP.containsMatchIn(text)
     }
 }

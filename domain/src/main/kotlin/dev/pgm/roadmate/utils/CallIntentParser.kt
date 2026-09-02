@@ -9,7 +9,16 @@ package dev.pgm.roadmate.utils
 object CallIntentParser {
 
     private val PATTERNS = listOf(
-        spanishRegex("""(?:llama|llamar|telefonea|telefonear)\s+a\s+(.+)""")
+        // "llama a Ana", "quiero llamar a mamá", "llámame a Ana" (Vosk hears
+        // the pronoun that isn't there often enough to be worth accepting).
+        spanishRegex("""(?:ll[aá]ma(?:me|le)?|llamar|telefon[eé]a(?:le)?|telefonear)\s+a\s+(.+)"""),
+        // "marca el número de Ana", "marca a Ana"
+        spanishRegex("""marca(?:r)?\s+(?:el\s+(?:n[uú]mero|tel[eé]fono)\s+de\s+|a\s+)(.+)"""),
+        // "ponme con Ana", "pásame con Ana" — the "con" is what keeps this
+        // clear of MediaIntentParser's "ponme música".
+        spanishRegex("""(?:ponme|p[aá]same|comun[ií]came)\s+con\s+(.+)"""),
+        // "quiero hablar con Ana"
+        spanishRegex("""(?:quiero\s+)?hablar\s+con\s+(.+)"""),
     )
 
     fun extractContactName(userInput: String): String? {

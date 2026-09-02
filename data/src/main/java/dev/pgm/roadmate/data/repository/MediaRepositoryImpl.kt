@@ -31,6 +31,12 @@ class MediaRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun launchAnyMusicApp(): MediaApp? =
+        MediaApp.entries.firstOrNull { isInstalled(it) && launchMediaApp(it) }
+
+    private fun isInstalled(app: MediaApp): Boolean =
+        context.packageManager.getLaunchIntentForPackage(app.packageName) != null
+
     private companion object {
         const val TAG = "MediaRepository"
     }
