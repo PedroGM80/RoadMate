@@ -62,12 +62,19 @@ This file is now the running state, not the original bring-up plan.
    `GeminiRepositoryImpl`, `VoskSpeechRecognizer`, `MapScreen.refreshPois`,
    and the **TEMP `DebugTrace.log("TTS speak …")` in `TextToSpeechManager`**
    (added for the streaming-latency check). Grep `DebugTrace`.
-3. **Bigger Vosk model** for accuracy — `vosk-model-es-0.42` (~1.4 GB) as a
-   runtime download (the small one is bundled in assets; this needs a
-   download-manager path like the LLM has). Improves recognition, not
-   latency.
-4. Smaller latency wins: drop lat/lon + clima lines from the prompt when
-   the question doesn't need them; tighten Vosk end-of-speech.
+3. ~~**Bigger Vosk model** for accuracy — `vosk-model-es-0.42` (~1.4 GB)~~ —
+   **dropped.** Tried before; it recognised *worse* than the small one on
+   this device (per user, 2026-09-03). Not worth the ~1.4 GB runtime
+   download. Accuracy has to come from elsewhere — restricted grammar for
+   command phrases, or the wake-word engine in item 9.
+4. Smaller latency wins.
+   - ~~Drop lat/lon + clima lines from the prompt when the question doesn't
+     need them~~ — *done 2026-09-03* (`PromptBuilder`
+     `LOCATION_QUESTION` / `WEATHER_QUESTION` keyword gates; coord + Clima
+     lines emitted only for spatial / weather questions, bias to include).
+     Device measurement of the first-audio latency still pending.
+   - Tighten Vosk end-of-speech (`RECORDING_END_SILENCE_MS = 5_000L` is
+     long) — still open.
 5. Map polish: markers slightly big / overlap when clustered; MapLibre
    attribution overlaps the chip row's corner; consider a "N cerca" count.
 6. ~~Verify the OpenWeather key once it activates~~ — key is live (see
@@ -77,6 +84,21 @@ This file is now the running state, not the original bring-up plan.
    the POI query works.
 8. GPU backend for MediaPipe: dead end on this MediaTek (silent hang);
    could be made opt-in for devices where it works.
+9. **Hands-free wake word — drop the mic button.** Idea raised by user
+   2026-09-03: an always-listening on-device hotword ("oye RoadMate") so
+   the driver never has to tap. Options, all on-device so the privacy
+   promise holds:
+   - **Vosk keyword spotting** — feed `KaldiRecognizer` a restricted
+     grammar (just the wake phrase / a few command words). Zero new deps,
+     Vosk already bundled. Cheapest; accuracy on a tiny grammar is the
+     open question.
+   - **Picovoice Porcupine** — dedicated wake-word engine, tiny, good
+     accuracy, but adds a dep + a Picovoice access key + licensing to
+     check for a shipped app.
+   - **openWakeWord** — ONNX/TFLite runtime, custom words need training.
+   Battery: driving = usually plugged in, so an always-on recogniser is
+   acceptable; still gate it on a setting. Pairs well with a restricted
+   grammar as the accuracy answer that item 3 was supposed to be.
 
 ## Not for a device — still open from before
 
