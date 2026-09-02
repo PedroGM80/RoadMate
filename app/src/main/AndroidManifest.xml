@@ -68,6 +68,11 @@
             android:foregroundServiceType="microphone" />
 
         <service
+            android:name="dev.pgm.roadmate.service.WakeWordForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <service
             android:name="dev.pgm.roadmate.tile.AskTileService"
             android:exported="true"
             android:icon="@drawable/lucide_ic_mic"

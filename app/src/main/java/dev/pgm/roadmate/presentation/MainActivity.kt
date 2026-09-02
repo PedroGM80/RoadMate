@@ -23,6 +23,7 @@ import dev.pgm.roadmate.presentation.screen.OnboardingScreen
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 import dev.pgm.roadmate.presentation.viewmodel.SettingsViewModel
 import dev.pgm.roadmate.service.SilenceDetectionForegroundService
+import dev.pgm.roadmate.service.WakeWordForegroundService
 import dev.pgm.roadmate.ui.theme.RoadMateTheme
 import dev.pgm.roadmate.utils.PermissionManager
 import kotlinx.coroutines.launch
@@ -88,7 +89,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // Reclaim the mic from whichever background service had it.
         SilenceDetectionForegroundService.stop(this)
+        WakeWordForegroundService.stop(this)
         if (permissionManager.hasRecordAudioPermission()) {
             // Picks the wake-word listener or the silence monitor — one, not both.
             viewModel.startAmbientListening()
@@ -107,10 +110,15 @@ class MainActivity : ComponentActivity() {
         // Don't leave the mic recording once the app isn't in the foreground.
         viewModel.cancelListening()
 
-        // Hand rest-reminder monitoring off to the foreground service instead of
-        // just dropping it — only one of the two should hold the mic at a time.
+        // Hand the mic off to a foreground service rather than just dropping it:
+        // the wake-word listener when it's configured, otherwise the
+        // rest-reminder monitor. Only one holds the mic at a time.
         if (permissionManager.hasRecordAudioPermission()) {
-            SilenceDetectionForegroundService.start(this)
+            if (viewModel.isWakeWordAvailable()) {
+                WakeWordForegroundService.start(this)
+            } else {
+                SilenceDetectionForegroundService.start(this)
+            }
         }
     }
 
