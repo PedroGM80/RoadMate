@@ -7,6 +7,7 @@ import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import com.google.mediapipe.tasks.genai.llminference.ProgressListener
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.utils.Constants
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
@@ -91,7 +92,24 @@ class LocalLlmManager @Inject constructor(
         .getOrNull()
         ?.also { engine = it }
 
-    suspend fun isReady(): Boolean = withContext(inferenceDispatcher) { obtainEngine() != null }
+    /**
+     * Whether this backend can answer — deliberately *not* run on
+     * [inferenceDispatcher].
+     *
+     * That dispatcher is one thread and a generation holds it for seconds, so
+     * hopping onto it here made a routing question ("which backend do I use?")
+     * queue behind whatever answer was already being produced — including the
+     * startup warm-up. The check itself needs no engine: an engine already
+     * built is ready, and otherwise the model file being on disk is what
+     * decides. If the build then fails on the inference thread, the callers
+     * already handle it (a null answer / an empty stream both fall through to
+     * "modo básico"), so nothing is lost by answering optimistically here.
+     *
+     * Still suspend, and still off the caller's thread: the fallback check
+     * stats the model file, and the callers collect on the main dispatcher.
+     */
+    suspend fun isReady(): Boolean =
+        engine != null || withContext(Dispatchers.IO) { modelManager.modelFile() != null }
 
     /** Build the engine and run one throwaway generation so the first real
      *  question doesn't eat the ~10 s cold XNNPACK/prefill cost. */
@@ -99,7 +117,13 @@ class LocalLlmManager @Inject constructor(
         if (engine != null) return@withContext
         runCatching {
             val t0 = System.currentTimeMillis()
-            generateResponse("Di \"listo\".")
+            // The warm-up's whole job is to pay the engine build + XNNPACK
+            // init + first prefill once, in the background. What it *says*
+            // is irrelevant, so ask for the shortest possible completion:
+            // an open instruction like "Di listo." had the model produce ~40
+            // words of English filler and burn ~3 s of the warm-up on tokens
+            // nobody reads.
+            generateResponse(WARM_UP_PROMPT)
             dbg("warm-up done (${System.currentTimeMillis() - t0} ms)")
         }
         Unit
@@ -257,6 +281,9 @@ class LocalLlmManager @Inject constructor(
     }
 
     private companion object {
+        /** Deliberately trivial and self-terminating — see [warmUp]. */
+        const val WARM_UP_PROMPT = "Responde solo con la palabra: ok"
+
         const val MAX_TOKENS = 512
         const val TOP_K = 40
         const val TEMPERATURE = 0.2f

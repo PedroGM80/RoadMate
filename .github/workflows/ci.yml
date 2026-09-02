@@ -44,3 +44,23 @@ jobs:
             **/build/reports/tests/
             **/build/test-results/
           if-no-files-found: ignore
+
+      # Android Lint sees a class of defect the unit tests structurally
+      # cannot: leaked Cursors and AudioRecords, foreground-service type
+      # mismatches, permission calls without a check, Compose effects doing
+      # the wrong thing. `checkDependencies = true` in :app covers :data and
+      # :domain too. Non-gating for now (lint { abortOnError = false }) —
+      # read the report, then tighten it.
+      - name: Android Lint
+        if: ${{ !cancelled() }}
+        run: ./gradlew :app:lintDebug --stacktrace
+
+      - name: Upload lint report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: lint-report
+          path: |
+            app/build/reports/lint-results-*.html
+            app/build/reports/lint-results-*.sarif
+          if-no-files-found: ignore

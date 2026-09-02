@@ -20,6 +20,7 @@ import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
 import dev.pgm.roadmate.presentation.map.MapViewModel
 import dev.pgm.roadmate.presentation.screen.OnboardingScreen
+import dev.pgm.roadmate.presentation.viewmodel.BackgroundListening
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 import dev.pgm.roadmate.presentation.viewmodel.SettingsViewModel
 import dev.pgm.roadmate.service.SilenceDetectionForegroundService
@@ -112,12 +113,13 @@ class MainActivity : ComponentActivity() {
 
         // Hand the mic off to a foreground service rather than just dropping it:
         // the wake-word listener when it's configured, otherwise the
-        // rest-reminder monitor. Only one holds the mic at a time.
+        // rest-reminder monitor. Only one holds the mic at a time, and neither
+        // starts while the hands-free setting is still unread.
         if (permissionManager.hasRecordAudioPermission()) {
-            if (viewModel.handsFreeActive()) {
-                WakeWordForegroundService.start(this)
-            } else {
-                SilenceDetectionForegroundService.start(this)
+            when (viewModel.backgroundListening()) {
+                BackgroundListening.WAKE_WORD -> WakeWordForegroundService.start(this)
+                BackgroundListening.REST_MONITOR -> SilenceDetectionForegroundService.start(this)
+                BackgroundListening.NONE -> Unit
             }
         }
     }

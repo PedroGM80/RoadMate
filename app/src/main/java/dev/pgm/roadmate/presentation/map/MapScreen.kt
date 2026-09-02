@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -95,7 +96,7 @@ private const val NAME_PIN = "NAME"
 private val NAME_PROPS = arrayOf("name:es", "name", "name:latin", "name_int")
 
 /** Throttles tile reverse-geocoding to "moved enough, and not too often". */
-private class GeoThrottle {
+internal class GeoThrottle {
     var at: Pair<Double, Double>? = null
     var whenMs = 0L
 }
@@ -110,6 +111,7 @@ private fun foldForSearch(s: String): String =
 @Composable
 fun MapScreen(
     viewModel: MapViewModel,
+    paneState: MapPaneState = rememberMapPaneState(),
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -122,17 +124,24 @@ fun MapScreen(
 
     val locationPermission = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
 
-    val mapView = rememberMapViewWithLifecycle()
-    var mapLibreMap by remember { mutableStateOf<MapLibreMap?>(null) }
-    var symbolManager by remember { mutableStateOf<SymbolManager?>(null) }
-    var lineManager by remember { mutableStateOf<LineManager?>(null) }
-    var circleManager by remember { mutableStateOf<CircleManager?>(null) }
-    var selectedPoi by remember { mutableStateOf<Pair<String, LatLng>?>(null) }
-    var centeredOnUser by remember { mutableStateOf(false) }
+    // Everything below that has to outlive a tab switch lives in [paneState]:
+    // the MapView itself, the loaded style's annotation managers and the
+    // one-shot setup flag. Only genuinely transient UI state (the POI spinner)
+    // stays local to this composition.
+    val mapView = paneState.mapView
+    var mapLibreMap by paneState.map
+    var symbolManager by paneState.symbolManager
+    var lineManager by paneState.lineManager
+    var circleManager by paneState.circleManager
+    var selectedPoi by paneState.selectedPoi
     var poiLoading by remember { mutableStateOf(false) }
-    val geoThrottle = remember { GeoThrottle() }
+    val geoThrottle = paneState.geoThrottle
 
-    LaunchedEffect(mapView) {
+    // Runs exactly once per MapView, not once per entry into composition:
+    // setStyle again on the same map would stack a second set of annotation
+    // managers (duplicate layers/sources) and a second camera-idle listener.
+    LaunchedEffect(paneState) {
+        if (!paneState.claimSetup()) return@LaunchedEffect
         mapView.getMapAsync { map ->
             mapLibreMap = map
             // Lift the MapLibre logo + (i) so they sit above the bottom
@@ -177,10 +186,12 @@ fun MapScreen(
         // The first GPS fix can take a few seconds after the component
         // activates; poll for it instead of centering once and giving up
         // (which left the map on the style's zoomed-out default).
+        // Pane-scoped: once RoadMate has centred on the driver, coming back to
+        // the map tab must not yank the camera away from where they panned.
         repeat(20) {
-            if (centeredOnUser) return@LaunchedEffect
+            if (paneState.centeredOnUser) return@LaunchedEffect
             if (centerOnUser(map)) {
-                centeredOnUser = true
+                paneState.centeredOnUser = true
                 return@LaunchedEffect
             }
             delay(500)
@@ -338,7 +349,15 @@ fun MapScreen(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        AndroidView(factory = { mapView }, modifier = Modifier.fillMaxSize())
+        AndroidView(
+            // The MapView outlives this composition, so on re-entry it may
+            // still be attached to the slot it was torn out of.
+            factory = {
+                (mapView.parent as? android.view.ViewGroup)?.removeView(mapView)
+                mapView
+            },
+            modifier = Modifier.fillMaxSize(),
+        )
 
         // The map stays full-bleed; only the controls inset past the system bars.
         Box(
@@ -556,12 +575,50 @@ private fun PoiSheet(
     }
 }
 
-/** A `MapView` wired to the current lifecycle, created once. */
+/**
+ * The map pane's long-lived pieces: the [MapView] and everything built
+ * against its loaded style.
+ *
+ * Hoisted out of [MapScreen] on purpose. The shell swaps Voz/Mapa with a
+ * Crossfade, so MapScreen leaves composition on every tab switch — and a
+ * MapView created inside it was destroyed and rebuilt each time, tearing down
+ * the GL context and re-fetching the style. Held here, a tab switch only
+ * detaches the view (its surface goes away, so it stops drawing and costs no
+ * battery) and re-attaches it on return.
+ */
+@Stable
+class MapPaneState internal constructor(internal val mapView: MapView) {
+    internal val map = mutableStateOf<MapLibreMap?>(null)
+    internal val symbolManager = mutableStateOf<SymbolManager?>(null)
+    internal val lineManager = mutableStateOf<LineManager?>(null)
+    internal val circleManager = mutableStateOf<CircleManager?>(null)
+    internal val selectedPoi = mutableStateOf<Pair<String, LatLng>?>(null)
+    internal val geoThrottle = GeoThrottle()
+
+    /** Set once the camera has been put on the driver's first fix. */
+    internal var centeredOnUser = false
+
+    private var setupClaimed = false
+
+    /** True for the first caller only — the style/manager setup is one-shot. */
+    internal fun claimSetup(): Boolean {
+        if (setupClaimed) return false
+        setupClaimed = true
+        return true
+    }
+}
+
+/**
+ * Creates the pane state and binds its MapView to the current lifecycle.
+ * Call this once, above whatever swaps the map in and out — see
+ * [dev.pgm.roadmate.presentation.RootScreen].
+ */
 @Composable
-private fun rememberMapViewWithLifecycle(): MapView {
+fun rememberMapPaneState(): MapPaneState {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val mapView = remember { MapView(context) }
+    val paneState = remember { MapPaneState(MapView(context)) }
+    val mapView = paneState.mapView
     // MapView.onDestroy() tears down the native renderer and is not
     // idempotent — calling it twice (ON_DESTROY *and* onDispose, which both
     // run when the activity finishes) trips MapLibre's native side. One flag,
@@ -583,10 +640,11 @@ private fun rememberMapViewWithLifecycle(): MapView {
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            (mapView.parent as? android.view.ViewGroup)?.removeView(mapView)
             destroyOnce()
         }
     }
-    return mapView
+    return paneState
 }
 
 @SuppressLint("MissingPermission")

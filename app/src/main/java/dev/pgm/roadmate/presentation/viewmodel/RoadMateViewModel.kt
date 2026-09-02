@@ -51,6 +51,9 @@ import javax.inject.Inject
  */
 enum class RoadMateStatus { IDLE, LISTENING, PROCESSING, SPEAKING, FOLLOW_UP }
 
+/** Which foreground service, if any, should take the mic when the app leaves the screen. */
+enum class BackgroundListening { NONE, WAKE_WORD, REST_MONITOR }
+
 data class RoadMateUiState(
     val status: RoadMateStatus = RoadMateStatus.IDLE,
     val lastRecognizedInput: String = "",
@@ -99,9 +102,18 @@ class RoadMateViewModel @Inject constructor(
     /** Rising blip so a hands-free "oye copiloto" sounds like a mic-button tap. */
     private val wakeEarcon = Earcon()
 
-    /** The driver's "manos libres" setting; the wake phrase only runs when on. */
-    val handsFreeEnabled: StateFlow<Boolean> = assistantPreferencesRepository.handsFreeEnabled
-        .stateIn(viewModelScope, SharingStarted.Eagerly, true)
+    /**
+     * The driver's "manos libres" setting; the wake phrase only runs when on.
+     *
+     * Null until DataStore has actually answered. The old `Eagerly, true`
+     * seed meant a driver who had switched hands-free *off* still had the wake
+     * recognizer — and the microphone — opened for the moment between launch
+     * and the first read, then torn down again. Ambient listening now simply
+     * waits for a real value: it is a few milliseconds, and nothing should
+     * touch the mic on a guess about a privacy setting.
+     */
+    val handsFreeEnabled: StateFlow<Boolean?> = assistantPreferencesRepository.handsFreeEnabled
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     init {
         viewModelScope.launch {
@@ -219,7 +231,19 @@ class RoadMateViewModel @Inject constructor(
      *  engine is available *and* the driver hasn't switched "manos libres"
      *  off. Used to pick the foreground and background paths. */
     fun handsFreeActive(): Boolean =
-        handsFreeEnabled.value && wakeWordRepository.isAvailable()
+        handsFreeEnabled.value == true && wakeWordRepository.isAvailable()
+
+    /**
+     * Which mic consumer should hold the microphone while the app is
+     * backgrounded. The policy lives here rather than in MainActivity so the
+     * "setting not read yet → claim nothing" rule is stated once and can be
+     * tested.
+     */
+    fun backgroundListening(): BackgroundListening = when {
+        handsFreeEnabled.value == null -> BackgroundListening.NONE
+        handsFreeActive() -> BackgroundListening.WAKE_WORD
+        else -> BackgroundListening.REST_MONITOR
+    }
 
     /**
      * Starts whichever always-on mic consumer applies: the "oye copiloto"
@@ -229,6 +253,9 @@ class RoadMateViewModel @Inject constructor(
      * onResume() (MainActivity), and whenever the setting flips.
      */
     fun startAmbientListening() {
+        // Setting not read yet — claim no mic at all. HomeScreen re-runs this
+        // as soon as the value lands.
+        if (handsFreeEnabled.value == null) return
         if (handsFreeActive()) {
             stopSilenceMonitoring()
             startWakeWordListening()

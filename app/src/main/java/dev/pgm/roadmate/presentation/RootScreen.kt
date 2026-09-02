@@ -42,6 +42,7 @@ import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.presentation.map.MapScreen
 import dev.pgm.roadmate.presentation.map.MapViewModel
+import dev.pgm.roadmate.presentation.map.rememberMapPaneState
 import dev.pgm.roadmate.presentation.screen.HomeScreen
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 import dev.pgm.roadmate.presentation.viewmodel.SettingsViewModel
@@ -62,6 +63,12 @@ fun RootScreen(
     modifier: Modifier = Modifier,
 ) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
+
+    // Held here, above the Crossfade: MapScreen leaves composition on every
+    // tab switch, and a MapView owned by it was destroyed and rebuilt each
+    // time (GL context torn down, style re-fetched). Now the switch only
+    // detaches and re-attaches the view.
+    val mapPane = rememberMapPaneState()
     val theme by settingsViewModel.theme.collectAsState()
     val answerStyle by settingsViewModel.answerStyle.collectAsState()
     val handsFree by settingsViewModel.handsFree.collectAsState()
@@ -117,13 +124,13 @@ fun RootScreen(
                 Row(paneModifier.fillMaxSize()) {
                     HomeScreen(roadMateViewModel, Modifier.weight(1f).fillMaxHeight())
                     VerticalDivider()
-                    MapScreen(mapViewModel, Modifier.weight(1f).fillMaxHeight())
+                    MapScreen(mapViewModel, mapPane, Modifier.weight(1f).fillMaxHeight())
                 }
             } else {
                 Crossfade(targetState = tab, label = "voz-mapa") { current ->
                     when (current) {
                         0 -> HomeScreen(roadMateViewModel, paneModifier.fillMaxSize())
-                        else -> MapScreen(mapViewModel, paneModifier.fillMaxSize())
+                        else -> MapScreen(mapViewModel, mapPane, paneModifier.fillMaxSize())
                     }
                 }
             }

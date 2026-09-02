@@ -1,11 +1,13 @@
 package dev.pgm.roadmate.service
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
@@ -60,6 +62,17 @@ class SilenceDetectionForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+
+        // The mic is this service's whole reason to exist. Without RECORD_AUDIO
+        // it would sit in the foreground holding a notification and capturing
+        // nothing.
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.w(TAG, "RECORD_AUDIO not granted, stopping")
+            stopSelf()
+            return
+        }
 
         // The type passed here must match android:foregroundServiceType="microphone"
         // in the manifest — targetSdk 37 throws InvalidForegroundServiceTypeException
@@ -145,15 +158,27 @@ class SilenceDetectionForegroundService : Service() {
         private const val CHANNEL_ID = "silence_detection"
         private const val NOTIFICATION_ID = 4202
 
+        /**
+         * Starting a microphone foreground service is only allowed from a
+         * valid app state (Android 12+ background-start limits, tightened
+         * again in 14 for the `microphone` type). MainActivity calls this from
+         * onPause(), which is inside the allowance — but a pause triggered by
+         * the screen locking or an incoming call can still land outside it,
+         * and the system's answer to that is an exception, not a no-op.
+         * RoadMate treats "couldn't keep listening in the background" as a
+         * degraded mode, never a crash.
+         */
         fun start(context: Context) {
-            ContextCompat.startForegroundService(
-                context,
-                Intent(context, SilenceDetectionForegroundService::class.java)
-            )
+            runCatching {
+                ContextCompat.startForegroundService(
+                    context,
+                    Intent(context, SilenceDetectionForegroundService::class.java),
+                )
+            }.onFailure { Log.w(TAG, "could not start in the background", it) }
         }
 
         fun stop(context: Context) {
-            context.stopService(Intent(context, SilenceDetectionForegroundService::class.java))
+            runCatching { context.stopService(Intent(context, SilenceDetectionForegroundService::class.java)) }
         }
     }
 }

@@ -255,12 +255,13 @@ class RoadMateViewModelTest {
     @Test
     fun `handsFreeActive needs both the engine and the setting`() =
         runTest(mainDispatcherRule.testDispatcher) {
-            assertFalse(
-                buildViewModel(wakeWordRepository = FakeWakeWordRepository(available = false)).handsFreeActive(),
-            )
-            assertTrue(
-                buildViewModel(wakeWordRepository = FakeWakeWordRepository(available = true)).handsFreeActive(),
-            )
+            val noEngine = buildViewModel(wakeWordRepository = FakeWakeWordRepository(available = false))
+            advanceUntilIdle()
+            assertFalse(noEngine.handsFreeActive())
+
+            val on = buildViewModel(wakeWordRepository = FakeWakeWordRepository(available = true))
+            advanceUntilIdle()
+            assertTrue(on.handsFreeActive())
 
             val off = FakeAssistantPreferencesRepository()
             off.setHandsFreeEnabled(false)
@@ -270,6 +271,23 @@ class RoadMateViewModelTest {
             )
             advanceUntilIdle()
             assertFalse(vm.handsFreeActive())
+        }
+
+    @Test
+    fun `nothing claims the mic until the hands-free setting has been read`() =
+        runTest(mainDispatcherRule.testDispatcher) {
+            val wakeWord = FakeWakeWordRepository(available = true)
+            val viewModel = buildViewModel(wakeWordRepository = wakeWord)
+
+            // DataStore hasn't answered yet: no wake word, no rest monitor, and
+            // no background service either.
+            assertEquals(BackgroundListening.NONE, viewModel.backgroundListening())
+            viewModel.startAmbientListening()
+            wakeWord.emissions.tryEmit(Unit)
+            assertFalse(viewModel.uiState.value.isListening)
+
+            advanceUntilIdle()
+            assertEquals(BackgroundListening.WAKE_WORD, viewModel.backgroundListening())
         }
 
     @Test

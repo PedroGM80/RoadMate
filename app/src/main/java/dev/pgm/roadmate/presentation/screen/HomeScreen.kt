@@ -66,6 +66,8 @@ fun HomeScreen(
         listOf(Manifest.permission.CALL_PHONE, Manifest.permission.READ_CONTACTS),
     )
 
+    // Null while DataStore is still being read; the effect below re-runs when
+    // the real value lands, so ambient listening starts once and correctly.
     val handsFree by viewModel.handsFreeEnabled.collectAsState()
 
     // Re-runs when the "manos libres" setting flips, so the wake phrase and

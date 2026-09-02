@@ -114,6 +114,27 @@ android {
         compose = true
         buildConfig = true
     }
+
+    lint {
+        // :app pulls in :data and :domain, and most of what lint has to say
+        // about this app (mic/permission handling, foreground services,
+        // Compose effects, resource leaks) lives in those modules — so check
+        // them from here rather than wiring three separate lint tasks.
+        checkDependencies = true
+
+        // Not a gate yet: this is the first run, and nobody has read the
+        // report. Once the existing findings are triaged (fix, or
+        // `./gradlew :app:updateLintBaseline` for what stays), flip this to
+        // true so a regression fails CI instead of scrolling past in a log.
+        abortOnError = false
+
+        // Missing translations aren't a defect — the app is Spanish-only.
+        disable += "MissingTranslation"
+
+        htmlReport = true
+        sarifReport = true
+        textReport = false
+    }
 }
 
 dependencies {
