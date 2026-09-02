@@ -75,6 +75,10 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
     }
 
     fun speak(text: String, onDone: () -> Unit = {}) {
+        // TEMP instrumentation (strip with the rest of DebugTrace): timestamps
+        // each utterance so the streaming-answer latency can be read off the
+        // trace — gap from "LLM stream PROMPT" to the first "TTS speak".
+        DebugTrace.log("TTS speak ${if (isReady) "" else "(queued) "}\"${text.take(90)}\"")
         if (text.isBlank()) {
             onDone()
             return
