@@ -1,6 +1,7 @@
 package dev.pgm.roadmate.presentation
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.window.core.layout.WindowSizeClass
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.domain.model.AnswerStyle
+import dev.pgm.roadmate.domain.model.LocalAiModel
+import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.presentation.map.MapScreen
 import dev.pgm.roadmate.presentation.map.MapViewModel
@@ -72,6 +75,8 @@ fun RootScreen(
     val theme by settingsViewModel.theme.collectAsState()
     val answerStyle by settingsViewModel.answerStyle.collectAsState()
     val handsFree by settingsViewModel.handsFree.collectAsState()
+    val localAiStatus by settingsViewModel.localAiStatus.collectAsState()
+    val selectedLocalAiModelId by settingsViewModel.selectedLocalAiModelId.collectAsState()
 
     // A voice search ("busca gasolineras") pulls the map to the front.
     LaunchedEffect(Unit) {
@@ -112,6 +117,11 @@ fun RootScreen(
                             onAnswerStyleChange = settingsViewModel::setAnswerStyle,
                             handsFree = handsFree,
                             onHandsFreeChange = settingsViewModel::setHandsFree,
+                            localAiModels = settingsViewModel.localAiModels,
+                            localAiStatus = localAiStatus,
+                            selectedLocalAiModelId = selectedLocalAiModelId,
+                            onSelectLocalAiModel = settingsViewModel::selectLocalAiModel,
+                            onRetryLocalAi = settingsViewModel::retryLocalAiDownload,
                             onClearOfflineMaps = settingsViewModel::clearOfflineMaps,
                             onClearMemory = settingsViewModel::clearMemory,
                         )
@@ -146,11 +156,17 @@ private fun SettingsMenu(
     onAnswerStyleChange: (AnswerStyle) -> Unit,
     handsFree: Boolean,
     onHandsFreeChange: (Boolean) -> Unit,
+    localAiModels: List<LocalAiModel>,
+    localAiStatus: LocalAiStatus,
+    selectedLocalAiModelId: String,
+    onSelectLocalAiModel: (String) -> Unit,
+    onRetryLocalAi: () -> Unit,
     onClearOfflineMaps: () -> Unit,
     onClearMemory: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    var pendingModel by remember { mutableStateOf<LocalAiModel?>(null) }
     val close = { open = false }
 
     IconButton(onClick = { open = true }) {
@@ -178,6 +194,50 @@ private fun SettingsMenu(
         )
 
         HorizontalDivider()
+        MenuHeader(R.string.settings_local_ai_header)
+        Text(
+            localAiStatusText(localAiStatus),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        localAiModels.forEach { model ->
+            DropdownMenuItem(
+                leadingIcon = { RadioButton(selected = model.id == selectedLocalAiModelId, onClick = null) },
+                text = {
+                    Column {
+                        Text(
+                            buildString {
+                                append(model.name)
+                                if (model.recommended) append("  ·  ${stringResource(R.string.settings_local_ai_recommended)}")
+                                if (model.approxSize.isNotEmpty()) append("  ·  ${model.approxSize}")
+                            },
+                        )
+                        Text(
+                            model.note,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                },
+                onClick = {
+                    if (model.id != selectedLocalAiModelId) pendingModel = model
+                },
+            )
+        }
+        if (localAiStatus is LocalAiStatus.DownloadFailed) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        stringResource(R.string.action_retry),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                },
+                onClick = { close(); onRetryLocalAi() },
+            )
+        }
+
+        HorizontalDivider()
         DropdownMenuItem(
             text = { Text(stringResource(R.string.clear_offline_maps)) },
             onClick = { close(); onClearOfflineMaps() },
@@ -203,6 +263,45 @@ private fun SettingsMenu(
             },
         )
     }
+
+    pendingModel?.let { model ->
+        AlertDialog(
+            onDismissRequest = { pendingModel = null },
+            title = { Text(stringResource(R.string.settings_local_ai_switch_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.settings_local_ai_switch_body,
+                        if (model.approxSize.isEmpty()) model.name else "${model.name} (${model.approxSize})",
+                    ),
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    onSelectLocalAiModel(model.id)
+                    pendingModel = null
+                    close()
+                }) { Text(stringResource(R.string.settings_local_ai_switch_action)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingModel = null }) { Text(stringResource(R.string.action_cancel)) }
+            },
+        )
+    }
+}
+
+/** Compact one-liner for the settings menu's "IA local" status row. */
+@Composable
+private fun localAiStatusText(status: LocalAiStatus): String = when (status) {
+    LocalAiStatus.ReadyAicore -> stringResource(R.string.settings_local_ai_nano)
+    LocalAiStatus.ReadyLocalModel -> stringResource(R.string.ai_ready)
+    LocalAiStatus.Checking -> stringResource(R.string.ai_checking)
+    LocalAiStatus.ModelDownloadable -> stringResource(R.string.ai_preparing_download)
+    is LocalAiStatus.Downloading ->
+        stringResource(R.string.ai_downloading, (status.progress * 100).toInt())
+    LocalAiStatus.WaitingForWifi -> stringResource(R.string.ai_waiting_wifi)
+    is LocalAiStatus.DownloadFailed -> stringResource(R.string.ai_download_failed)
+    LocalAiStatus.Unavailable -> stringResource(R.string.ai_unavailable)
 }
 
 @Composable

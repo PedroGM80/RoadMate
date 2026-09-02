@@ -155,6 +155,12 @@ class GeminiRepositoryImpl @Inject constructor(
         localAiModelManager.fetch()
     }
 
+    override fun selectedLocalAiModelId(): Flow<String> = localAiModelManager.selectedId
+
+    override suspend fun selectLocalAiModel(id: String) {
+        localAiModelManager.select(id)
+    }
+
     private companion object {
         /** Enough to catch a repeated question in one trip, small enough to forget. */
         const val MAX_CACHED_ANSWERS = 32

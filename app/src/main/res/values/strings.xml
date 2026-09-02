@@ -26,6 +26,12 @@
     <string name="answer_detailed">Con más detalle</string>
     <string name="settings_voice_header">Voz</string>
     <string name="settings_hands_free">Manos libres («oye, copiloto»)</string>
+    <string name="settings_local_ai_header">IA local</string>
+    <string name="settings_local_ai_recommended">Recomendado</string>
+    <string name="settings_local_ai_nano">Gemini Nano (del sistema)</string>
+    <string name="settings_local_ai_switch_title">¿Cambiar de modelo?</string>
+    <string name="settings_local_ai_switch_body">Se descargará %1$s por Wi-Fi y sustituirá al modelo actual.</string>
+    <string name="settings_local_ai_switch_action">Cambiar</string>
     <string name="clear_offline_maps">Borrar mapas descargados</string>
     <string name="clear_memory">Borrar lo aprendido</string>
     <string name="clear_memory_confirm_title">¿Borrar lo aprendido?</string>

@@ -44,10 +44,18 @@ class AssistantPreferencesRepositoryImpl @Inject constructor(
         context.roadMatePreferencesDataStore.edit { it[HANDS_FREE_KEY] = enabled }
     }
 
+    override val localAiModelId: Flow<String?> =
+        context.roadMatePreferencesDataStore.data.map { prefs -> prefs[LOCAL_AI_MODEL_KEY] }
+
+    override suspend fun setLocalAiModelId(id: String) {
+        context.roadMatePreferencesDataStore.edit { it[LOCAL_AI_MODEL_KEY] = id }
+    }
+
     private companion object {
         val ANSWER_STYLE_KEY = stringPreferencesKey("answer_style")
         val THEME_KEY = stringPreferencesKey("theme_preference")
         val HANDS_FREE_KEY = booleanPreferencesKey("hands_free_enabled")
+        val LOCAL_AI_MODEL_KEY = stringPreferencesKey("local_ai_model_id")
 
         inline fun <reified T : Enum<T>> enumOrNull(name: String): T? =
             runCatching { enumValueOf<T>(name) }.getOrNull()

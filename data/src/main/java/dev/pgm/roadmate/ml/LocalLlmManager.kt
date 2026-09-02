@@ -7,7 +7,9 @@ import com.google.mediapipe.tasks.genai.llminference.LlmInferenceSession
 import com.google.mediapipe.tasks.genai.llminference.ProgressListener
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.utils.Constants
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
@@ -75,8 +77,17 @@ class LocalLlmManager @Inject constructor(
         Executors.newSingleThreadExecutor { r -> Thread(r, "roadmate-llm").apply { isDaemon = true } }
             .asCoroutineDispatcher()
 
+    /** Watches for a model switch so the loaded engine is dropped and rebuilt. */
+    private val watchScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     init {
         DebugTrace.init(File(context.filesDir, "aicore_debug.log"))
+        watchScope.launch {
+            modelManager.modelChanged.collect {
+                dbg("model changed — releasing engine")
+                releaseEngine()
+            }
+        }
     }
 
     private fun dbg(line: String) = DebugTrace.log("LLM $line")

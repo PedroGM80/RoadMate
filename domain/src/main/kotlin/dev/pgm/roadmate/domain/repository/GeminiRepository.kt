@@ -1,8 +1,11 @@
 package dev.pgm.roadmate.domain.repository
 
+import dev.pgm.roadmate.domain.model.LocalAiCatalog
+import dev.pgm.roadmate.domain.model.LocalAiModel
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 
 /**
  * Contract for asking the on-device model a question and getting text back.
@@ -64,4 +67,18 @@ interface GeminiRepository {
      * backend is already available or the download path is disabled.
      */
     suspend fun requestLocalAiModelDownload()
+
+    /** The downloadable models the driver can choose between. */
+    val localAiModels: List<LocalAiModel> get() = LocalAiCatalog.models
+
+    /** Id of the model currently selected for the downloadable backend. */
+    fun selectedLocalAiModelId(): Flow<String> = flowOf(LocalAiCatalog.recommended.id)
+
+    /**
+     * Persist a different model choice and start swapping to it: the new file
+     * downloads (Wi-Fi only), the previous one is removed, and the loaded
+     * engine is dropped so the next question uses the new model. No-op for an
+     * unknown id.
+     */
+    suspend fun selectLocalAiModel(id: String) {}
 }

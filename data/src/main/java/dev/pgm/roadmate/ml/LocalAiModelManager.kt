@@ -7,17 +7,23 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dev.pgm.roadmate.data.BuildConfig
+import dev.pgm.roadmate.domain.model.LocalAiCatalog
+import dev.pgm.roadmate.domain.model.LocalAiModel
 import dev.pgm.roadmate.domain.model.LocalAiStatus
+import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -29,23 +35,24 @@ import javax.inject.Singleton
 import kotlin.coroutines.coroutineContext
 
 /**
- * Gets the universal local-AI model onto the device with **no account, no
- * token, no manual steps**: a plain HTTPS download (resumable) of a small
- * Apache-2.0 model to internal storage, run afterwards through MediaPipe by
- * [LocalLlmManager].
+ * Gets the selected local-AI model onto the device with **no account, no
+ * token, no manual steps**: a plain resumable HTTPS download of an
+ * Apache-2.0 `.task` model to internal storage, run afterwards through
+ * MediaPipe by [LocalLlmManager].
  *
- * The download is **unmetered-network only** — if the active network is
- * metered it parks at [LocalAiStatus.WaitingForWifi] and auto-starts the
- * moment an unmetered network appears. [RoadMateViewModel] kicks
- * [fetch] automatically once it sees [LocalAiStatus.ModelDownloadable]; the
- * UI also exposes a manual button for ret/resume.
+ * Which model is a driver choice ([LocalAiCatalog], persisted via
+ * [AssistantPreferencesRepository]); the app keeps **one** on disk and
+ * switching deletes the previous file. On launch, if the persisted choice
+ * isn't set, a completed model already on disk is adopted, else the
+ * recommended one.
  *
- * URL / filename / expected size come from `BuildConfig` (overridable in
- * `local.properties`). A blank URL disables the path → [LocalAiStatus.Unavailable].
+ * The download is **unmetered-network only** — on a metered network it parks
+ * at [LocalAiStatus.WaitingForWifi] and auto-starts when Wi-Fi appears.
  */
 @Singleton
 class LocalAiModelManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val preferences: AssistantPreferencesRepository,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -59,12 +66,24 @@ class LocalAiModelManager @Inject constructor(
     }
 
     private val modelDir = File(context.filesDir, "models")
-    private val modelFile = File(modelDir, BuildConfig.LOCAL_AI_MODEL_FILENAME)
-    private val partFile = File(modelDir, BuildConfig.LOCAL_AI_MODEL_FILENAME + ".part")
-    private val expectedSize = BuildConfig.LOCAL_AI_MODEL_SIZE_BYTES
+
+    @Volatile
+    private var model: LocalAiModel = LocalAiCatalog.recommended
+
+    private val modelFile get() = File(modelDir, model.fileName)
+    private val partFile get() = File(modelDir, model.fileName + ".part")
+    private val expectedSize get() = model.sizeBytes
 
     private val _status = MutableStateFlow<LocalAiStatus>(LocalAiStatus.Checking)
     val status: StateFlow<LocalAiStatus> = _status.asStateFlow()
+
+    private val _selectedId = MutableStateFlow(model.id)
+    /** Id of the model in use right now (persisted choice, on-disk adoption, or recommended). */
+    val selectedId: StateFlow<String> = _selectedId.asStateFlow()
+
+    private val _modelChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    /** Emits when the active model file changes, so a loaded engine can be dropped. */
+    val modelChanged: SharedFlow<Unit> = _modelChanged.asSharedFlow()
 
     @Volatile
     private var downloadJob: Job? = null
@@ -72,19 +91,58 @@ class LocalAiModelManager @Inject constructor(
     @Volatile
     private var awaitingUnmetered = false
 
-    /**
-     * The registered "tell me when Wi-Fi appears" callback, kept so it can be
-     * taken down again. Without the reference the app went on listening for a
-     * network it no longer needed — after the model finished by another route,
-     * or after the download path was disabled.
-     */
     @Volatile
     private var unmeteredCallback: ConnectivityManager.NetworkCallback? = null
+
+    init {
+        scope.launch {
+            val saved = preferences.localAiModelId.first()
+            applyModel(
+                LocalAiCatalog.byId(saved) ?: detectOnDisk() ?: LocalAiCatalog.recommended,
+                announce = false,
+            )
+            preferences.localAiModelId.collect { id ->
+                LocalAiCatalog.byId(id)?.let { applyModel(it, announce = true) }
+            }
+        }
+    }
+
+    /** Persist a new choice — the flow collector above swaps to it. */
+    suspend fun select(id: String) {
+        if (LocalAiCatalog.byId(id) != null) preferences.setLocalAiModelId(id)
+    }
+
+    private fun applyModel(target: LocalAiModel, announce: Boolean) {
+        if (announce && target.id == model.id) return
+        downloadJob?.cancel()
+        model = target
+        _selectedId.value = target.id
+        cleanupOtherFiles()
+        refreshStatus()
+        if (announce) {
+            _modelChanged.tryEmit(Unit)
+            // The driver picked this in Settings — that's the consent to fetch.
+            if (_status.value == LocalAiStatus.ModelDownloadable) fetch()
+        }
+    }
+
+    /** Delete any model file that isn't the current one — only one is kept. */
+    private fun cleanupOtherFiles() {
+        runCatching {
+            modelDir.listFiles()?.forEach { f ->
+                if (f.name != model.fileName && f.name != "${model.fileName}.part") f.delete()
+            }
+        }
+    }
+
+    private fun detectOnDisk(): LocalAiModel? = LocalAiCatalog.models.firstOrNull { m ->
+        val f = File(modelDir, m.fileName)
+        f.isFile && f.length() >= MIN_PLAUSIBLE_BYTES && (m.sizeBytes <= 0L || f.length() == m.sizeBytes)
+    }
 
     /** Cheap re-evaluation of resting state; safe to call repeatedly. */
     fun refreshStatus() {
         _status.value = when {
-            BuildConfig.LOCAL_AI_MODEL_URL.isBlank() -> LocalAiStatus.Unavailable
             isModelComplete() -> LocalAiStatus.ReadyLocalModel
             downloadJob?.isActive == true -> _status.value
             awaitingUnmetered -> LocalAiStatus.WaitingForWifi
@@ -92,7 +150,7 @@ class LocalAiModelManager @Inject constructor(
         }
     }
 
-    /** The model file, or null until a verified copy is on disk. */
+    /** The current model's file, or null until a verified copy is on disk. */
     fun modelFile(): File? = modelFile.takeIf { isModelComplete() }
 
     private fun isModelComplete(): Boolean =
@@ -101,15 +159,10 @@ class LocalAiModelManager @Inject constructor(
             (expectedSize <= 0L || modelFile.length() == expectedSize)
 
     /**
-     * Starts (or resumes) the download. No-op if already complete or in
-     * flight. Defers to Wi-Fi when the network is metered.
+     * Starts (or resumes) the download of the current model. No-op if already
+     * complete or in flight. Defers to Wi-Fi when the network is metered.
      */
     fun fetch() {
-        if (BuildConfig.LOCAL_AI_MODEL_URL.isBlank()) {
-            stopWaitingForUnmetered()
-            _status.value = LocalAiStatus.Unavailable
-            return
-        }
         if (isModelComplete()) {
             stopWaitingForUnmetered()
             _status.value = LocalAiStatus.ReadyLocalModel
@@ -127,26 +180,23 @@ class LocalAiModelManager @Inject constructor(
     }
 
     private suspend fun runDownload() {
+        val downloading = model
         _status.value = LocalAiStatus.Downloading(0f)
         try {
             modelDir.mkdirs()
             val resumeFrom = if (partFile.isFile) partFile.length() else 0L
 
-            // The whole file is already on disk in .part (killed between the
-            // last write and the rename) — just finalize it, no request.
             if (expectedSize > 0L && resumeFrom >= expectedSize) {
                 finalizePartFile()
                 return
             }
 
             val request = Request.Builder()
-                .url(BuildConfig.LOCAL_AI_MODEL_URL)
+                .url(downloading.url)
                 .apply { if (resumeFrom > 0L) header("Range", "bytes=$resumeFrom-") }
                 .build()
 
             client.newCall(request).execute().use { response ->
-                // Server rejected the resume offset — drop the stale .part so
-                // the next fetch() restarts cleanly.
                 if (response.code == 416) {
                     partFile.delete()
                     _status.value = LocalAiStatus.DownloadFailed("reintenta la descarga")
@@ -199,12 +249,10 @@ class LocalAiModelManager @Inject constructor(
             throw ce
         } catch (e: Exception) {
             Log.w(TAG, "model download failed", e)
-            // Keep the .part file so the next fetch() resumes instead of restarting.
             _status.value = LocalAiStatus.DownloadFailed(e.message ?: "error de red")
         }
     }
 
-    /** Validates the fully-downloaded `.part` file and atomically promotes it. */
     private fun finalizePartFile() {
         if (expectedSize > 0L && partFile.length() != expectedSize) {
             partFile.delete()
@@ -223,6 +271,7 @@ class LocalAiModelManager @Inject constructor(
         }
         stopWaitingForUnmetered()
         _status.value = LocalAiStatus.ReadyLocalModel
+        _modelChanged.tryEmit(Unit)
     }
 
     private fun isMeteredOrOffline(): Boolean {

@@ -19,4 +19,8 @@ interface AssistantPreferencesRepository {
     /** Whether the always-on wake phrase is active. Defaults to on. */
     val handsFreeEnabled: Flow<Boolean>
     suspend fun setHandsFreeEnabled(enabled: Boolean)
+
+    /** Id of the chosen downloadable local-AI model; null until the driver picks one. */
+    val localAiModelId: Flow<String?>
+    suspend fun setLocalAiModelId(id: String)
 }

@@ -201,6 +201,12 @@ class FakeAssistantPreferencesRepository(
     override suspend fun setHandsFreeEnabled(enabled: Boolean) {
         handsFreeFlow.value = enabled
     }
+
+    val localAiModelFlow = MutableStateFlow<String?>(null)
+    override val localAiModelId: StateFlow<String?> = localAiModelFlow
+    override suspend fun setLocalAiModelId(id: String) {
+        localAiModelFlow.value = id
+    }
 }
 
 class FakeMemoryRepository(
