@@ -90,6 +90,18 @@ class PhoneCallRepositoryImpl @Inject constructor(
             ContactMatching.resolve(matches, query)
         }
 
+    override fun placeCall(phoneNumber: String) {
+        val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:$phoneNumber")).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        // A phone with no dialer is exotic but possible — don't crash the loop.
+        runCatching { context.startActivity(callIntent) }
+            .onFailure { Log.w(TAG, "No activity to place the call", it) }
+    }
+
+    private fun hasPermission(permission: String): Boolean =
+        ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
     private fun phoneLabel(type: Int): PhoneLabel = when (type) {
         ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE -> PhoneLabel.MOBILE
         ContactsContract.CommonDataKinds.Phone.TYPE_WORK,
