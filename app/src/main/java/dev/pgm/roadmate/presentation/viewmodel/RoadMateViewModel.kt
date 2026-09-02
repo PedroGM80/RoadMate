@@ -427,6 +427,9 @@ class RoadMateViewModel @Inject constructor(
 
     private suspend fun buildTravelContext(userInput: String): TravelContext {
         val location = locationRepository.getCurrentCoordinates()
+        if (location == null) {
+            dev.pgm.roadmate.ml.DebugTrace.log("ctx: no location fix -> weather will be skipped")
+        }
         val weatherDescription = location?.let { (lat, lon) ->
             weatherRepository.getCurrentWeatherDescription(lat, lon)
         }

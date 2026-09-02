@@ -1,5 +1,6 @@
 package dev.pgm.roadmate.data.datasource.remote
 
+import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
 import com.squareup.moshi.Moshi
 import dev.pgm.roadmate.data.di.OpenWeatherApiKey
@@ -8,18 +9,27 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Query
 import javax.inject.Inject
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @JsonClass(generateAdapter = true)
 internal data class WeatherResponse(
     val weather: List<WeatherDescription>,
-    val main: WeatherMain
+    val main: WeatherMain,
+    val wind: WeatherWind? = null,
 )
 
 @JsonClass(generateAdapter = true)
 internal data class WeatherDescription(val description: String)
 
 @JsonClass(generateAdapter = true)
-internal data class WeatherMain(val temp: Double)
+internal data class WeatherMain(
+    val temp: Double,
+    @Json(name = "feels_like") val feelsLike: Double? = null,
+)
+
+@JsonClass(generateAdapter = true)
+internal data class WeatherWind(val speed: Double? = null)
 
 private interface OpenWeatherApi {
     @GET("data/2.5/weather")
@@ -57,13 +67,43 @@ class WeatherDataSource @Inject constructor(
     }
 
     suspend fun getCurrentWeatherDescription(lat: Double, lon: Double): String? {
-        if (apiKey.isBlank()) return null
+        if (apiKey.isBlank()) {
+            dev.pgm.roadmate.ml.DebugTrace.log("weather: no API key in this build")
+            return null
+        }
 
         return runCatching {
             val response = api.getCurrentWeather(lat, lon, apiKey)
             val description = response.weather.firstOrNull()?.description
-            val temp = response.main.temp
-            description?.let { "$it, ${temp.toInt()}°C" }
+            description?.let { desc -> describe(desc, response) }
+        }.onFailure {
+            dev.pgm.roadmate.ml.DebugTrace.log(
+                "weather: fetch failed at $lat,$lon: ${it.javaClass.simpleName}: ${it.message}",
+            )
+        }.onSuccess {
+            dev.pgm.roadmate.ml.DebugTrace.log("weather: $lat,$lon -> ${it ?: "null (empty body)"}")
         }.getOrNull()
+    }
+
+    /**
+     * Short spoken-weather line. Beyond "sky, temperature" it adds the
+     * "sensación" (feels-like) when it's noticeably off the real temp and a
+     * wind note when it's blowing hard — so two readings minutes apart aren't
+     * always the byte-identical sentence, and the extra detail is the kind a
+     * driver actually wants.
+     */
+    private fun describe(sky: String, r: WeatherResponse): String {
+        val temp = r.main.temp.roundToInt()
+        val sb = StringBuilder("$sky, $temp°C")
+        r.main.feelsLike?.roundToInt()?.let { feels ->
+            if (abs(feels - temp) >= 3) sb.append(", sensación $feels°C")
+        }
+        r.wind?.speed?.let { ms ->
+            when {
+                ms >= 13.8 -> sb.append(", con viento muy fuerte")
+                ms >= 8.0 -> sb.append(", con viento fuerte")
+            }
+        }
+        return sb.toString()
     }
 }
