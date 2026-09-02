@@ -16,6 +16,9 @@ enum class FactType {
 
     /** "X es mi hermano" — [key] is the relationship word, [value] the name. */
     RELATIONSHIP,
+
+    /** Where the car is parked — [value] is "lat,lon". Replaced each time. */
+    PARKING,
 }
 
 /**

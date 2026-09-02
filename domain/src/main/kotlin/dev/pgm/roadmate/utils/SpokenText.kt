@@ -80,6 +80,16 @@ object SpokenText {
     const val REST_NUDGE = "Llevas un buen rato al volante. ¿Paramos a descansar?"
     const val REST_MONITOR = "Atento por si necesitas un descanso."
 
+    // Parking ("he aparcado aquí" / "¿dónde aparqué?")
+    const val PARKING_SAVED = "Vale, guardo dónde has aparcado."
+    const val PARKING_NO_FIX_TO_SAVE = "No tengo tu ubicación ahora mismo. Prueba cuando haya señal."
+    const val PARKING_NONE = "No tengo guardado dónde aparcaste."
+    const val PARKING_NO_FIX_NOW = "Sé dónde aparcaste, pero ahora no tengo tu ubicación."
+    fun parkingHere(distance: String, direction: String) =
+        "El coche está a unos $distance, hacia el $direction."
+    fun parkingTakeMe(distance: String, direction: String) =
+        "El coche está a unos $distance, hacia el $direction. Te llevo, mira el mapa."
+
     // Speech playback controls ("repite", "más despacio"…)
     const val NOTHING_TO_REPEAT = "Todavía no he dicho nada."
     const val SPEECH_SLOWER = "Vale, hablo más despacio."

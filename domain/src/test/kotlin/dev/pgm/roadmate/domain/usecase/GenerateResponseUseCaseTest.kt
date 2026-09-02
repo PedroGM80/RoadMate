@@ -102,6 +102,24 @@ class GenerateResponseUseCaseTest {
     }
 
     @Test
+    fun `parking is saved, then found by distance and bearing`() = runTest {
+        val mem = FakeMemoryRepository()
+        val uc = useCase(memoryRepository = mem)
+
+        val parked = context.copy(currentLocation = 36.4609 to -6.19) // ~100 m north of "here"
+        assertEquals(listOf("Vale, guardo dónde has aparcado."), uc(parked, "he aparcado aquí").toList())
+
+        val found = uc(context, "¿dónde aparqué?").toList()
+        assertEquals(listOf("El coche está a unos 100 metros, hacia el norte."), found)
+    }
+
+    @Test
+    fun `asking for the car with nothing saved says so`() = runTest {
+        val emitted = useCase()(context, "¿dónde está el coche?").toList()
+        assertEquals(listOf("No tengo guardado dónde aparcaste."), emitted)
+    }
+
+    @Test
     fun `"repite" says the last answer again`() = runTest {
         val speech = FakeSpeechSynthesisRepository()
         val uc = useCase(FakeGeminiRepository(response = "quedan 12 kilómetros"), speech)

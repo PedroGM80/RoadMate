@@ -24,6 +24,7 @@ import dev.pgm.roadmate.utils.MapSearchIntentParser
 import dev.pgm.roadmate.utils.MediaIntentParser
 import dev.pgm.roadmate.utils.PlaceCategoryParser
 import dev.pgm.roadmate.utils.MemoryCommandParser
+import dev.pgm.roadmate.utils.ParkingIntentParser
 import dev.pgm.roadmate.utils.PlaybackCommandParser
 import dev.pgm.roadmate.utils.PlaceName
 import dev.pgm.roadmate.utils.PromptBuilder
@@ -38,12 +39,26 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import java.util.Locale
 import javax.inject.Inject
+import kotlin.math.asin
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.min
+import kotlin.math.pow
+import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /** Speech-rate bounds and per-nudge step for "más despacio" / "más rápido". */
 private const val MIN_RATE = 0.6f
 private const val MAX_RATE = 1.6f
 private const val RATE_STEP = 0.15f
+
+private val SPANISH_ES: Locale = Locale.forLanguageTag("es-ES")
+private val COMPASS_ES = listOf(
+    "norte", "noreste", "este", "sureste", "sur", "suroeste", "oeste", "noroeste",
+)
 
 /**
  * Builds a prompt from [TravelContext], asks the on-device model for a
@@ -134,7 +149,11 @@ class GenerateResponseUseCase @Inject constructor(
         val styleChange = StylePreferenceParser.parse(userInput)
         val memoryCommand = MemoryCommandParser.parse(userInput)
         val arithmetic = ArithmeticParser.evaluate(userInput)
+        val parkingIntent = ParkingIntentParser.parse(userInput)
         val shortcut = when {
+            // Before the map/call parsers — "llévame al coche" and "dónde está
+            // el coche" would otherwise be read as a place search.
+            parkingIntent != null -> handleParking(parkingIntent, context)
             contactName != null -> handleCallRequest(contactName)
             mapQuery != null -> handleMapSearch(
                 mapQuery,
@@ -405,6 +424,77 @@ class GenerateResponseUseCase @Inject constructor(
                 FactType.WORK to "trabajo"
             else -> null
         }
+    }
+
+    /**
+     * "he aparcado aquí" stores the current fix (replacing any previous one);
+     * "¿dónde aparqué?" / "llévame al coche" give the distance + compass
+     * bearing to it, and TAKE_ME also drops a route on the offline map.
+     */
+    private suspend fun handleParking(
+        intent: ParkingIntentParser.Intent,
+        context: TravelContext,
+    ): String {
+        val here = context.currentLocation
+
+        if (intent == ParkingIntentParser.Intent.SAVE) {
+            if (here == null) return SpokenText.PARKING_NO_FIX_TO_SAVE
+            memoryRepository.forget(FactType.PARKING)
+            memoryRepository.remember(UserFact(FactType.PARKING, value = "${here.first},${here.second}"))
+            return SpokenText.PARKING_SAVED
+        }
+
+        val spot = memoryRepository.facts(FactType.PARKING).firstOrNull()?.value?.toCoords()
+            ?: return SpokenText.PARKING_NONE
+        if (here == null) return SpokenText.PARKING_NO_FIX_NOW
+
+        val distance = distanceWords(here, spot)
+        val direction = COMPASS_ES[bearingIndex(here, spot)]
+
+        return if (intent == ParkingIntentParser.Intent.TAKE_ME && mapSearchCoordinator.hasOfflineMap()) {
+            mapSearchCoordinator.submit(
+                MapSearchRequest(
+                    rawQuery = "el coche",
+                    category = null,
+                    origin = here,
+                    navigate = true,
+                    destination = spot,
+                ),
+            )
+            SpokenText.parkingTakeMe(distance, direction)
+        } else {
+            SpokenText.parkingHere(distance, direction)
+        }
+    }
+
+    private fun distanceWords(a: Pair<Double, Double>, b: Pair<Double, Double>): String {
+        val metres = haversineMetres(a, b)
+        return if (metres < 950) {
+            "${((metres / 10).roundToInt() * 10).coerceAtLeast(10)} metros"
+        } else {
+            "%.1f km".format(SPANISH_ES, metres / 1000.0)
+        }
+    }
+
+    private fun haversineMetres(a: Pair<Double, Double>, b: Pair<Double, Double>): Double {
+        val r = 6_371_000.0
+        val dLat = Math.toRadians(b.first - a.first)
+        val dLon = Math.toRadians(b.second - a.second)
+        val la1 = Math.toRadians(a.first)
+        val la2 = Math.toRadians(b.first)
+        val h = sin(dLat / 2).pow(2) + cos(la1) * cos(la2) * sin(dLon / 2).pow(2)
+        return 2 * r * asin(min(1.0, sqrt(h)))
+    }
+
+    /** 0=norte, 1=noreste … 7=noroeste — index into [COMPASS_ES]. */
+    private fun bearingIndex(a: Pair<Double, Double>, b: Pair<Double, Double>): Int {
+        val dLon = Math.toRadians(b.second - a.second)
+        val la1 = Math.toRadians(a.first)
+        val la2 = Math.toRadians(b.first)
+        val y = sin(dLon) * cos(la2)
+        val x = cos(la1) * sin(la2) - sin(la1) * cos(la2) * cos(dLon)
+        val deg = (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
+        return (((deg + 22.5) / 45.0).toInt()) % 8
     }
 
     /** A `"lat,lon"` fact value → coordinate pair, or null if it doesn't parse. */
