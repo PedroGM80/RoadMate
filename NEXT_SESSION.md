@@ -59,9 +59,10 @@ This file is now the running state, not the original bring-up plan.
 2. **Strip the debug tracing** — do this LAST, right before a release build /
    R8 verification: `DebugTrace.kt`, all `dbg(...)` / `DebugTrace.log(...)`
    calls in `LocalLlmManager` (incl. the `stream …` lines), `GeminiNanoManager`,
-   `GeminiRepositoryImpl`, `VoskSpeechRecognizer`, `MapScreen.refreshPois`,
-   and the **TEMP `DebugTrace.log("TTS speak …")` in `TextToSpeechManager`**
-   (added for the streaming-latency check). Grep `DebugTrace`.
+   `GeminiRepositoryImpl`, `VoskSpeechRecognizer`, `WakeWordDetector` (the
+   `wake: …` lines), `MapScreen.refreshPois`, and the **TEMP
+   `DebugTrace.log("TTS speak …")` in `TextToSpeechManager`** (added for the
+   streaming-latency check). Grep `DebugTrace`.
 3. ~~**Bigger Vosk model** for accuracy — `vosk-model-es-0.42` (~1.4 GB)~~ —
    **dropped.** Tried before; it recognised *worse* than the small one on
    this device (per user, 2026-09-03). Not worth the ~1.4 GB runtime
@@ -84,21 +85,43 @@ This file is now the running state, not the original bring-up plan.
    the POI query works.
 8. GPU backend for MediaPipe: dead end on this MediaTek (silent hang);
    could be made opt-in for devices where it works.
-9. **Hands-free wake word — drop the mic button.** Idea raised by user
-   2026-09-03: an always-listening on-device hotword ("oye RoadMate") so
-   the driver never has to tap. Options, all on-device so the privacy
-   promise holds:
-   - **Vosk keyword spotting** — feed `KaldiRecognizer` a restricted
-     grammar (just the wake phrase / a few command words). Zero new deps,
-     Vosk already bundled. Cheapest; accuracy on a tiny grammar is the
-     open question.
-   - **Picovoice Porcupine** — dedicated wake-word engine, tiny, good
-     accuracy, but adds a dep + a Picovoice access key + licensing to
-     check for a shipped app.
-   - **openWakeWord** — ONNX/TFLite runtime, custom words need training.
-   Battery: driving = usually plugged in, so an always-on recogniser is
-   acceptable; still gate it on a setting. Pairs well with a restricted
-   grammar as the accuracy answer that item 3 was supposed to be.
+9. **Hands-free wake word "RoadMate".** *Code landed 2026-09-03* (user
+   picked Picovoice Porcupine). Foreground + background, mic button kept as
+   fallback:
+   - `WakeWordDetector` (data/ml) wraps `PorcupineManager` in a callbackFlow;
+     `WakeWordRepository` (domain) / `…Impl` (data). No-ops unless a key +
+     both model files are present.
+   - `RoadMateViewModel`: `startWakeWordListening()` → on detection runs the
+     same `startListening()` cycle; `startAmbientListening()` picks wake word
+     **or** the rest-silence monitor (mutually exclusive — one mic owner).
+     `startListening()` pauses/resumes the wake job around the Vosk capture.
+   - `WakeWordForegroundService` (data/service, `foregroundServiceType=
+     microphone`): background detection → headless STT + answer. Started from
+     `MainActivity.onPause` when configured.
+   - `libs.porcupine.android` = `ai.picovoice:porcupine-android:4.0.2`;
+     `PICOVOICE_ACCESS_KEY` from `local.properties` → `BuildConfig`.
+
+   **To actually turn it on (device prereqs, not code):**
+   1. Free AccessKey from console.picovoice.ai → `local.properties`:
+      `PICOVOICE_ACCESS_KEY=...`
+   2. Train a "RoadMate" wake word (console → Porcupine, platform **Android**,
+      pick the language) → save as `data/src/main/assets/wake/roadmate.ppn`.
+   3. Grab the matching `porcupine_params_<lang>.pv` from the porcupine repo
+      (`lib/common/`), rename to
+      `data/src/main/assets/wake/porcupine_params.pv`.
+   (`.ppn`/`.pv` are gitignored; see `assets/wake/README.md`.)
+
+   **Licensing:** free-plan custom `.ppn` is time-limited and needs
+   periodic regeneration — fine for dev, a shipped build needs a paid
+   Picovoice plan or the Vosk restricted-grammar fallback.
+
+   **Known limitation:** the 30-min rest-reminder is suspended whenever
+   hands-free is active (both want the mic continuously). Fix later by
+   fanning one `AudioRecord` PCM stream to both Porcupine and the dB check
+   instead of running two mic owners.
+
+   **Still TODO:** settings toggle to disable hands-free; earcon on
+   detection; device bring-up (needs the prereqs above).
 
 ## Not for a device — still open from before
 
