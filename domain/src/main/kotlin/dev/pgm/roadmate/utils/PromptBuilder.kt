@@ -18,12 +18,44 @@ import java.util.Locale
  * interpolated value is flattened to a single line and length-capped so a
  * stray long string can't blow past the model's context or crash the
  * native tokenizer.
+ *
+ * The coordinate lines (own position, home, work) and the weather line are
+ * emitted only when the question looks spatial or weather-related — on a
+ * ~6 tok/s CPU backend every skipped line shaves prefill off the time to the
+ * first spoken word, and they add nothing to an identity or general-knowledge
+ * answer. The keyword match errs towards inclusion.
  */
 object PromptBuilder {
 
     private const val MAX_EXCHANGES = 1
     private const val MAX_FIELD_CHARS = 200
     private const val MAX_EXCHANGE_CHARS = 160
+
+    /**
+     * Coordinates (own position, home, work) and the weather line are only
+     * useful when the question is spatial or weather-related. For identity,
+     * general-knowledge and chit-chat questions they're ~30 tokens of prefill
+     * on the answer's critical path that change nothing — at ~6 tok/s on this
+     * CPU that's real latency before the first spoken word. So each is included
+     * only when the question looks like it needs it. The bias is to include:
+     * a slightly longer prompt costs a fraction of a second, a missing fact
+     * costs a wrong answer.
+     */
+    private val LOCATION_QUESTION = Regex(
+        """\b(?:d[oó]nde|cerca|cercan[oa]s?|lejos|distancia|kil[oó]metros?|km|""" +
+            """llego|llegar|llegamos|llegar[eé]|queda|quedan|quedamos|falta|faltan|""" +
+            """ruta|camino|trayecto|aqu[ií]|estoy|estamos|ubicaci[oó]n|alrededor|""" +
+            """zona|salida|autov[ií]a|autopista|casa|trabajo|barrio)\b""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    private val WEATHER_QUESTION = Regex(
+        """\b(?:tiempo|clima|llover|lloviendo|llover[aá]|lluvia|chispea|nublad[oa]s?|""" +
+            """despejad[oa]s?|solead[oa]|nieve|nevando|granizo|niebla|temperatura|""" +
+            """grados|pron[oó]stico|fr[ií]o|calor|viento|ventoso|paraguas|chubasquero|""" +
+            """abrigo|chaqueta|cadenas)\b""",
+        RegexOption.IGNORE_CASE,
+    )
 
     fun buildPrompt(
         context: TravelContext,
@@ -41,6 +73,9 @@ object PromptBuilder {
         val time = "%02d:%02d".format(Locale.US, context.hour, context.minute)
         val question = userInput.oneLine(MAX_FIELD_CHARS).ifBlank { "(sin pregunta)" }
 
+        val wantsLocation = LOCATION_QUESTION.containsMatchIn(userInput)
+        val wantsWeather = WEATHER_QUESTION.containsMatchIn(userInput)
+
         val prompt = buildString {
             appendLine(Constants.GEMINI_SYSTEM_PROMPT)
             appendLine(style.promptInstruction)
@@ -48,15 +83,21 @@ object PromptBuilder {
 
             appendLine("Contexto:")
             appendLine("- Hora: $time")
-            appendLine("- Ubicación (lat,lon): $location")
+            if (wantsLocation) {
+                appendLine("- Ubicación (lat,lon): $location")
+            }
             context.destination?.oneLine(MAX_FIELD_CHARS)?.takeIf { it.isNotBlank() }
                 ?.let { appendLine("- Destino: $it") }
-            context.weatherDescription?.oneLine(MAX_FIELD_CHARS)?.takeIf { it.isNotBlank() }
-                ?.let { appendLine("- Clima: $it") }
-            home?.oneLine(MAX_FIELD_CHARS)?.takeIf { it.isNotBlank() }
-                ?.let { appendLine("- Casa (lat,lon): $it") }
-            work?.oneLine(MAX_FIELD_CHARS)?.takeIf { it.isNotBlank() }
-                ?.let { appendLine("- Trabajo (lat,lon): $it") }
+            if (wantsWeather) {
+                context.weatherDescription?.oneLine(MAX_FIELD_CHARS)?.takeIf { it.isNotBlank() }
+                    ?.let { appendLine("- Clima: $it") }
+            }
+            if (wantsLocation) {
+                home?.oneLine(MAX_FIELD_CHARS)?.takeIf { it.isNotBlank() }
+                    ?.let { appendLine("- Casa (lat,lon): $it") }
+                work?.oneLine(MAX_FIELD_CHARS)?.takeIf { it.isNotBlank() }
+                    ?.let { appendLine("- Trabajo (lat,lon): $it") }
+            }
 
             driverPreferences.map { it.oneLine(MAX_FIELD_CHARS) }.filter { it.isNotBlank() }
                 .takeIf { it.isNotEmpty() }

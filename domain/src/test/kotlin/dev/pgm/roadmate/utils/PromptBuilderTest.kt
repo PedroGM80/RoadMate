@@ -63,7 +63,65 @@ class PromptBuilderTest {
 
     @Test
     fun `falls back to unknown location text when null`() {
-        assertTrue(PromptBuilder.buildPrompt(context(), "hola").contains("desconocida"))
+        val prompt = PromptBuilder.buildPrompt(
+            context(input = "¿cuánto queda?"),
+            "¿cuánto queda?",
+        )
+
+        assertTrue(prompt.contains("desconocida"))
+    }
+
+    @Test
+    fun `omits coordinates entirely when the question is not spatial`() {
+        val prompt = PromptBuilder.buildPrompt(
+            context(location = 36.4614 to -6.1998, input = "¿quién pintó el Guernica?"),
+            "¿quién pintó el Guernica?",
+        )
+
+        assertFalse(prompt.contains("Ubicación"))
+        assertFalse(prompt.contains("36.4614"))
+    }
+
+    @Test
+    fun `includes coordinates when the question is spatial`() {
+        val prompt = PromptBuilder.buildPrompt(
+            context(location = 36.4614 to -6.1998, input = "¿estamos cerca?"),
+            "¿estamos cerca?",
+        )
+
+        assertTrue(prompt.contains("Ubicación (lat,lon): 36.4614, -6.1998"))
+    }
+
+    @Test
+    fun `omits the weather line unless the question is weather-related`() {
+        val plain = context(input = "¿qué hora es?").copy(weatherDescription = "cielo despejado")
+        val rainy = context(input = "¿me llevo paraguas?").copy(weatherDescription = "lluvia ligera")
+
+        assertFalse(PromptBuilder.buildPrompt(plain, "¿qué hora es?").contains("Clima:"))
+        assertTrue(
+            PromptBuilder.buildPrompt(rainy, "¿me llevo paraguas?").contains("Clima: lluvia ligera"),
+        )
+    }
+
+    @Test
+    fun `omits home and work coordinates unless the question is spatial`() {
+        val chat = PromptBuilder.buildPrompt(
+            context(input = "cuéntame un chiste"),
+            "cuéntame un chiste",
+            home = "40.0,-3.7",
+            work = "40.1,-3.6",
+        )
+        val route = PromptBuilder.buildPrompt(
+            context(input = "¿cuánto falta para casa?"),
+            "¿cuánto falta para casa?",
+            home = "40.0,-3.7",
+            work = "40.1,-3.6",
+        )
+
+        assertFalse(chat.contains("Casa (lat,lon)"))
+        assertFalse(chat.contains("Trabajo (lat,lon)"))
+        assertTrue(route.contains("Casa (lat,lon): 40.0,-3.7"))
+        assertTrue(route.contains("Trabajo (lat,lon): 40.1,-3.6"))
     }
 
     @Test
