@@ -125,6 +125,25 @@ without reading the full git log.
   the `POI` category (changed from an earlier, less honest `IOT` choice).
   `HomeCarScreen` compiles against real `androidx.car.app` 1.7.0 APIs
   (`Header`, `PaneTemplate`, `Row.setImage`, `Action.setIcon`).
+  **`automotive_app_desc.xml` debe declarar `<uses name="template" />`.** El
+  commit cb80ba4 (2026-09-01) lo cambió a `androidx.car.app` creyendo que
+  `template` era el valor antiguo de media/mensajería: es al revés. El valor
+  `template` es el único que reconoce el host de Android Auto para apps de
+  Car App Library, y con cualquier otro la app no aparece en el lanzador del
+  coche. Revertido el 2026-09-03. Fuente:
+  https://developer.android.com/training/cars/apps/auto
+  No volver a "arreglarlo".
+- **`minCarApiLevel` estaba declarado en 1 pero el código exige 7** —
+  encontrado 2026-09-04 leyendo el `.jar` de fuentes de
+  `androidx.car.app:app:1.7.0` (no hay lint.jar en el AAR, así que
+  `./gradlew lintDebug` no lo detecta; hay que mirar las anotaciones
+  `@RequiresCarApi` a mano). `HomeCarScreen` construye un `Header` y llama
+  `PaneTemplate.Builder#setHeader(Header)`; `Header` exige nivel 5 pero
+  `setHeader` exige nivel 7. Con `minCarApiLevel=1` el manifest le decía al
+  host "sirvo hosts de nivel 1-6 también", así que en un host real de nivel
+  bajo (Automotive OS más viejo, no actualizable vía Play) esa llamada habría
+  lanzado una excepción en tiempo de ejecución la primera vez que se dibujara
+  la plantilla. Corregido a 7 en `AndroidManifest.xml`.
 - **Car microphone preference**: `CarMicrophonePreference` uses
   `AudioManager.setCommunicationDevice()` (API 31+) to prefer the car's mic
   when connected — best-effort, stays 100% offline. (An earlier proposal to
@@ -275,12 +294,55 @@ trusting any of it.**
 
 ## Explicitly unverified / open
 
+- **Cómo se prueba en un coche real (importante)**: la opción "Fuentes
+  desconocidas" del modo desarrollador de Android Auto **no aplica a las apps
+  de Car App Library** — solo a media, notificaciones de mensajería y apps
+  "parked". Una app con plantillas instalada por `adb install` /
+  `installDebug` **nunca** aparecerá en el lanzador del coche, por muy bien
+  que esté el manifest. Para verla en el coche hay que instalarla desde una
+  fuente de confianza: Google Play Internal App Sharing (sin revisión, lo más
+  rápido) o un canal de pruebas internas. Para desarrollo diario, Desktop Head
+  Unit (ya instalado en
+  `~/Library/Android/sdk/extras/google/auto/desktop-head-unit`).
+  Fuente: https://developer.android.com/training/cars/testing
 - **Real Android Auto head unit / DHU**: never actually driven in this
   environment — Desktop Head Unit couldn't be gotten working here (the
   Android Auto companion app's developer-mode UI didn't resolve cleanly,
   and DHU opens a window outside the reach of the available tooling).
   Everything car-side is verified by compilation against the real API only.
   **Needs a real car or a working DHU setup before shipping.**
+- **"llama a X" ejecuta `context.startActivity(ACTION_CALL)` desde el propio
+  `CarAppService`, no desde una Activity visible.** El javadoc de
+  `CarAppService` dice explícitamente que mientras la app se muestra en la
+  pantalla del coche, el sistema *no* la considera en primer plano ("it will
+  be considered in the background") — la misma condición que hace la
+  ubicación potencialmente poco fiable según ese mismo javadoc. En Android
+  10+ eso es justo el tipo de estado en el que un `startActivity` sin
+  Activity visible puede ser bloqueado en silencio (background activity
+  launch restrictions) — sin excepción, sin log claro, la llamada
+  simplemente no se hace.
+  Contraevidencia real, no solo teoría: `CarContext.requestPermissions()` —
+  el mecanismo oficial y ya usado en la propia librería (ver
+  `HomeCarScreen`/permiso pendiente) — hace exactamente lo mismo
+  (`context.startActivity(...FLAG_ACTIVITY_NEW_TASK)`) desde ese mismo
+  contexto, y es una función pública, documentada y usada en producción por
+  cualquier app de Car App Library que pida permisos desde el coche. Que ese
+  flujo funcione sugiere que el binding del host sí lleva alguna exención de
+  BAL. No es prueba para *nuestro* Intent (`ACTION_CALL` en vez del
+  `CarAppPermissionActivity` propio de la librería), y nadie lo ha probado en
+  un coche o DHU real todavía.
+  **Antes de dar por bueno el flujo de llamadas desde el coche, probarlo en
+  un dispositivo real: decir "llama a X" desde `HomeCarScreen` y confirmar
+  que la llamada se coloca.** Si falla en silencio, la mitigación estándar es
+  arrancar un foreground service de corta duración justo antes del
+  `startActivity` (o mover la llamada a un `PendingIntent` disparado por el
+  propio host) — no se ha implementado porque sin poder probarlo aquí sería
+  añadir complejidad a ciegas.
+- **Ubicación desde el coche puede ser menos fiable que desde el teléfono**,
+  por la misma razón de "no-foreground" de arriba (aviso explícito en el
+  javadoc de `CarAppService`, no una suposición). `getCurrentCoordinates()`
+  es una lectura puntual (no `ACCESS_BACKGROUND_LOCATION`, no updates
+  continuos), así que el riesgo es bajo, pero sin verificar en hardware real.
 - **Play Store category for the Android Auto service**: `POI` is the best
   fit available today, but no category actually matches "general voice
   assistant" well. Talk to Google's Android for Cars team before

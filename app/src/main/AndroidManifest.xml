@@ -47,9 +47,20 @@
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
+        <!-- Must match the highest @RequiresCarApi actually used in the car
+             code, not just "1". HomeCarScreen builds a Header and calls
+             PaneTemplate.Builder#setHeader(Header) — setHeader is
+             @RequiresCarApi(7) in androidx.car.app 1.7.0 (Header itself is
+             only @RequiresCarApi(5)). Declaring "1" here tells the host this
+             app can run on API level 1-6 hosts too; on one of those the
+             setHeader() call would throw at runtime the first time the
+             template is drawn. There is no lint check for this — the
+             library's AAR ships no lint.jar — so this has to be verified by
+             hand against the androidx.car.app sources whenever the car UI
+             changes what template APIs it calls. -->
         <meta-data
             android:name="androidx.car.app.minCarApiLevel"
-            android:value="1" />
+            android:value="7" />
 
         <activity
             android:name=".presentation.MainActivity"
