@@ -41,12 +41,20 @@ class RoadMateCarAppService : CarAppService() {
     /**
      * Who is allowed to bind to this service and drive RoadMate's car screens.
      *
-     * ALLOW_ALL_HOSTS is what makes sideloading onto your own head unit work
-     * with Android Auto's "Unknown sources" developer option — but it also
-     * lets *any* app on the phone bind and drive the assistant, including
-     * placing calls. That is a debug-build convenience, not something to ship,
-     * so a release build uses the Car App Library's own signature allowlist
-     * (Android Auto and Automotive OS hosts only).
+     * ALLOW_ALL_HOSTS es lo que permite que el Desktop Head Unit (DHU) se
+     * conecte durante el desarrollo — pero también deja que *cualquier* app
+     * del movil se enlace y maneje el asistente, incluidas las llamadas. Es
+     * una comodidad de la build de debug, no algo que se publique, asi que la
+     * build de release usa la allowlist por firma de la propia Car App
+     * Library (solo hosts de Android Auto y Automotive OS).
+     *
+     * OJO con las pruebas: la opcion "Fuentes desconocidas" de Android Auto
+     * NO aplica a las apps de Car App Library. En un coche real la app tiene
+     * que venir de una fuente de confianza (Google Play; lo mas rapido es
+     * Internal App Sharing o el canal de pruebas internas). Instalarla con
+     * `adb install` / `installDebug` nunca la hara aparecer en el coche.
+     * Para desarrollo, usar el Desktop Head Unit.
+     * https://developer.android.com/training/cars/testing
      */
     override fun createHostValidator(): HostValidator =
         if (BuildConfig.DEBUG) {

@@ -102,7 +102,9 @@
 
         <service
             android:name="dev.pgm.roadmate.car.RoadMateCarAppService"
-            android:exported="true">
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_name">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
                 <!-- POI fits what RoadMate actually does (location-aware Q&A,

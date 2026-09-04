@@ -1,10 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Car App Library apps MUST declare `androidx.car.app` here. `template` is the
-  older media/messaging-style value and makes Android Auto ignore the app
-  entirely — it won't show in the car launcher. See "Get started with the
-  Android for Cars App Library".
+  Cómo Android Auto descubre la app. El host lee este fichero a través del
+  meta-data `com.google.android.gms.car.application` del manifest y busca la
+  capacidad declarada aquí.
+
+  Para una app de Car App Library el valor OBLIGATORIO es `template`. Ver
+  "Add support for Android Auto to your templated app":
+  https://developer.android.com/training/cars/apps/auto
+
+      <automotiveApp>
+          <uses name="template" />
+      </automotiveApp>
+
+  `androidx.car.app` NO es un valor válido: no lo reconoce ningún host, así
+  que la app queda invisible en el lanzador del coche. (`media` y
+  `notification` son los valores de las apps de música/mensajería clásicas,
+  que no usan Car App Library.)
 -->
 <automotiveApp>
-    <uses name="androidx.car.app" />
+    <uses name="template" />
 </automotiveApp>
