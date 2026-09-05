@@ -5,10 +5,16 @@ import androidx.car.app.Session
 import androidx.car.app.validation.HostValidator
 import dagger.hilt.android.AndroidEntryPoint
 import dev.pgm.roadmate.BuildConfig
+import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
+import dev.pgm.roadmate.domain.repository.CurrentPlaceRepository
+import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
+import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
+import dev.pgm.roadmate.domain.repository.PcmTranscriber
+import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
-import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
+import dev.pgm.roadmate.presentation.map.OfflineMapController
 import dev.pgm.roadmate.utils.PermissionManager
 import javax.inject.Inject
 
@@ -24,9 +30,6 @@ import javax.inject.Inject
 class RoadMateCarAppService : CarAppService() {
 
     @Inject
-    lateinit var recordAudioUseCase: RecordAudioUseCase
-
-    @Inject
     lateinit var generateResponseUseCase: GenerateResponseUseCase
 
     @Inject
@@ -37,6 +40,27 @@ class RoadMateCarAppService : CarAppService() {
 
     @Inject
     lateinit var permissionManager: PermissionManager
+
+    @Inject
+    lateinit var speechSynthesisRepository: SpeechSynthesisRepository
+
+    @Inject
+    lateinit var pcmTranscriber: PcmTranscriber
+
+    @Inject
+    lateinit var currentPlaceRepository: CurrentPlaceRepository
+
+    @Inject
+    lateinit var mapSearchCoordinator: MapSearchCoordinator
+
+    @Inject
+    lateinit var preferences: AssistantPreferencesRepository
+
+    @Inject
+    lateinit var gemini: GeminiRepository
+
+    @Inject
+    lateinit var offlineMap: OfflineMapController
 
     /**
      * Who is allowed to bind to this service and drive RoadMate's car screens.
@@ -66,10 +90,16 @@ class RoadMateCarAppService : CarAppService() {
         }
 
     override fun onCreateSession(): Session = RoadMateSession(
-        recordAudioUseCase,
         generateResponseUseCase,
         locationRepository,
         weatherRepository,
         permissionManager,
+        speechSynthesisRepository,
+        pcmTranscriber,
+        currentPlaceRepository,
+        mapSearchCoordinator,
+        preferences,
+        gemini,
+        offlineMap,
     )
 }

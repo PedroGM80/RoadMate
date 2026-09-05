@@ -171,6 +171,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.car.app)
+    implementation(libs.androidx.car.app.projected)
     implementation(libs.maplibre.android.sdk)
     implementation(libs.maplibre.annotation)
     implementation(libs.hilt.android)

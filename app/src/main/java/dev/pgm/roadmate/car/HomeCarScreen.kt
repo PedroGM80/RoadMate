@@ -1,107 +1,245 @@
 package dev.pgm.roadmate.car
 
+import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Header
-import androidx.car.app.model.Pane
-import androidx.car.app.model.PaneTemplate
-import androidx.car.app.model.Row
+import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
 import androidx.core.graphics.drawable.IconCompat
-import android.util.Log
 import androidx.lifecycle.lifecycleScope
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.domain.model.TravelContext
+import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
+import dev.pgm.roadmate.domain.repository.CurrentPlaceRepository
+import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
+import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
+import dev.pgm.roadmate.domain.repository.PcmTranscriber
+import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
-import dev.pgm.roadmate.domain.usecase.RecordAudioUseCase
+import dev.pgm.roadmate.presentation.map.OfflineMapController
 import dev.pgm.roadmate.utils.PermissionManager
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
 /**
- * Single-screen voice Q&A UI for the car display: a status row and one
- * "Escuchar" action, matching the same golden path as HomeScreen on the phone
- * (record -> transcribe -> ask Gemini -> speak), but through PaneTemplate
- * instead of Compose, since Android Auto only renders host-controlled
- * templates. Rest-reminder silence detection isn't surfaced here — it still
- * runs via SilenceDetectionForegroundService/RoadMateViewModel when this
- * screen isn't the one in front.
+ * Voice Q&A on the car display: the answer as the message body, one primary
+ * "Escuchar" action, and the driver's current position under it. Same golden
+ * path as HomeScreen on the phone (record -> transcribe -> ask Gemini ->
+ * speak), through a host template instead of Compose, since Android Auto only
+ * renders host-controlled templates.
  *
- * Listening/processing collapses into the host's native loading spinner
- * (Pane.setLoading) rather than juggling separate "Escuchando.../
- * Procesando..." row text — one generic busy state reads faster at a glance,
- * which matters more here than on the phone.
+ * MessageTemplate, not PaneTemplate. PaneTemplate is built for a short list of
+ * labelled detail rows next to up to two actions; putting a whole spoken
+ * answer in a Row title made the host lay it out as one giant scrollable row
+ * with paging chevrons down the side, truncate it while driving restrictions
+ * are on (Row titles are single-line under restriction), and float the action
+ * in the middle of the empty space. MessageTemplate is the shape the content
+ * actually has — one block of prose, an icon, and buttons anchored at the
+ * bottom — and the host handles driving-restricted truncation of a *message*
+ * by itself.
+ *
+ * The microphone comes from the host via [CarMicAudioSource], never from
+ * `AudioRecord` — see that class for why the phone's mic is unreachable here.
+ *
+ * Rest-reminder silence detection isn't surfaced here — it still runs via
+ * SilenceDetectionForegroundService/RoadMateViewModel when this screen isn't
+ * the one in front.
  */
 class HomeCarScreen(
     carContext: CarContext,
-    private val recordAudioUseCase: RecordAudioUseCase,
     private val generateResponseUseCase: GenerateResponseUseCase,
     private val locationRepository: LocationRepository,
     private val weatherRepository: WeatherRepository,
-    private val permissionManager: PermissionManager
+    private val permissionManager: PermissionManager,
+    private val speechSynthesisRepository: SpeechSynthesisRepository,
+    private val pcmTranscriber: PcmTranscriber,
+    private val currentPlaceRepository: CurrentPlaceRepository,
+    private val mapSearchCoordinator: MapSearchCoordinator,
+    private val preferences: AssistantPreferencesRepository,
+    private val gemini: GeminiRepository,
+    private val offlineMap: OfflineMapController,
 ) : Screen(carContext) {
 
-    private var statusText = "Pulsa Escuchar y pregunta."
+    private var statusText = carContext.getString(R.string.car_idle)
+
+    /** What the mic understood, echoed back so a misheard question is obvious. */
     private var lastRecognizedInput: String? = null
     private var isBusy = false
 
-    private val header = Header.Builder()
-        .setTitle("RoadMate")
-        .setStartHeaderAction(Action.APP_ICON)
-        .build()
+    private val micIcon = carIcon(R.drawable.lucide_ic_mic, CarColor.DEFAULT)
 
-    private val micIcon = CarIcon.Builder(
-        IconCompat.createWithResource(carContext, R.drawable.lucide_ic_mic)
-    ).setTint(CarColor.DEFAULT).build()
+    // The lucide vectors are stroked in black, so they only look right once the
+    // host recolours them. CarColor.DEFAULT is the host's own foreground colour
+    // and is what buttons and rows expect.
+    //
+    // The big icon MessageTemplate draws above the message is a different
+    // case: DEFAULT left it black on the near-black template surface, and
+    // PRIMARY resolves to the app's own primary — also dark — so it stayed
+    // invisible. createCustom names both variants outright, so the host picks
+    // one that contrasts whichever mode it is in instead of us guessing.
+    private val micIconLarge = carIcon(
+        R.drawable.lucide_ic_mic,
+        CarColor.createCustom(MIC_TINT_DAY, MIC_TINT_NIGHT),
+    )
+    private val stopIcon = carIcon(R.drawable.lucide_ic_square, CarColor.DEFAULT)
+    private val mapIcon = carIcon(R.drawable.lucide_ic_map, CarColor.DEFAULT)
+
+    init {
+        // A template is a snapshot: it observes nothing, so anything that
+        // changes what it should say has to invalidate it.
+        //
+        // Sparingly, though. The host meters templates — the DHU's "Permits"
+        // counter is that budget — and an app that redraws on every emission
+        // burns through it and is dropped as unresponsive. So: only signals
+        // that actually change a *rendered string*, and only when the string
+        // itself changes.
+        lifecycleScope.launch {
+            // StateFlow already conflates equal values, so this fires only on
+            // the actual start/stop transitions.
+            speechSynthesisRepository.isSpeaking.collect { invalidate() }
+        }
+        // The location line is polled rather than driven by the GPS flow. On
+        // the move it would otherwise change several times a second, and every
+        // change is a template the host has to accept — the budget the DHU
+        // shows as "Permits". A 15-second check keeps the header honest at a
+        // cost of at most four redraws a minute.
+        lifecycleScope.launch {
+            var shown = locationLine()
+            while (isActive) {
+                delay(LOCATION_REFRESH_MS)
+                val current = locationLine()
+                if (current != shown) {
+                    shown = current
+                    invalidate()
+                }
+            }
+        }
+        lifecycleScope.launch { runCatching { locationRepository.getCurrentCoordinates() } }
+    }
 
     override fun onGetTemplate(): Template {
         if (!permissionManager.hasRecordAudioPermission()) {
-            return PaneTemplate.Builder(
-                Pane.Builder()
-                    .addRow(
-                        Row.Builder()
-                            .setImage(micIcon)
-                            .setTitle("Permisos pendientes")
-                            .addText("Abre RoadMate en el móvil una vez para dar permiso de micrófono y ubicación.")
-                            .build()
-                    )
+            return MessageTemplate.Builder(
+                carContext.getString(R.string.car_permissions_message)
+            )
+                .setHeader(header())
+                .setIcon(micIconLarge)
+                .build()
+        }
+
+        if (isBusy) {
+            // The host draws its own spinner; the message is only what it falls
+            // back to if it decides to show text alongside it.
+            return MessageTemplate.Builder(carContext.getString(R.string.car_listening))
+                .setHeader(header())
+                .setLoading(true)
+                .build()
+        }
+
+        return MessageTemplate.Builder(messageBody())
+            .setHeader(header())
+            .setIcon(micIconLarge)
+            .addAction(
+                Action.Builder()
+                    .setTitle(carContext.getString(R.string.car_listen))
+                    .setIcon(micIcon)
+                    // FLAG_PRIMARY is what gets it the filled treatment; without
+                    // it both buttons render identically and neither reads as
+                    // "the thing to press".
+                    .setFlags(Action.FLAG_PRIMARY)
+                    .setOnClickListener(::startListening)
                     .build()
             )
-                .setHeader(header)
-                .build()
-        }
-
-        val pane = if (isBusy) {
-            Pane.Builder().setLoading(true).build()
-        } else {
-            Pane.Builder()
-                .addRow(
-                    Row.Builder()
-                        .setImage(micIcon)
-                        .setTitle(statusText)
-                        .apply { lastRecognizedInput?.let { addText("Tú: “$it”") } }
-                        .build()
-                )
-                .addAction(
-                    Action.Builder()
-                        .setTitle("Escuchar")
-                        .setIcon(micIcon)
-                        .setOnClickListener(::startListening)
-                        .build()
-                )
-                .build()
-        }
-
-        return PaneTemplate.Builder(pane)
-            .setHeader(header)
+            // MessageTemplate takes at most two actions, and the second one
+            // is whichever the driver needs at that moment: cutting off a long
+            // answer beats everything while it is being read, and the way to
+            // the map the rest of the time. Repeating is left out — the answer
+            // is spoken as it arrives and stays on screen, so a third control
+            // would cost more attention than it saves.
+            .addAction(if (isSpeaking()) stopAction() else mapAction())
             .build()
     }
+
+    /**
+     * No end actions here on purpose. Android Auto renders `Header`
+     * `addEndHeaderAction` buttons on a MessageTemplate but never delivers the
+     * click to the app — verified against the host with a log on the listener
+     * — so anything the driver has to be able to press lives in the template's
+     * own action row instead.
+     */
+    private fun header(): Header = Header.Builder()
+        // The header title, not the message body: the host caps how many lines
+        // of a MessageTemplate message it will draw (a third line came out as
+        // "…"), and the header is the one part that survives every restriction
+        // level. The app icon in the start slot still says which app this is.
+        .setTitle(locationLine())
+        .setStartHeaderAction(Action.APP_ICON)
+        .build()
+
+    private fun mapScreen(): MapCarScreen = MapCarScreen(
+        carContext,
+        locationRepository,
+        currentPlaceRepository,
+        mapSearchCoordinator,
+        preferences,
+        gemini,
+        offlineMap,
+    )
+
+    /**
+     * The answer alone leaves the driver guessing when speech recognition got
+     * the question wrong, which is most of what goes wrong in a moving car.
+     * Echoing the transcript above the answer makes a misheard question
+     * self-evident.
+     */
+    private fun messageBody(): String = buildString {
+        lastRecognizedInput?.let { append("“").append(it).append("”\n\n") }
+        append(statusText)
+    }
+
+    /**
+     * Where the driver is, for the header — the same thing the phone shows in
+     * its location chip. The street name when the phone's offline map has
+     * resolved one, the raw fix otherwise, and the app's own name only when
+     * there is no fix at all.
+     */
+    private fun locationLine(): String {
+        currentPlaceRepository.label.value?.let { return it }
+        val here = locationRepository.location.value
+            ?: return carContext.getString(R.string.app_name)
+        return carContext.getString(R.string.car_map_coordinates, here.first, here.second)
+    }
+
+    private fun isSpeaking(): Boolean = speechSynthesisRepository.isSpeaking.value
+
+    private fun stopAction(): Action = Action.Builder()
+        .setTitle(carContext.getString(R.string.car_stop))
+        .setIcon(stopIcon)
+        .setOnClickListener {
+            speechSynthesisRepository.stop()
+            invalidate()
+        }
+        .build()
+
+    private fun mapAction(): Action = Action.Builder()
+        .setTitle(carContext.getString(R.string.car_map_action))
+        .setIcon(mapIcon)
+        .setOnClickListener { screenManager.push(mapScreen()) }
+        .build()
+
+    private fun carIcon(resId: Int, tint: CarColor): CarIcon =
+        CarIcon.Builder(IconCompat.createWithResource(carContext, resId))
+            .setTint(tint)
+            .build()
 
     private fun startListening() {
         if (isBusy) return
@@ -115,8 +253,16 @@ class HomeCarScreen(
             // screen spinning forever with no button to press. The finally is
             // the whole point.
             try {
-                val userInput = recordAudioUseCase.finalText()
+                // Silence any answer still being read and let the output buffer
+                // drain before opening the mic: in a car the speaker sits next
+                // to the microphone, and the recogniser will happily transcribe
+                // RoadMate's own voice as the next question.
+                speechSynthesisRepository.stop()
+                speechSynthesisRepository.awaitDoneSpeaking()
+
+                val userInput = pcmTranscriber.transcribe(CarMicAudioSource(carContext))
                 if (userInput.isBlank()) {
+                    lastRecognizedInput = null
                     statusText = carContext.getString(R.string.car_not_heard)
                     return@launch
                 }
@@ -146,7 +292,9 @@ class HomeCarScreen(
                     isBusy = false
                     invalidate()
                 }
-                if (!answered) statusText = carContext.getString(R.string.car_no_answer)
+                if (!answered) {
+                    statusText = carContext.getString(R.string.car_no_answer)
+                }
             } catch (c: CancellationException) {
                 throw c
             } catch (t: Throwable) {
@@ -161,5 +309,12 @@ class HomeCarScreen(
 
     private companion object {
         const val TAG = "HomeCarScreen"
+
+        /** How often the header re-checks where the car is. */
+        const val LOCATION_REFRESH_MS = 15_000L
+
+        /** RoadMate blue on a light surface, plain white on a dark one. */
+        const val MIC_TINT_DAY = 0xFF1A73E8.toInt()
+        const val MIC_TINT_NIGHT = 0xFFFFFFFF.toInt()
     }
 }

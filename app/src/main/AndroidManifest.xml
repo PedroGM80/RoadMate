@@ -5,6 +5,17 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Da acceso al micrófono del coche a través del host (CarAudioRecord).
+         Sin esto CarAudioRecord.create() lanza SecurityException. No sustituye
+         a RECORD_AUDIO: esa sigue haciendo falta para el micro del móvil. -->
+    <uses-permission android:name="androidx.car.app.MICROPHONE" />
+    <!-- Necesario para las plantillas de mapa del host (PlaceListMapTemplate).
+         Sin ella el host rechaza la plantilla con
+         SecurityException: "The car app does not have a required permission:
+         androidx.car.app.MAP_TEMPLATES". No implica ser app de navegación:
+         eso sería ACCESS_SURFACE, que el host solo da a la categoría
+         NAVIGATION y que aquí no hace falta porque el mapa lo pinta él. -->
+    <uses-permission android:name="androidx.car.app.MAP_TEMPLATES" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

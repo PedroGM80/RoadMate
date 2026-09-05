@@ -16,6 +16,7 @@ import dev.pgm.roadmate.data.repository.OnboardingRepositoryImpl
 import dev.pgm.roadmate.data.repository.PhoneCallRepositoryImpl
 import dev.pgm.roadmate.data.repository.SilenceDetectionRepositoryImpl
 import dev.pgm.roadmate.data.repository.SpeechRecognitionRepositoryImpl
+import dev.pgm.roadmate.data.repository.VoskPcmTranscriberImpl
 import dev.pgm.roadmate.data.repository.SpeechSynthesisRepositoryImpl
 import dev.pgm.roadmate.data.repository.WakeWordRepositoryImpl
 import dev.pgm.roadmate.data.repository.WeatherRepositoryImpl
@@ -34,6 +35,7 @@ import dev.pgm.roadmate.domain.repository.RoutingRepository
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
+import dev.pgm.roadmate.domain.repository.PcmTranscriber
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WakeWordRepository
@@ -58,6 +60,9 @@ abstract class RepositoryModule {
 
     @Binds
     abstract fun bindSpeechRecognitionRepository(impl: SpeechRecognitionRepositoryImpl): SpeechRecognitionRepository
+
+    @Binds
+    abstract fun bindPcmTranscriber(impl: VoskPcmTranscriberImpl): PcmTranscriber
 
     @Binds
     abstract fun bindSilenceDetectionRepository(impl: SilenceDetectionRepositoryImpl): SilenceDetectionRepository
