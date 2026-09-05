@@ -3,6 +3,7 @@ package dev.pgm.roadmate.car
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
+import androidx.car.app.model.Header
 import androidx.car.app.model.ItemList
 import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.ParkedOnlyOnClickListener
@@ -85,8 +86,7 @@ class SettingsCarScreen(
             .build()
 
         return ListTemplate.Builder()
-            .setTitle(carContext.getString(R.string.car_settings_title))
-            .setHeaderAction(Action.BACK)
+            .setHeader(backHeader(R.string.car_settings_title))
             .setSingleList(items)
             .build()
     }
@@ -133,8 +133,7 @@ class SettingsCarScreen(
                 )
             }
             return ListTemplate.Builder()
-                .setTitle(carContext.getString(R.string.car_settings_offline_map))
-                .setHeaderAction(Action.BACK)
+                .setHeader(backHeader(R.string.car_settings_offline_map))
                 .setSingleList(list.build())
                 .build()
         }
@@ -222,8 +221,7 @@ class SettingsCarScreen(
                 )
             }
             return ListTemplate.Builder()
-                .setTitle(carContext.getString(R.string.car_settings_model))
-                .setHeaderAction(Action.BACK)
+                .setHeader(backHeader(R.string.car_settings_model))
                 .setSingleList(list.build())
                 .build()
         }
@@ -260,6 +258,12 @@ class SettingsCarScreen(
             invalidate()
             lifecycleScope.launch { preferences.setHandsFreeEnabled(handsFree) }
         }
+        .build()
+
+    /** Title + a back action, the shape every screen here uses. */
+    private fun backHeader(titleRes: Int): Header = Header.Builder()
+        .setTitle(carContext.getString(titleRes))
+        .setStartHeaderAction(Action.BACK)
         .build()
 
     /**

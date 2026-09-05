@@ -1,3 +1,10 @@
+// The MediaPipe LlmInference / LlmInferenceSession family is marked
+// @Deprecated in the current tasks-genai release with no drop-in replacement
+// yet — the GenAI API is still moving. Migrating touches the on-device
+// inference path, which can only be validated on hardware, so the call sites
+// stay as they are until that can be done deliberately.
+@file:Suppress("DEPRECATION")
+
 package dev.pgm.roadmate.ml
 
 import android.content.Context

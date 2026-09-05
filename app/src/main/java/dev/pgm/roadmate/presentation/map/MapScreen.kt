@@ -647,6 +647,9 @@ fun rememberMapPaneState(): MapPaneState {
         // it is exactly the kind of app the system asks to make room — and
         // this was the one component never told about it.
         val trimCallback = object : ComponentCallbacks2 {
+            // TRIM_MEMORY_RUNNING_* are deprecated on API 35+ (no longer
+            // delivered there); still the right signal on the versions that do.
+            @Suppress("DEPRECATION")
             override fun onTrimMemory(level: Int) {
                 if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
                     runCatching { mapView.onLowMemory() }
@@ -655,7 +658,10 @@ fun rememberMapPaneState(): MapPaneState {
 
             override fun onConfigurationChanged(newConfig: Configuration) = Unit
 
-            @Deprecated("Deprecated in Java")
+            @Deprecated(
+                message = "Deprecated in Java",
+                replaceWith = ReplaceWith("onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)")
+            )
             override fun onLowMemory() {
                 runCatching { mapView.onLowMemory() }
             }

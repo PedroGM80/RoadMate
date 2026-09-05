@@ -197,6 +197,9 @@ class CarMapRenderer(
      *
      * @return true when it was applied; false while the map is still loading.
      */
+    // MapLibreMap.setPadding(l,t,r,b) is deprecated with no replacement in the
+    // pinned SDK; the int-array overload doesn't exist here yet.
+    @Suppress("DEPRECATION")
     private fun applyVisibleArea(): Boolean {
         val area = visibleArea ?: return false
         val view = mapView ?: return false
