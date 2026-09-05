@@ -52,6 +52,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -127,6 +128,8 @@ fun MapScreen(
     val routeSummary by viewModel.routeSummary.collectAsStateWithLifecycle()
 
     val locationPermission = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
+    val density = LocalDensity.current.density
+    val filterLabel = poiFilter?.let { stringResource(it.labelRes) }
 
     // Everything below that has to outlive a tab switch lives in [paneState]:
     // the MapView itself, the loaded style's annotation managers and the
@@ -151,13 +154,12 @@ fun MapScreen(
             // Lift the MapLibre logo + (i) so they sit above the bottom
             // filter-chip row instead of tucked behind its corner (still
             // visible, as the OSM/MapLibre licence requires).
-            val d = context.resources.displayMetrics.density
-            val side = (8 * d).toInt()
-            val lift = (150 * d).toInt()
+            val side = (8 * density).toInt()
+            val lift = (150 * density).toInt()
             map.uiSettings.setLogoMargins(side, 0, 0, lift)
             map.uiSettings.setAttributionMargins(side, 0, 0, lift)
             map.setStyle(Style.Builder().fromUri(viewModel.styleUrl)) { style ->
-                registerPinIcons(style, context)
+                registerPinIcons(style, context, density)
                 // Created before the SymbolManager so the route line + its
                 // destination dot sit under the pins.
                 lineManager = LineManager(mapView, map, style)
@@ -265,9 +267,7 @@ fun MapScreen(
             // Nothing at all — tell the driver instead of leaving them hanging.
             if (pins.isEmpty()) {
                 if (navigateToResult || nameQuery != null) {
-                    val what = nameQuery
-                        ?: poiFilter?.let { context.getString(it.labelRes) }
-                        ?: ""
+                    val what = nameQuery ?: filterLabel ?: ""
                     viewModel.onSearchFoundNothing(what)
                 }
                 return@LaunchedEffect
@@ -461,7 +461,7 @@ fun MapScreen(
                             val map = mapLibreMap ?: return@ExtendedFloatingActionButton
                             viewModel.downloadVisibleRegion(
                                 bounds = map.projection.visibleRegion.latLngBounds,
-                                pixelRatio = context.resources.displayMetrics.density,
+                                pixelRatio = density,
                             )
                         },
                         icon = { Icon(painterResource(R.drawable.lucide_ic_download), contentDescription = null) },
@@ -981,8 +981,7 @@ private fun fallbackLabelFor(context: Context, kind: PoiKind): String = when (ki
  *   arm's length; the car screen is further away and lower-resolution, and a
  *   32dp pin there comes out as a speck among the base style's own icons.
  */
-internal fun registerPinIcons(style: Style, context: Context, sizeDp: Float = 32f) {
-    val density = context.resources.displayMetrics.density
+internal fun registerPinIcons(style: Style, context: Context, density: Float, sizeDp: Float = 32f) {
     val size = (sizeDp * density).toInt()
     val cx = size / 2f
     val ring = 2.5f * density

@@ -8,9 +8,8 @@ import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarColor
-import androidx.car.app.model.CarIcon
-import androidx.car.app.model.ForegroundCarColorSpan
 import androidx.car.app.model.CarText
+import androidx.car.app.model.ForegroundCarColorSpan
 import androidx.car.app.model.Header
 import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
@@ -92,7 +91,7 @@ class HomeCarScreen(
      */
     private var busyLabelRes: Int? = null
 
-    private val SUGGESTIONS by lazy {
+    private val suggestions by lazy {
         listOf(
             carContext.getString(R.string.car_suggestion_1),
             carContext.getString(R.string.car_suggestion_2),
@@ -299,7 +298,7 @@ class HomeCarScreen(
      * suggestion to help the driver discover what they can ask the local IA.
      */
     private fun idleMessage(): CarText {
-        val suggestion = SUGGESTIONS.random()
+        val suggestion = suggestions.random()
         val prefix = carContext.getString(R.string.car_suggestion_prefix)
         val body = carContext.getString(R.string.car_idle)
 
@@ -322,9 +321,8 @@ class HomeCarScreen(
      */
     private fun locationLine(): String {
         currentPlaceRepository.label.value?.let { return "$it · IA Local" }
-        val here = locationRepository.location.value
-            ?: return carContext.getString(R.string.app_name)
-        return carContext.getString(R.string.car_map_coordinates, here.latitude, here.longitude)
+        val (lat, lon) = locationRepository.location.value ?: return carContext.getString(R.string.app_name)
+        return carContext.getString(R.string.car_map_coordinates, lat, lon)
     }
 
     private fun isSpeaking(): Boolean = speechSynthesisRepository.isSpeaking.value
@@ -384,8 +382,8 @@ class HomeCarScreen(
                 val calendar = Calendar.getInstance()
                 val travelContext = TravelContext(
                     currentLocation = location,
-                    hour = calendar.get(Calendar.HOUR_OF_DAY),
-                    minute = calendar.get(Calendar.MINUTE),
+                    hour = calendar[Calendar.HOUR_OF_DAY],
+                    minute = calendar[Calendar.MINUTE],
                     date = calendar.time,
                     userInput = userInput,
                     weatherDescription = weather,
