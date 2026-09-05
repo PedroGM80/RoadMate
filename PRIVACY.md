@@ -1,6 +1,6 @@
 # RoadMate — Privacy Policy
 
-_Last updated: 2 September 2026_
+_Last updated: 5 September 2026_
 
 RoadMate is a voice copilot for driving. It is built to work **on your
 device**: your voice and your questions are captured, transcribed, and
@@ -77,12 +77,13 @@ only on an unmetered (Wi-Fi) connection and only once.
 When you ask RoadMate to do something another app owns, it hands that app an
 Android intent and nothing more:
 
-- **"Find …"** → a `geo:` search string is passed to your installed maps app.
 - **"Call …"** → a phone number is passed to the dialer.
 - **"Open Spotify / YouTube Music"** → a launch request is passed to that app.
-- **Map navigation** → a `google.navigation:` intent is passed to Google Maps.
 
-RoadMate does not query any places, directory, or maps API itself.
+Place search ("find a petrol station") and route drawing happen **inside
+RoadMate**, on its own downloaded offline map. RoadMate does not query any
+places, directory, or maps API, and no longer hands searches or navigation
+off to Google Maps.
 
 ## Text-to-speech
 
@@ -105,6 +106,9 @@ text-to-speech engine configured in your system settings.
   the background monitor is required to show.
 - **Phone** (`CALL_PHONE`) — to place a call when you ask.
 - **Contacts** (`READ_CONTACTS`) — to resolve a name to a number.
+- **Calendar** (`READ_CALENDAR`) — to answer "¿qué tengo hoy?" and "¿cuál es
+  mi próxima cita?". Read locally at the moment you ask; never uploaded or
+  stored by RoadMate.
 
 ## Children
 
