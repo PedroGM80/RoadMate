@@ -19,7 +19,7 @@ enum class ThemePreference {
 
         /** [hour] 0–23. Fixed dusk-to-dawn window — the fallback for [AUTO] when
          *  there's no location fix to compute real sunrise/sunset from. */
-        fun isNightHour(hour: Int): Boolean = hour < 7 || hour >= 20
+        fun isNightHour(hour: Int): Boolean = hour !in 7..<20
 
         /**
          * Whether [AUTO] should be dark right now: real sunrise/sunset at

@@ -39,6 +39,7 @@ import dev.pgm.roadmate.presentation.viewmodel.RoadMateUiState
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 import dev.pgm.roadmate.ui.rememberReduceMotion
 import dev.pgm.roadmate.ui.theme.Spacing
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -46,7 +47,7 @@ fun HomeScreen(
     viewModel: RoadMateViewModel,
     modifier: Modifier = Modifier,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val reduceMotion = rememberReduceMotion()
 
     val corePermissions = rememberMultiplePermissionsState(
@@ -72,7 +73,7 @@ fun HomeScreen(
 
     // Null while DataStore is still being read; the effect below re-runs when
     // the real value lands, so ambient listening starts once and correctly.
-    val handsFree by viewModel.handsFreeEnabled.collectAsState()
+    val handsFree by viewModel.handsFreeEnabled.collectAsStateWithLifecycle()
 
     // Re-runs when the "manos libres" setting flips, so the wake phrase and
     // the rest-reminder monitor swap without needing a restart.

@@ -1,7 +1,6 @@
 package dev.pgm.roadmate
 
 import android.app.Application
-import android.content.ComponentCallbacks2
 import android.util.Log
 import dagger.hilt.android.HiltAndroidApp
 import dev.pgm.roadmate.domain.repository.GeminiRepository
@@ -43,7 +42,7 @@ class RoadMateApplication : Application() {
      */
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        if (level < ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) return
+        if (level < TRIM_MEMORY_UI_HIDDEN) return
         if (!::geminiRepository.isInitialized) return
         appScope.launch {
             if (geminiRepository.releaseLocalAiMemory()) {

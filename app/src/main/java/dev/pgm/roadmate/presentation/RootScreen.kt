@@ -25,7 +25,6 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +36,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.window.core.layout.WindowSizeClass
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.domain.model.AnswerStyle
@@ -72,11 +72,11 @@ fun RootScreen(
     // time (GL context torn down, style re-fetched). Now the switch only
     // detaches and re-attaches the view.
     val mapPane = rememberMapPaneState()
-    val theme by settingsViewModel.theme.collectAsState()
-    val answerStyle by settingsViewModel.answerStyle.collectAsState()
-    val handsFree by settingsViewModel.handsFree.collectAsState()
-    val localAiStatus by settingsViewModel.localAiStatus.collectAsState()
-    val selectedLocalAiModelId by settingsViewModel.selectedLocalAiModelId.collectAsState()
+    val theme by settingsViewModel.theme.collectAsStateWithLifecycle()
+    val answerStyle by settingsViewModel.answerStyle.collectAsStateWithLifecycle()
+    val handsFree by settingsViewModel.handsFree.collectAsStateWithLifecycle()
+    val localAiStatus by settingsViewModel.localAiStatus.collectAsStateWithLifecycle()
+    val selectedLocalAiModelId by settingsViewModel.selectedLocalAiModelId.collectAsStateWithLifecycle()
 
     // A voice search ("busca gasolineras") pulls the map to the front.
     LaunchedEffect(Unit) {

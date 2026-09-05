@@ -89,6 +89,7 @@ import org.maplibre.geojson.Point
 import kotlin.math.cos
 import kotlin.math.hypot
 import kotlin.time.Duration.Companion.milliseconds
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 private const val PIN_PREFIX = "roadmate-pin-"
 
@@ -118,12 +119,12 @@ fun MapScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val offlineStatus by viewModel.offlineStatus.collectAsState()
-    val poiFilter by viewModel.poiFilter.collectAsState()
-    val nameQuery by viewModel.nameQuery.collectAsState()
-    val navigateToResult by viewModel.navigateToResult.collectAsState()
-    val route by viewModel.route.collectAsState()
-    val routeSummary by viewModel.routeSummary.collectAsState()
+    val offlineStatus by viewModel.offlineStatus.collectAsStateWithLifecycle()
+    val poiFilter by viewModel.poiFilter.collectAsStateWithLifecycle()
+    val nameQuery by viewModel.nameQuery.collectAsStateWithLifecycle()
+    val navigateToResult by viewModel.navigateToResult.collectAsStateWithLifecycle()
+    val route by viewModel.route.collectAsStateWithLifecycle()
+    val routeSummary by viewModel.routeSummary.collectAsStateWithLifecycle()
 
     val locationPermission = rememberPermissionState(android.Manifest.permission.ACCESS_FINE_LOCATION)
 
@@ -815,10 +816,10 @@ internal fun placeFromTiles(map: MapLibreMap, atLat: Double, atLon: Double): Str
 
 @Composable
 private fun MapControls(
-    modifier: Modifier = Modifier,
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     onRecenter: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val zoomInLabel = stringResource(R.string.map_zoom_in)
     val zoomOutLabel = stringResource(R.string.map_zoom_out)

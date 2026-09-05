@@ -14,7 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
@@ -25,6 +24,7 @@ import dev.pgm.roadmate.R
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateStatus
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateUiState
 import dev.pgm.roadmate.ui.theme.Spacing
+import androidx.compose.ui.graphics.graphicsLayer
 
 /**
  * The card that shows what was heard and what RoadMate answered. It pops
@@ -62,7 +62,9 @@ fun AnswerCard(
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = MaterialTheme.shapes.large,
-        modifier = modifier.fillMaxWidth().scale(scale.value),
+        modifier = modifier.fillMaxWidth().graphicsLayer {
+            scaleX = scale.value; scaleY = scale.value
+        },
     ) {
         Column(
             modifier = Modifier

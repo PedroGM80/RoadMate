@@ -205,7 +205,7 @@ class LocalLlmManager @Inject constructor(
                             .setTemperature(TEMPERATURE)
                             .build()
                     )
-                    try {
+                    session.use { session ->
                         // Keep MediaPipe's native tokenizer away from control
                         // chars and pathological lengths — a garbage/huge prompt
                         // has crashed nativePredictSync with a JNI abort on-device.
@@ -220,8 +220,6 @@ class LocalLlmManager @Inject constructor(
                         session.generateResponse().fixMojibake().also {
                             dbg("RESPONSE (${System.currentTimeMillis() - t0} ms) <<< \"$it\"")
                         }
-                    } finally {
-                        session.close()
                     }
                 }.onFailure {
                     Log.w(TAG, "generateResponse failed", it)

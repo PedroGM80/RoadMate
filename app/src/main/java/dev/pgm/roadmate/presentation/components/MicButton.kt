@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.audio.Earcon
 import dev.pgm.roadmate.ui.theme.Spacing
+import androidx.compose.ui.graphics.graphicsLayer
 
 /**
  * The one control the app is really about. Tap to start/stop; a short earcon
@@ -119,7 +120,9 @@ fun MicButton(
                         MaterialTheme.colorScheme.onSecondary
                     },
                 ),
-                modifier = Modifier.size(80.dp).scale(pressScale),
+                modifier = Modifier.size(80.dp).graphicsLayer {
+                    scaleX = pressScale; scaleY = pressScale
+                },
             ) {
                 Icon(
                     painter = painterResource(

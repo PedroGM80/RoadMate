@@ -33,7 +33,6 @@ import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.coroutineContext
 
 /**
  * Gets the selected local-AI model onto the device with **no account, no
@@ -197,7 +196,7 @@ class LocalAiModelManager @Inject constructor(
             modelDir.mkdirs()
             val resumeFrom = if (partFile.isFile) partFile.length() else 0L
 
-            if (expectedSize > 0L && resumeFrom >= expectedSize) {
+            if (expectedSize in 1..resumeFrom) {
                 finalizePartFile()
                 return
             }
