@@ -20,6 +20,9 @@ import dev.pgm.roadmate.domain.repository.ReminderRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.utils.ArithmeticParser
+import dev.pgm.roadmate.utils.parseCoords
+import dev.pgm.roadmate.utils.compassWord
+import dev.pgm.roadmate.utils.distanceInWords
 import dev.pgm.roadmate.utils.CallFollowUpParser
 import dev.pgm.roadmate.utils.CalendarQuestionParser
 import dev.pgm.roadmate.utils.CallIntentParser
@@ -46,26 +49,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
-import java.util.Locale
 import javax.inject.Inject
-import kotlin.math.asin
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.min
-import kotlin.math.pow
-import kotlin.math.roundToInt
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /** Speech-rate bounds and per-nudge step for "más despacio" / "más rápido". */
 private const val MIN_RATE = 0.6f
 private const val MAX_RATE = 1.6f
 private const val RATE_STEP = 0.15f
-
-private val SPANISH_ES: Locale = Locale.forLanguageTag("es-ES")
-private val COMPASS_ES = listOf(
-    "norte", "noreste", "este", "sureste", "sur", "suroeste", "oeste", "noroeste",
-)
 
 /**
  * Builds a prompt from [TravelContext], asks the on-device model for a
@@ -486,7 +475,7 @@ class GenerateResponseUseCase @Inject constructor(
         // coordinate instead of searching the tiles for a place named "casa".
         if (navigate) {
             savedPlaceFor(query)?.let { (type, label) ->
-                val coords = memoryRepository.facts(type).firstOrNull()?.value?.toCoords()
+                val coords = memoryRepository.facts(type).firstOrNull()?.value?.let(::parseCoords)
                     ?: return SpokenText.placeNotSet(label)
                 mapSearchCoordinator.submit(
                     MapSearchRequest(
@@ -547,12 +536,12 @@ class GenerateResponseUseCase @Inject constructor(
             return SpokenText.PARKING_SAVED
         }
 
-        val spot = memoryRepository.facts(FactType.PARKING).firstOrNull()?.value?.toCoords()
+        val spot = memoryRepository.facts(FactType.PARKING).firstOrNull()?.value?.let(::parseCoords)
             ?: return SpokenText.PARKING_NONE
         if (here == null) return SpokenText.PARKING_NO_FIX_NOW
 
-        val distance = distanceWords(here.latLon(), spot)
-        val direction = COMPASS_ES[bearingIndex(here.latLon(), spot)]
+        val distance = distanceInWords(here.latLon(), spot)
+        val direction = compassWord(here.latLon(), spot)
 
         return if (intent == ParkingIntentParser.Intent.TAKE_ME && mapSearchCoordinator.hasOfflineMap()) {
             mapSearchCoordinator.submit(
@@ -570,45 +559,9 @@ class GenerateResponseUseCase @Inject constructor(
         }
     }
 
-    private fun distanceWords(a: Pair<Double, Double>, b: Pair<Double, Double>): String {
-        val metres = haversineMetres(a, b)
-        return if (metres < 950) {
-            "${((metres / 10).roundToInt() * 10).coerceAtLeast(10)} metros"
-        } else {
-            "%.1f km".format(SPANISH_ES, metres / 1000.0)
-        }
-    }
 
-    private fun haversineMetres(a: Pair<Double, Double>, b: Pair<Double, Double>): Double {
-        val r = 6_371_000.0
-        val dLat = Math.toRadians(b.first - a.first)
-        val dLon = Math.toRadians(b.second - a.second)
-        val la1 = Math.toRadians(a.first)
-        val la2 = Math.toRadians(b.first)
-        val h = sin(dLat / 2).pow(2) + cos(la1) * cos(la2) * sin(dLon / 2).pow(2)
-        return 2 * r * asin(min(1.0, sqrt(h)))
-    }
 
-    /** 0=norte, 1=noreste … 7=noroeste — index into [COMPASS_ES]. */
-    private fun bearingIndex(a: Pair<Double, Double>, b: Pair<Double, Double>): Int {
-        val dLon = Math.toRadians(b.second - a.second)
-        val la1 = Math.toRadians(a.first)
-        val la2 = Math.toRadians(b.first)
-        val y = sin(dLon) * cos(la2)
-        val x = cos(la1) * sin(la2) - sin(la1) * cos(la2) * cos(dLon)
-        val deg = (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
-        return (((deg + 22.5) / 45.0).toInt()) % 8
-    }
 
-    /** A `"lat,lon"` fact value → coordinate pair, or null if it doesn't parse. */
-    private fun String.toCoords(): Pair<Double, Double>? {
-        val parts = split(",").map { it.trim().toDoubleOrNull() }
-        return if (parts.size == 2 && parts[0] != null && parts[1] != null) {
-            parts[0]!! to parts[1]!!
-        } else {
-            null
-        }
-    }
 
     private fun handleMediaRequest(app: MediaApp): String =
         if (mediaRepository.launchMediaApp(app)) {
