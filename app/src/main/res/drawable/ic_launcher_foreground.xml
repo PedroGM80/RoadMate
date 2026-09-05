@@ -1,34 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  A speech bubble with a voice waveform in it: someone in the car talking to
+  you, which is what RoadMate is. The old icon was a studio microphone, which
+  reads as "podcast" more than "copilot", and a lone mic says nothing about
+  where it is used.
+
+  The bars are drawn in the background's amber rather than punched out as
+  holes so the shape stays a single filled bubble at 48dp, where a thin
+  outline would disappear. `monochrome` gets its own drawable for that reason.
+
+  Everything sits inside the adaptive icon's safe zone (the central 66dp), so
+  no launcher mask can clip the tail off.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- mic capsule -->
-    <path android:fillColor="#FFFFFF" android:pathData="M46,42h16v14h-16z" />
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M54,34m-8,0a8,8 0,1 0,16 0a8,8 0,1 0,-16 0" />
+        android:pathData="M38,32H70A12,12 0 0,1 82,44V58A12,12 0 0,1 70,70H52L40,81L41,70H38A12,12 0 0,1 26,58V44A12,12 0 0,1 38,32Z" />
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,64m-8,0a8,8 0,1 0,16 0a8,8 0,1 0,-16 0" />
-    <!-- stand -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3.5"
-        android:pathData="M40,56a14,14 0,0 0,28 0" />
-    <!-- stem + base -->
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3.5"
+        android:strokeColor="#FFB4560C"
+        android:strokeWidth="5"
         android:strokeLineCap="round"
-        android:pathData="M54,70v8" />
+        android:pathData="M42,46V56" />
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3.5"
+        android:strokeColor="#FFB4560C"
+        android:strokeWidth="5"
         android:strokeLineCap="round"
-        android:pathData="M45,78h18" />
+        android:pathData="M50,42V60" />
+    <path
+        android:strokeColor="#FFB4560C"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M58,44V58" />
+    <path
+        android:strokeColor="#FFB4560C"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M66,47V55" />
 </vector>
