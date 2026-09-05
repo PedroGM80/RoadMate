@@ -26,12 +26,7 @@ import dev.pgm.roadmate.presentation.viewmodel.RoadMateUiState
 import dev.pgm.roadmate.ui.theme.Spacing
 import androidx.compose.ui.graphics.graphicsLayer
 
-/**
- * The card that shows what was heard and what RoadMate answered. It pops
- * (scale + a confirm haptic) when a fresh answer lands, so the arrival is
- * felt even if the driver's eyes are on the road. An error/nudge is drawn
- * in the error colour, not the reply green.
- */
+
 @Composable
 fun AnswerCard(
     uiState: RoadMateUiState,

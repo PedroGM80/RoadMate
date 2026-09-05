@@ -134,13 +134,13 @@ fun RootScreen(
                 Row(paneModifier.fillMaxSize()) {
                     HomeScreen(roadMateViewModel, Modifier.weight(1f).fillMaxHeight())
                     VerticalDivider()
-                    MapScreen(mapViewModel, mapPane, Modifier.weight(1f).fillMaxHeight())
+                    MapScreen(mapViewModel, Modifier.weight(1f).fillMaxHeight(), mapPane)
                 }
             } else {
                 Crossfade(targetState = tab, label = "voz-mapa") { current ->
                     when (current) {
                         0 -> HomeScreen(roadMateViewModel, paneModifier.fillMaxSize())
-                        else -> MapScreen(mapViewModel, mapPane, paneModifier.fillMaxSize())
+                        else -> MapScreen(mapViewModel, paneModifier.fillMaxSize(), mapPane)
                     }
                 }
             }

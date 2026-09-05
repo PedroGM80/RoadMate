@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import dev.pgm.roadmate.ui.theme.Spacing
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.createBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -116,8 +117,8 @@ private fun foldForSearch(s: String): String =
 @Composable
 fun MapScreen(
     viewModel: MapViewModel,
-    paneState: MapPaneState = rememberMapPaneState(),
     modifier: Modifier = Modifier,
+    paneState: MapPaneState = rememberMapPaneState(),
 ) {
     val context = LocalContext.current
     val offlineStatus by viewModel.offlineStatus.collectAsStateWithLifecycle()
@@ -987,7 +988,7 @@ internal fun registerPinIcons(style: Style, context: Context, density: Float, si
     val ring = 2.5f * density
 
     fun pin(fill: Int, iconRes: Int): Bitmap {
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(size, size)
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 

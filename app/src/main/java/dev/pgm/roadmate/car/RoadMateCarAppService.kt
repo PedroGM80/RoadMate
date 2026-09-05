@@ -1,5 +1,6 @@
 package dev.pgm.roadmate.car
 
+import android.annotation.SuppressLint
 import androidx.car.app.CarAppService
 import androidx.car.app.Session
 import androidx.car.app.validation.HostValidator
@@ -84,6 +85,10 @@ class RoadMateCarAppService : CarAppService() {
      * Para desarrollo, usar el Desktop Head Unit.
      * https://developer.android.com/training/cars/testing
      */
+    // hosts_allowlist_sample is the Car App Library's own signed-host list
+    // (Android Auto + Automotive OS). It's marked @hide/private, but it is the
+    // documented release validator — there is no public equivalent.
+    @SuppressLint("PrivateResource")
     override fun createHostValidator(): HostValidator =
         if (BuildConfig.DEBUG) {
             HostValidator.ALLOW_ALL_HOSTS_VALIDATOR

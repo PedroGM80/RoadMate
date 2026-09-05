@@ -114,11 +114,7 @@
     <string name="car_listening">Escuchando…</string>
     <string name="car_processing">Procesando…</string>
     <string name="car_listen">Escuchar</string>
-    <string name="car_stop">Parar</string>
-    <string name="car_permissions_title">Permisos pendientes</string>
     <string name="car_permissions_message">Abre RoadMate en el móvil una vez para dar permiso de micrófono y ubicación.</string>
-    <string name="car_map_title">Mapa</string>
-    <string name="car_map_action">Mapa</string>
     <string name="car_map_locating">Buscando tu posición…</string>
     <string name="car_map_coordinates">%1$.5f, %2$.5f</string>
     <string name="car_map_needs_offline">Descarga la zona en el móvil para buscar sitios sin conexión.</string>
@@ -127,8 +123,6 @@
     <string name="car_route_failed">No he podido trazar la ruta.</string>
     <string name="car_route_no_location">Aún no tengo tu posición. Espera unos segundos e inténtalo otra vez.</string>
     <string name="car_no_places">No hay sitios de esta categoría cerca.</string>
-    <string name="car_location_unknown">Ubicación no disponible</string>
-    <string name="car_settings_action">Ajustes</string>
     <string name="car_settings_title">Ajustes</string>
     <string name="car_settings_checking">Comprobando…</string>
     <string name="car_settings_offline_map">Mapa sin conexión</string>

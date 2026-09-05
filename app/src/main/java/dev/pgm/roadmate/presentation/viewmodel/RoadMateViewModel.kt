@@ -493,7 +493,6 @@ class RoadMateViewModel @Inject constructor(
     }
 
     override fun onCleared() {
-        super.onCleared()
         cancelListening()
         stopAmbientListening()
         runCatching { wakeEarcon.release() }

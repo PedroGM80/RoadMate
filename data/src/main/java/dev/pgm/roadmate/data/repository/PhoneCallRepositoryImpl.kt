@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.core.net.toUri
 import android.provider.ContactsContract
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -29,7 +30,7 @@ class PhoneCallRepositoryImpl @Inject constructor(
         hasPermission(Manifest.permission.CALL_PHONE) && hasPermission(Manifest.permission.READ_CONTACTS)
 
     override fun placeCall(phoneNumber: String) {
-        val callIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:$phoneNumber")).apply {
+        val callIntent = Intent(Intent.ACTION_CALL, "tel:$phoneNumber".toUri()).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         // A phone with no dialer is exotic but possible — don't crash the loop.

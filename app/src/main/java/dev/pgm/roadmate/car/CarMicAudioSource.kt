@@ -1,5 +1,6 @@
 package dev.pgm.roadmate.car
 
+import android.annotation.SuppressLint
 import androidx.car.app.CarContext
 import androidx.car.app.media.CarAudioRecord
 import dev.pgm.roadmate.domain.audio.PcmAudioSource
@@ -28,6 +29,9 @@ class CarMicAudioSource(private val carContext: CarContext) : PcmAudioSource {
 
     override val bufferSize: Int = CarAudioRecord.AUDIO_CONTENT_BUFFER_SIZE
 
+    // CarAudioRecord.create is gated by androidx.car.app.MICROPHONE (see the
+    // class KDoc), not RECORD_AUDIO, so lint's check doesn't apply here.
+    @SuppressLint("MissingPermission")
     override fun start() {
         val created = CarAudioRecord.create(carContext)
         created.startRecording()

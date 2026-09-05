@@ -1,6 +1,7 @@
 package dev.pgm.roadmate.data.datasource.local
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import androidx.annotation.RequiresPermission
 import com.google.android.gms.location.CurrentLocationRequest
@@ -26,6 +27,9 @@ class LocationDataSource @Inject constructor(@ApplicationContext context: Contex
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
     private val permissionManager = PermissionManager(context)
 
+    // hasLocationPermission() is the guard; lint's flow analysis doesn't follow
+    // it into PermissionManager, hence the suppress rather than an inline check.
+    @SuppressLint("MissingPermission")
     suspend fun getCurrentLocation(): UserLocation? {
         if (!permissionManager.hasLocationPermission()) return null
         return fetchLocation()

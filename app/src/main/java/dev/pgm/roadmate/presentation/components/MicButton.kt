@@ -40,14 +40,7 @@ import dev.pgm.roadmate.audio.Earcon
 import dev.pgm.roadmate.ui.theme.Spacing
 import androidx.compose.ui.graphics.graphicsLayer
 
-/**
- * The one control the app is really about. Tap to start/stop; a short earcon
- * and a toggle haptic confirm it. Idle = amber (the CTA); listening = the
- * "active" secondary-container tone with a stop glyph — deliberately not the
- * red error colour, which would read as danger. A single breathing dot marks
- * "listening" — no fake waveform, since nothing here actually taps the mic
- * amplitude. The pulse and the dot hold still under reduce-motion.
- */
+
 @Composable
 fun MicButton(
     isListening: Boolean,
@@ -75,10 +68,7 @@ fun MicButton(
     )
 
     Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        // The dot's space is reserved whether or not it's showing. It used to
-        // be added to the layout only while listening, which pushed the button
-        // ~30dp down the instant it was tapped — a target that moves under the
-        // driver's thumb, right when they might want to tap it again to stop.
+
         ListeningDot(
             visible = isListening,
             reduceMotion = reduceMotion,
