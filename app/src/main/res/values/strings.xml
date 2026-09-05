@@ -40,7 +40,7 @@
     <string name="action_cancel">Cancelar</string>
 
     <!-- Home -->
-    <string name="home_tagline">Tu copiloto de viaje, 100% en tu móvil.</string>
+    <string name="home_tagline" formatted="false">Tu copiloto de viaje, 100% en tu móvil.</string>
     <string name="home_prompt_idle">Pulsa el micrófono y pregunta.</string>
     <string name="home_listening">Escuchando…</string>
     <string name="home_recognized_quote">Tú: “%1$s”</string>

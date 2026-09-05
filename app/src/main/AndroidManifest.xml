@@ -29,6 +29,14 @@
     <uses-permission android:name="android.permission.SEND_SMS" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
 
+    <!-- CALL_PHONE / SEND_SMS imply android.hardware.telephony, which would
+         hide RoadMate from Wi-Fi tablets, foldables and Chrome OS. The call
+         and SMS paths already degrade with a spoken explanation when there is
+         no SIM, so telephony is a nice-to-have, not a requirement. -->
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="false" />
+
     <!-- Car App Library: declares the app targets the templates host (Android
          Auto / Automotive OS). required=false so phones without it still
          install. Part of the standard Car App Library manifest setup. -->
@@ -79,7 +87,6 @@
         <activity
             android:name=".presentation.MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
             android:theme="@style/Theme.RoadMate"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -125,11 +132,17 @@
                 android:resource="@xml/widget_ask_info" />
         </receiver>
 
+        <!-- Exported with no <permission>: the Android Auto / Automotive OS
+             host has to be able to bind to it, and the Car App Library has no
+             signature permission to gate it with. Binder identity is checked
+             instead at runtime by createHostValidator() — ALLOW_ALL only in
+             debug, the library's signed host allowlist in release. -->
         <service
             android:name="dev.pgm.roadmate.car.RoadMateCarAppService"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
-            android:label="@string/app_name">
+            android:label="@string/app_name"
+            tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
                 <!-- NAVIGATION, no POI: solo esta categoría obtiene

@@ -3,7 +3,6 @@ package dev.pgm.roadmate.data.repository
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
-import android.os.Build
 import android.telephony.SmsManager
 import android.util.Log
 import androidx.core.content.ContextCompat
@@ -37,13 +36,8 @@ class MessagingRepositoryImpl @Inject constructor(
         }.onFailure { Log.w(TAG, "sendSms failed", it) }.getOrDefault(false)
     }
 
-    @Suppress("DEPRECATION")
     private fun smsManager(): SmsManager? =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            context.getSystemService(SmsManager::class.java)
-        } else {
-            SmsManager.getDefault()
-        }
+        context.getSystemService(SmsManager::class.java)
 
     private companion object {
         const val TAG = "MessagingRepository"

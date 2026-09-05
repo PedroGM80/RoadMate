@@ -83,8 +83,9 @@ jobs:
       # into the same analysis. It does NOT cover :domain, which is a plain
       # kotlin("jvm") module with no lint plugin applied — see NEXT_SESSION.md.
       #
-      # Non-gating for now (lint { abortOnError = false }): read the report,
-      # fix or baseline what's in it, then tighten.
+      # Gating (lint { abortOnError = true }): the 2026-09-05 triage fixed the
+      # real findings and parked the rest in app/lint-baseline.xml, so a new
+      # issue outside the baseline now fails this job.
       - name: Android Lint
         if: ${{ !cancelled() }}
         run: ./gradlew :app:lintDebug --stacktrace

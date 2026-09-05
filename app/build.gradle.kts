@@ -127,14 +127,18 @@ android {
         // there — but the gap is real, not covered by this line.
         checkDependencies = true
 
-        // Not a gate yet: this is the first run, and nobody has read the
-        // report. Once the existing findings are triaged (fix, or
-        // `./gradlew :app:updateLintBaseline` for what stays), flip this to
-        // true so a regression fails CI instead of scrolling past in a log.
-        abortOnError = false
+        // A gate: the first run was triaged 2026-09-05 — the real findings
+        // fixed (StringFormatInvalid, telephony uses-feature, dead SDK_INT
+        // guards, redundant label), the rest parked in lint-baseline.xml. A
+        // new warning outside the baseline now fails the build.
+        abortOnError = true
+        baseline = file("lint-baseline.xml")
 
         // Missing translations aren't a defect — the app is Spanish-only.
         disable += "MissingTranslation"
+        // RoadMate logs through android.util.Log by design — Timber would be a
+        // dependency added for nothing but this check.
+        disable += "LogNotTimber"
 
         htmlReport = true
         sarifReport = true
