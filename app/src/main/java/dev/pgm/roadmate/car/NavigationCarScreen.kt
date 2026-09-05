@@ -79,9 +79,17 @@ class NavigationCarScreen(
      */
     private var travelEstimate: TravelEstimate? = null
 
-    /** Set while the route is being computed, so the driver sees something. */
-    private var routing = false
     private var routeJob: Job? = null
+
+    /**
+     * A one-line route status kept on screen while a route is being computed or
+     * when one couldn't be built. Without it a tap on a place with no GPS fix,
+     * or a route the engine can't trace, did nothing visible at all — the
+     * screen dropped straight back to the bare map and the only feedback was a
+     * spoken line, which is inaudible if the car has taken audio focus. Null
+     * once a route succeeds: then the host's own travel-estimate banner says it.
+     */
+    private var routeStatus: String? = null
 
     init {
         lifecycleScope.launch {
@@ -127,7 +135,7 @@ class NavigationCarScreen(
             .addAction(mapAction(R.drawable.lucide_ic_zoom_out) { renderer.zoomOut() })
             .build()
 
-        if (poiKind == null) {
+        if (poiKind == null && routeStatus == null) {
             return NavigationTemplate.Builder()
                 .setMapActionStrip(mapStrip)
                 .setActionStrip(categoryStrip())
@@ -164,14 +172,21 @@ class NavigationCarScreen(
 
     private fun contentTemplate(): Template {
         val list = ItemList.Builder()
-        if (routing) {
+        routeStatus?.let { status ->
+            list.addItem(Row.Builder().setTitle(status).build())
+        }
+        val places = nearbyPlaces()
+        places.forEach { list.addItem(placeRow(it)) }
+        // A ListTemplate with an empty list is rejected by the host. A category
+        // with nothing pinned nearby (or a status-only panel) still needs one
+        // row so the screen renders instead of throwing.
+        if (routeStatus == null && places.isEmpty()) {
             list.addItem(
                 Row.Builder()
-                    .setTitle(carContext.getString(R.string.car_route_working))
+                    .setTitle(carContext.getString(R.string.car_no_places))
                     .build()
             )
         }
-        nearbyPlaces().forEach { list.addItem(placeRow(it)) }
         return ListTemplate.Builder()
             .setHeader(header())
             .setSingleList(list.build())
@@ -226,12 +241,14 @@ class NavigationCarScreen(
 
     private fun select(kind: PoiKind) {
         poiKind = kind
+        routeStatus = null
         renderer.showPois(kind)
         invalidate()
     }
 
     private fun clear() {
         poiKind = null
+        routeStatus = null
         renderer.showPois(null)
         invalidate()
     }
@@ -246,22 +263,31 @@ class NavigationCarScreen(
     }
 
     private fun routeTo(place: CarPlace) {
-        val from = locationRepository.location.value ?: return
         routeJob?.cancel()
+        val from = locationRepository.location.value
+        if (from == null) {
+            // No fix yet — say so and keep the panel up, rather than swallow
+            // the tap and leave the driver looking at an unchanged screen.
+            routeStatus = carContext.getString(R.string.car_route_no_location)
+            speechSynthesisRepository.speak(routeStatus!!)
+            invalidate()
+            return
+        }
         // Collapsing the list here, not when the route lands: the driver has
         // made their choice, and what they want to see next is the road.
         poiKind = null
         renderer.showPois(null)
-        routing = true
+        routeStatus = carContext.getString(R.string.car_route_working)
         travelEstimate = null
         invalidate()
         routeJob = lifecycleScope.launch {
             val result = routingRepository.route(from, place.latitude to place.longitude)
-            routing = false
             if (result == null) {
+                routeStatus = carContext.getString(R.string.car_route_failed)
                 renderer.showRoute(emptyList())
                 speechSynthesisRepository.speak(carContext.getString(R.string.car_route_failed))
             } else {
+                routeStatus = null
                 renderer.showRoute(result.points)
                 travelEstimate = estimateFor(result.distanceMeters, result.durationSeconds)
                 // Same as the phone: the driver hears the result, the screen
@@ -293,7 +319,7 @@ class NavigationCarScreen(
     private fun clearRoute() {
         routeJob?.cancel()
         routeJob = null
-        routing = false
+        routeStatus = null
         travelEstimate = null
         renderer.showRoute(emptyList())
         invalidate()
