@@ -8,15 +8,28 @@ import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
+import dev.pgm.roadmate.domain.repository.CurrentPlaceRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
+import dev.pgm.roadmate.presentation.map.PoiKind
+import dev.pgm.roadmate.presentation.map.placeFromTiles
+import dev.pgm.roadmate.presentation.map.refreshPois
+import dev.pgm.roadmate.presentation.map.registerPinIcons
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.Style
+import org.maplibre.android.plugins.annotation.CircleManager
+import org.maplibre.android.plugins.annotation.CircleOptions
+import org.maplibre.android.plugins.annotation.LineManager
+import org.maplibre.android.plugins.annotation.LineOptions
+import org.maplibre.android.plugins.annotation.SymbolManager
+import kotlin.math.cos
 import kotlin.math.ln
+import kotlin.math.sqrt
 
 /**
  * Draws RoadMate's own MapLibre map onto the car screen.
@@ -41,12 +54,19 @@ class CarMapRenderer(
     private val carContext: CarContext,
     private val styleUrl: String,
     private val locationRepository: LocationRepository,
+    private val currentPlaceRepository: CurrentPlaceRepository,
 ) : SurfaceCallback {
 
     private var virtualDisplay: VirtualDisplay? = null
     private var presentation: Presentation? = null
     private var mapView: MapView? = null
     private var map: MapLibreMap? = null
+    private var symbolManager: SymbolManager? = null
+    private var lineManager: LineManager? = null
+    private var circleManager: CircleManager? = null
+
+    /** The category currently pinned, re-queried on every camera idle. */
+    private var poiKind: PoiKind? = null
 
     /** Set once the first camera move has happened, so it only auto-centres once. */
     private var centredOnDriver = false
@@ -59,6 +79,9 @@ class CarMapRenderer(
      * pane.
      */
     private var visibleArea: Rect? = null
+
+    private var lastGeocodedAt: Pair<Double, Double>? = null
+    private var lastGeocodedMs = 0L
 
     override fun onSurfaceAvailable(surfaceContainer: SurfaceContainer) {
         val surface = surfaceContainer.surface ?: return
@@ -115,9 +138,34 @@ class CarMapRenderer(
                 isCompassEnabled = false
             }
             loaded.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
+                registerPinIcons(style, carContext)
+                Log.i(
+                    TAG,
+                    "pin images registered: " +
+                        PoiKind.entries.joinToString { k ->
+                            "${k.name}=${style.getImage("roadmate-pin-" + k.name) != null}"
+                        },
+                )
+                // Created before the SymbolManager so the route line and its
+                // destination dot sit underneath the POI pins, same order as
+                // the phone's map.
+                lineManager = LineManager(view, loaded, style)
+                circleManager = CircleManager(view, loaded, style)
+                val manager = SymbolManager(view, loaded, style).apply {
+                    iconAllowOverlap = true
+                    textAllowOverlap = false
+                }
+                symbolManager = manager
                 enableDriverDot(loaded, style)
                 applyVisibleArea()
                 centreOnDriver(animate = false)
+                // POI features come from the loaded tiles, so the pins have to
+                // be recomputed whenever the camera settles somewhere new —
+                // exactly what the phone's map does.
+                loaded.addOnCameraIdleListener {
+                    refreshPins()
+                    resolveWhereWeAre(loaded)
+                }
             }
         }
     }
@@ -165,6 +213,86 @@ class CarMapRenderer(
         map?.moveCamera(CameraUpdateFactory.zoomBy(ln(scaleFactor.toDouble()) / LN_2))
     }
 
+    /**
+     * Pins one category on the car map, or clears them with null.
+     *
+     * Same query the phone runs: the POI classes come out of the vector
+     * *source* rather than what the style happens to draw, because at driving
+     * zoom the style renders only a handful of icons and a rendered query
+     * finds almost nothing.
+     */
+    fun showPois(kind: PoiKind?) {
+        poiKind = kind
+        if (kind == null) symbolManager?.deleteAll()
+        refreshPins()
+    }
+
+    /** How many of the requested category are pinned right now, for the list. */
+    fun poiCount(): Int = lastPinCount
+
+    private var lastPinCount = 0
+
+    private fun refreshPins() {
+        val loaded = map ?: return
+        val view = mapView ?: return
+        val manager = symbolManager ?: return
+        lastPinCount = refreshPois(loaded, view, manager, poiKind, null).size
+        Log.i(TAG, "pins for ${poiKind?.name}: $lastPinCount, symbols=${manager.annotations.size()}")
+    }
+
+    /**
+     * What is pinned right now, read back off the symbols rather than kept in
+     * a second list: the pins are recomputed on every camera idle, and a
+     * cached copy would drift from what the driver can actually see.
+     */
+    fun pinnedPlaces(): List<CarPlace> {
+        val annotations = symbolManager?.annotations ?: return emptyList()
+        return (0 until annotations.size()).mapNotNull { index ->
+            val symbol = annotations.valueAt(index) ?: return@mapNotNull null
+            val at = symbol.latLng ?: return@mapNotNull null
+            val name = symbol.data?.takeIf { it.isJsonPrimitive }?.asString.orEmpty()
+            CarPlace(name, at.latitude, at.longitude)
+        }
+    }
+
+    /** Draws a computed route and frames it. Empty clears whatever is drawn. */
+    fun showRoute(points: List<Pair<Double, Double>>) {
+        runCatching { lineManager?.deleteAll() }
+        runCatching { circleManager?.deleteAll() }
+        if (points.size < 2) return
+
+        val line = points.map { LatLng(it.first, it.second) }
+        runCatching {
+            lineManager?.create(
+                LineOptions()
+                    .withLatLngs(line)
+                    .withLineColor(ROUTE_COLOR)
+                    .withLineWidth(ROUTE_WIDTH)
+            )
+        }
+        runCatching {
+            circleManager?.create(
+                CircleOptions()
+                    .withLatLng(line.last())
+                    .withCircleRadius(7f)
+                    .withCircleColor(ROUTE_COLOR)
+                    .withCircleStrokeColor("#FFFFFF")
+                    .withCircleStrokeWidth(2.5f)
+            )
+        }
+        runCatching {
+            map?.animateCamera(
+                CameraUpdateFactory.newLatLngBounds(
+                    LatLngBounds.Builder().includes(line).build(),
+                    ROUTE_PADDING_PX,
+                )
+            )
+        }
+        // The driver has been taken somewhere on purpose; do not yank the
+        // camera back to the car on the next layout pass.
+        centredOnDriver = true
+    }
+
     fun zoomIn() = map?.moveCamera(CameraUpdateFactory.zoomBy(1.0))
 
     fun zoomOut() = map?.moveCamera(CameraUpdateFactory.zoomBy(-1.0))
@@ -179,6 +307,34 @@ class CarMapRenderer(
         val loaded = map ?: return
         if (animate && centredOnDriver) loaded.animateCamera(target) else loaded.moveCamera(target)
         centredOnDriver = true
+    }
+
+    /**
+     * Turns the car's coordinates into "Calle Servando Camuñez · San Fernando"
+     * off the loaded tiles — the same on-device reverse geocode the phone
+     * does, no network geocoder. Until the car map existed this could only run
+     * on the phone, which is why the car screens had nothing but a latitude
+     * and a longitude to show.
+     *
+     * Throttled by distance and time: the query walks every road feature in
+     * the loaded tiles, and the answer does not change between two fixes a few
+     * metres apart.
+     */
+    private fun resolveWhereWeAre(loaded: MapLibreMap) {
+        val here = locationRepository.location.value ?: return
+        val now = System.currentTimeMillis()
+        val movedEnough = lastGeocodedAt?.let { metresBetween(it, here) > GEOCODE_MOVE_M } ?: true
+        if (!movedEnough || now - lastGeocodedMs < GEOCODE_INTERVAL_MS) return
+        lastGeocodedAt = here
+        lastGeocodedMs = now
+        val label = runCatching { placeFromTiles(loaded, here.first, here.second) }.getOrNull()
+        if (label != null) currentPlaceRepository.update(label)
+    }
+
+    private fun metresBetween(a: Pair<Double, Double>, b: Pair<Double, Double>): Double {
+        val dLat = (b.first - a.first) * 110_540.0
+        val dLon = (b.second - a.second) * 111_320.0 * cos(Math.toRadians(a.first))
+        return sqrt(dLat * dLat + dLon * dLon)
     }
 
     private fun enableDriverDot(loaded: MapLibreMap, style: Style) {
@@ -203,6 +359,12 @@ class CarMapRenderer(
                 view.onDestroy()
             }
         }
+        symbolManager?.let { runCatching { it.onDestroy() } }
+        symbolManager = null
+        lineManager?.let { runCatching { it.onDestroy() } }
+        lineManager = null
+        circleManager?.let { runCatching { it.onDestroy() } }
+        circleManager = null
         mapView = null
         map = null
         runCatching { presentation?.dismiss() }
@@ -217,6 +379,13 @@ class CarMapRenderer(
         const val TAG = "CarMapRenderer"
         const val VIRTUAL_DISPLAY_NAME = "RoadMateCarMap"
         const val DRIVING_ZOOM = 15.5
+        const val ROUTE_COLOR = "#1565C0"
+        const val ROUTE_WIDTH = 5f
+        const val ROUTE_PADDING_PX = 140
+
+        /** Don't re-geocode until the car has actually gone somewhere. */
+        const val GEOCODE_MOVE_M = 40.0
+        const val GEOCODE_INTERVAL_MS = 8_000L
         val LN_2 = ln(2.0)
     }
 }

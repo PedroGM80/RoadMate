@@ -760,7 +760,7 @@ private fun resolvePlaceLabel(map: MapLibreMap, viewModel: MapViewModel, throttl
  * vector *source* (like the POI query) so it resolves at driving zoom, and
  * runs entirely on-device — no network geocoder.
  */
-private fun placeFromTiles(map: MapLibreMap, atLat: Double, atLon: Double): String? {
+internal fun placeFromTiles(map: MapLibreMap, atLat: Double, atLon: Double): String? {
     val src = map.style?.sources?.firstOrNull { it is VectorSource } as? VectorSource ?: return null
     val cosLat = cos(Math.toRadians(atLat))
     fun toM(lat: Double, lon: Double): Pair<Double, Double> =
@@ -859,7 +859,7 @@ private fun MapControls(
  * query finds almost nothing. Source features come from every loaded tile
  * regardless of what's drawn; we clip to the visible region ourselves.
  */
-private fun refreshPois(
+internal fun refreshPois(
     map: MapLibreMap,
     mapView: MapView,
     manager: SymbolManager,
@@ -968,7 +968,7 @@ private fun fallbackLabelFor(context: Context, kind: PoiKind): String = when (ki
     PoiKind.FOOD -> context.getString(R.string.map_poi_food_one)
 }
 
-private fun registerPinIcons(style: Style, context: Context) {
+internal fun registerPinIcons(style: Style, context: Context) {
     val density = context.resources.displayMetrics.density
     val size = (32f * density).toInt()
     val cx = size / 2f

@@ -11,6 +11,7 @@ import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.PcmTranscriber
+import dev.pgm.roadmate.domain.repository.RoutingRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
@@ -62,6 +63,9 @@ class RoadMateCarAppService : CarAppService() {
     @Inject
     lateinit var offlineMap: OfflineMapController
 
+    @Inject
+    lateinit var routingRepository: RoutingRepository
+
     /**
      * Who is allowed to bind to this service and drive RoadMate's car screens.
      *
@@ -101,5 +105,6 @@ class RoadMateCarAppService : CarAppService() {
         preferences,
         gemini,
         offlineMap,
+        routingRepository,
     )
 }

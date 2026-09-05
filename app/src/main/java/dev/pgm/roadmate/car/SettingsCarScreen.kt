@@ -91,22 +91,53 @@ class SettingsCarScreen(
             .build()
     }
 
-    private fun offlineMapRow(): Row {
-        val status = offlineMap.status.value
-        val builder = Row.Builder()
-            .setTitle(carContext.getString(R.string.car_settings_offline_map))
-            .addText(offlineMapText(status))
+    /**
+     * Status only. Deleting the downloaded regions used to be this row's own
+     * click listener, which meant one tap on a line that reads as information
+     * threw the maps away — and being parked, the only thing standing in front
+     * of it, is the normal case. Both actions now live behind
+     * [offlineMapScreen] where they are named for what they do.
+     */
+    private fun offlineMapRow(): Row = Row.Builder()
+        .setTitle(carContext.getString(R.string.car_settings_offline_map))
+        .addText(offlineMapText(offlineMap.status.value))
+        .setBrowsable(true)
+        .setOnClickListener { screenManager.push(offlineMapScreen()) }
+        .build()
 
-        when (status) {
-            is OfflineMapStatus.Downloading -> Unit // nothing to press mid-download
-            is OfflineMapStatus.Ready -> builder.setOnClickListener(
-                ParkedOnlyOnClickListener.create { offlineMap.deleteAll() }
-            )
-            else -> builder.setOnClickListener(
-                ParkedOnlyOnClickListener.create { downloadAroundHere() }
-            )
+    private fun offlineMapScreen(): Screen = object : Screen(carContext) {
+        override fun onGetTemplate(): Template {
+            val status = offlineMap.status.value
+            val list = ItemList.Builder()
+                .addItem(
+                    Row.Builder()
+                        .setTitle(carContext.getString(R.string.car_settings_map_download))
+                        .addText(offlineMapText(status))
+                        .setOnClickListener(
+                            ParkedOnlyOnClickListener.create { downloadAroundHere() }
+                        )
+                        .build()
+                )
+            if (status is OfflineMapStatus.Ready) {
+                list.addItem(
+                    Row.Builder()
+                        .setTitle(carContext.getString(R.string.car_settings_map_delete))
+                        .addText(carContext.getString(R.string.car_settings_map_delete_note))
+                        .setOnClickListener(
+                            ParkedOnlyOnClickListener.create {
+                                offlineMap.deleteAll()
+                                screenManager.pop()
+                            }
+                        )
+                        .build()
+                )
+            }
+            return ListTemplate.Builder()
+                .setTitle(carContext.getString(R.string.car_settings_offline_map))
+                .setHeaderAction(Action.BACK)
+                .setSingleList(list.build())
+                .build()
         }
-        return builder.build()
     }
 
     private fun offlineMapText(status: OfflineMapStatus): String = when (status) {

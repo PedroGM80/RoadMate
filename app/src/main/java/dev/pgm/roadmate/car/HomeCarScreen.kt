@@ -4,11 +4,14 @@ import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
+import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
 import androidx.car.app.model.Header
 import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
+import androidx.car.app.navigation.model.MapController
+import androidx.car.app.navigation.model.MapWithContentTemplate
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.lifecycleScope
 import dev.pgm.roadmate.R
@@ -19,6 +22,7 @@ import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.PcmTranscriber
+import dev.pgm.roadmate.domain.repository.RoutingRepository
 import dev.pgm.roadmate.domain.repository.SpeechSynthesisRepository
 import dev.pgm.roadmate.domain.repository.WeatherRepository
 import dev.pgm.roadmate.domain.usecase.GenerateResponseUseCase
@@ -56,6 +60,7 @@ import java.util.Calendar
  */
 class HomeCarScreen(
     carContext: CarContext,
+    private val renderer: CarMapRenderer,
     private val generateResponseUseCase: GenerateResponseUseCase,
     private val locationRepository: LocationRepository,
     private val weatherRepository: WeatherRepository,
@@ -67,6 +72,7 @@ class HomeCarScreen(
     private val preferences: AssistantPreferencesRepository,
     private val gemini: GeminiRepository,
     private val offlineMap: OfflineMapController,
+    private val routingRepository: RoutingRepository,
 ) : Screen(carContext) {
 
     private var statusText = carContext.getString(R.string.car_idle)
@@ -92,6 +98,7 @@ class HomeCarScreen(
     )
     private val stopIcon = carIcon(R.drawable.lucide_ic_square, CarColor.DEFAULT)
     private val mapIcon = carIcon(R.drawable.lucide_ic_map, CarColor.DEFAULT)
+    private val settingsIcon = carIcon(R.drawable.lucide_ic_settings, CarColor.DEFAULT)
 
     init {
         // A template is a snapshot: it observes nothing, so anything that
@@ -126,7 +133,34 @@ class HomeCarScreen(
         lifecycleScope.launch { runCatching { locationRepository.getCurrentCoordinates() } }
     }
 
-    override fun onGetTemplate(): Template {
+    /**
+     * The map is the backdrop, the voice card sits on it.
+     *
+     * A MessageTemplate on its own left the driver looking at a black screen
+     * with a sentence in the middle of it, and its own action strip — the only
+     * place a third control fits — was not being drawn. Wrapped in
+     * [MapWithContentTemplate] the map is always there, the settings icon has
+     * a strip the host actually renders, and the map controls come along for
+     * free.
+     */
+    override fun onGetTemplate(): Template = MapWithContentTemplate.Builder()
+        .setContentTemplate(voiceCard())
+        .setMapController(
+            MapController.Builder()
+                .setMapActionStrip(
+                    ActionStrip.Builder()
+                        .addAction(Action.PAN)
+                        .addAction(mapIconAction(R.drawable.lucide_ic_locate_fixed) { renderer.centreOnDriver() })
+                        .addAction(mapIconAction(R.drawable.lucide_ic_zoom_in) { renderer.zoomIn() })
+                        .addAction(mapIconAction(R.drawable.lucide_ic_zoom_out) { renderer.zoomOut() })
+                        .build()
+                )
+                .build()
+        )
+        .setActionStrip(settingsStrip())
+        .build()
+
+    private fun voiceCard(): Template {
         if (!permissionManager.hasRecordAudioPermission()) {
             return MessageTemplate.Builder(
                 carContext.getString(R.string.car_permissions_message)
@@ -148,34 +182,56 @@ class HomeCarScreen(
         return MessageTemplate.Builder(messageBody())
             .setHeader(header())
             .setIcon(micIconLarge)
+            // Icons only, no labels: a driver gets a glance, and a recognised
+            // glyph reads faster than a word — which is also why the host
+            // allows a title-less action. FLAG_PRIMARY is what gets this one
+            // the filled treatment; without it both buttons render identically
+            // and neither reads as "the thing to press".
             .addAction(
                 Action.Builder()
-                    .setTitle(carContext.getString(R.string.car_listen))
                     .setIcon(micIcon)
-                    // FLAG_PRIMARY is what gets it the filled treatment; without
-                    // it both buttons render identically and neither reads as
-                    // "the thing to press".
                     .setFlags(Action.FLAG_PRIMARY)
                     .setOnClickListener(::startListening)
                     .build()
             )
-            // MessageTemplate takes at most two actions, and the second one
-            // is whichever the driver needs at that moment: cutting off a long
-            // answer beats everything while it is being read, and the way to
-            // the map the rest of the time. Repeating is left out — the answer
-            // is spoken as it arrives and stays on screen, so a third control
-            // would cost more attention than it saves.
+            // The second slot is whichever the driver needs at that moment:
+            // cutting off a long answer beats everything while it is being
+            // read, and the way to the places list the rest of the time.
             .addAction(if (isSpeaking()) stopAction() else mapAction())
             .build()
     }
 
+    private fun mapIconAction(iconRes: Int, onClick: () -> Unit): Action = Action.Builder()
+        .setIcon(carIcon(iconRes, CarColor.DEFAULT))
+        .setOnClickListener(onClick)
+        .build()
+
     /**
-     * No end actions here on purpose. Android Auto renders `Header`
-     * `addEndHeaderAction` buttons on a MessageTemplate but never delivers the
-     * click to the app — verified against the host with a log on the listener
-     * — so anything the driver has to be able to press lives in the template's
-     * own action row instead.
+     * Settings, as an icon in the top corner — on the *outer* template's
+     * strip. A MessageTemplate's own header end actions are drawn by Android
+     * Auto but never deliver the click (verified with a log on the listener),
+     * and its two action slots are spoken for by the mic and the contextual
+     * second control, so this is the only place a third one both renders and
+     * responds.
      */
+    private fun settingsStrip(): ActionStrip = ActionStrip.Builder()
+        .addAction(
+            Action.Builder()
+                .setIcon(settingsIcon)
+                .setOnClickListener { screenManager.push(settingsScreen()) }
+                .build()
+        )
+        .build()
+
+    private fun settingsScreen(): SettingsCarScreen = SettingsCarScreen(
+        carContext,
+        preferences,
+        gemini,
+        offlineMap,
+        locationRepository,
+    )
+
+    /** No end actions in the header — see [settingsStrip] for why. */
     private fun header(): Header = Header.Builder()
         // The header title, not the message body: the host caps how many lines
         // of a MessageTemplate message it will draw (a third line came out as
@@ -187,11 +243,12 @@ class HomeCarScreen(
 
     private fun mapScreen(): NavigationCarScreen = NavigationCarScreen(
         carContext,
+        renderer,
         locationRepository,
         currentPlaceRepository,
         mapSearchCoordinator,
-        preferences,
-        gemini,
+        routingRepository,
+        speechSynthesisRepository,
         offlineMap,
     )
 
@@ -222,7 +279,6 @@ class HomeCarScreen(
     private fun isSpeaking(): Boolean = speechSynthesisRepository.isSpeaking.value
 
     private fun stopAction(): Action = Action.Builder()
-        .setTitle(carContext.getString(R.string.car_stop))
         .setIcon(stopIcon)
         .setOnClickListener {
             speechSynthesisRepository.stop()
@@ -231,7 +287,6 @@ class HomeCarScreen(
         .build()
 
     private fun mapAction(): Action = Action.Builder()
-        .setTitle(carContext.getString(R.string.car_map_action))
         .setIcon(mapIcon)
         .setOnClickListener { screenManager.push(mapScreen()) }
         .build()
