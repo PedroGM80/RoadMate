@@ -1,5 +1,7 @@
 package dev.pgm.roadmate.car
 
+import android.text.SpannableString
+import android.text.Spanned
 import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.Screen
@@ -7,6 +9,8 @@ import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarColor
 import androidx.car.app.model.CarIcon
+import androidx.car.app.model.ForegroundCarColorSpan
+import androidx.car.app.model.CarText
 import androidx.car.app.model.Header
 import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
@@ -80,7 +84,14 @@ class HomeCarScreen(
 
     /** What the mic understood, echoed back so a misheard question is obvious. */
     private var lastRecognizedInput: String? = null
-    private var isBusy = false
+
+    /**
+     * The string shown on the host's loading card while a question is in
+     * flight, or null when idle. "Escuchando…" while the mic is open, then
+     * "Procesando…" once it closes — otherwise the card claims to still be
+     * recording for the several seconds the model takes.
+     */
+    private var busyLabelRes: Int? = null
 
     private val micIcon = carIcon(R.drawable.lucide_ic_mic, CarColor.DEFAULT)
 
@@ -171,10 +182,10 @@ class HomeCarScreen(
                 .build()
         }
 
-        if (isBusy) {
+        busyLabelRes?.let { labelRes ->
             // The host draws its own spinner; the message is only what it falls
             // back to if it decides to show text alongside it.
-            return MessageTemplate.Builder(carContext.getString(R.string.car_listening))
+            return MessageTemplate.Builder(carContext.getString(labelRes))
                 .setHeader(header())
                 .setLoading(true)
                 .build()
@@ -183,21 +194,23 @@ class HomeCarScreen(
         return MessageTemplate.Builder(messageBody())
             .setHeader(header())
             .setIcon(micIconLarge)
-            // Icons only, no labels: a driver gets a glance, and a recognised
-            // glyph reads faster than a word — which is also why the host
-            // allows a title-less action. FLAG_PRIMARY is what gets this one
-            // the filled treatment; without it both buttons render identically
-            // and neither reads as "the thing to press".
+            // The primary carries a word as well as the glyph — it is the one
+            // thing on this screen the driver is meant to press, and Android
+            // Auto's own guidance is to label the primary action even where the
+            // secondary ones stay icon-only. FLAG_PRIMARY is also what gets it
+            // the filled treatment.
             .addAction(
                 Action.Builder()
                     .setIcon(micIcon)
+                    .setTitle(carContext.getString(R.string.car_listen))
                     .setFlags(Action.FLAG_PRIMARY)
                     .setOnClickListener(::startListening)
                     .build()
             )
-            // The second slot is whichever the driver needs at that moment:
-            // cutting off a long answer beats everything while it is being
-            // read, and the way to the places list the rest of the time.
+            // The second slot is a glyph — a known icon reads faster than a
+            // word at a glance — and is whichever the driver needs at that
+            // moment: cutting off a long answer beats everything while it is
+            // being read, and the way to the places list the rest of the time.
             .addAction(if (isSpeaking()) stopAction() else mapAction())
             .build()
     }
@@ -259,9 +272,16 @@ class HomeCarScreen(
      * Echoing the transcript above the answer makes a misheard question
      * self-evident.
      */
-    private fun messageBody(): String = buildString {
-        lastRecognizedInput?.let { append("“").append(it).append("”\n\n") }
-        append(statusText)
+    private fun messageBody(): CarText {
+        val transcript = lastRecognizedInput ?: return CarText.create(statusText)
+        val text = SpannableString("“$transcript”\n\n$statusText")
+        text.setSpan(
+            ForegroundCarColorSpan.create(CarColor.PRIMARY),
+            0,
+            transcript.length + 2, // including the quotes
+            Spanned.SPAN_INCLUSIVE_EXCLUSIVE
+        )
+        return CarText.create(text)
     }
 
     /**
@@ -298,8 +318,8 @@ class HomeCarScreen(
             .build()
 
     private fun startListening() {
-        if (isBusy) return
-        isBusy = true
+        if (busyLabelRes != null) return
+        busyLabelRes = R.string.car_listening
         invalidate()
 
         lifecycleScope.launch {
@@ -323,6 +343,9 @@ class HomeCarScreen(
                     return@launch
                 }
                 lastRecognizedInput = userInput
+                // Mic is closed now; stop the card claiming it is still listening.
+                busyLabelRes = R.string.car_processing
+                invalidate()
 
                 val location = locationRepository.getCurrentCoordinates()
                 // Same weather the phone would have: without it "¿qué tiempo
@@ -345,7 +368,7 @@ class HomeCarScreen(
                 generateResponseUseCase(travelContext, userInput).collect { response ->
                     answered = true
                     statusText = response
-                    isBusy = false
+                    busyLabelRes = null
                     invalidate()
                 }
                 if (!answered) {
@@ -357,7 +380,7 @@ class HomeCarScreen(
                 Log.w(TAG, "car question failed", t)
                 statusText = carContext.getString(R.string.car_error)
             } finally {
-                isBusy = false
+                busyLabelRes = null
                 invalidate()
             }
         }
