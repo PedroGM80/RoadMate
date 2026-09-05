@@ -185,7 +185,7 @@ class HomeCarScreen(
         .setStartHeaderAction(Action.APP_ICON)
         .build()
 
-    private fun mapScreen(): MapCarScreen = MapCarScreen(
+    private fun mapScreen(): NavigationCarScreen = NavigationCarScreen(
         carContext,
         locationRepository,
         currentPlaceRepository,

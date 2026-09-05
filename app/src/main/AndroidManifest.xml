@@ -9,13 +9,16 @@
          Sin esto CarAudioRecord.create() lanza SecurityException. No sustituye
          a RECORD_AUDIO: esa sigue haciendo falta para el micro del móvil. -->
     <uses-permission android:name="androidx.car.app.MICROPHONE" />
-    <!-- Necesario para las plantillas de mapa del host (PlaceListMapTemplate).
-         Sin ella el host rechaza la plantilla con
-         SecurityException: "The car app does not have a required permission:
-         androidx.car.app.MAP_TEMPLATES". No implica ser app de navegación:
-         eso sería ACCESS_SURFACE, que el host solo da a la categoría
-         NAVIGATION y que aquí no hace falta porque el mapa lo pinta él. -->
+    <!-- Plantillas de mapa del host. Sin ella el host rechaza la plantilla
+         con SecurityException: "The car app does not have a required
+         permission: androidx.car.app.MAP_TEMPLATES". -->
     <uses-permission android:name="androidx.car.app.MAP_TEMPLATES" />
+    <!-- Dibujar el mapa propio sobre la superficie del coche. El host solo
+         concede ACCESS_SURFACE a las apps de categoría NAVIGATION, de ahí el
+         intent-filter del CarAppService más abajo. -->
+    <uses-permission android:name="androidx.car.app.ACCESS_SURFACE" />
+    <!-- NavigationTemplate / MapWithContentTemplate. -->
+    <uses-permission android:name="androidx.car.app.NAVIGATION_TEMPLATES" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -129,13 +132,20 @@
             android:label="@string/app_name">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
-                <!-- POI fits what RoadMate actually does (location-aware Q&A,
-                     trip context) better than IoT (device control, which this
-                     isn't). Still an imperfect fit — no category exists for a
-                     general voice assistant. Talk to Google's Android for
-                     Cars team before submitting for review; a mismatched
-                     category risks rejection or later removal. -->
-                <category android:name="androidx.car.app.category.POI" />
+                <!-- NAVIGATION, no POI: solo esta categoría obtiene
+                     ACCESS_SURFACE, y sin superficie no hay forma de pintar
+                     el mapa propio ni de tener controles de mapa (zoom,
+                     centrado, pan) en el coche. Implica que Google la revisa
+                     como app de navegación al publicarla: hay que enseñar
+                     mapa y guiado, no solo asistente de voz. -->
+                <category android:name="androidx.car.app.category.NAVIGATION" />
+            </intent-filter>
+            <!-- Las apps de navegación tienen que aceptar la intención de
+                 navegar hacia un destino; sin esto el host no las considera
+                 completas. -->
+            <intent-filter>
+                <action android:name="androidx.car.app.action.NAVIGATE" />
+                <data android:scheme="geo" />
             </intent-filter>
         </service>
     </application>
