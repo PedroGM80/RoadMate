@@ -2,11 +2,7 @@ package dev.pgm.roadmate.presentation.map
 
 import android.annotation.SuppressLint
 import android.content.ComponentCallbacks2
-import android.content.Context
 import android.content.res.Configuration
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Paint
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -44,7 +40,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,14 +52,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import dev.pgm.roadmate.ui.theme.Dimens
 import dev.pgm.roadmate.ui.theme.Elevation
 import dev.pgm.roadmate.ui.theme.IconSize
 import dev.pgm.roadmate.ui.theme.Spacing
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.content.ContextCompat
-import androidx.core.graphics.createBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -74,25 +66,11 @@ import com.google.accompanist.permissions.rememberPermissionState
 import dev.pgm.roadmate.R
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
-import org.maplibre.android.geometry.LatLngBounds
-import org.maplibre.android.location.LocationComponentActivationOptions
-import org.maplibre.android.location.modes.CameraMode
-import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapView
-import org.maplibre.android.maps.Style
 import org.maplibre.android.plugins.annotation.CircleManager
-import org.maplibre.android.plugins.annotation.CircleOptions
 import org.maplibre.android.plugins.annotation.LineManager
-import org.maplibre.android.plugins.annotation.LineOptions
 import org.maplibre.android.plugins.annotation.SymbolManager
-import org.maplibre.android.plugins.annotation.SymbolOptions
-import org.maplibre.android.style.sources.VectorSource
-import org.maplibre.geojson.LineString
-import org.maplibre.geojson.MultiLineString
-import org.maplibre.geojson.Point
-import kotlin.math.cos
-import kotlin.math.hypot
 import kotlin.time.Duration.Companion.milliseconds
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
@@ -128,213 +106,24 @@ fun MapScreen(
     var poiLoading by remember { mutableStateOf(false) }
     val geoThrottle = paneState.geoThrottle
 
-    // Runs exactly once per MapView, not once per entry into composition:
-    // setStyle again on the same map would stack a second set of annotation
-    // managers (duplicate layers/sources) and a second camera-idle listener.
-    LaunchedEffect(paneState) {
-        if (!paneState.claimSetup()) return@LaunchedEffect
-        mapView.getMapAsync { map ->
-            mapLibreMap = map
-            // Lift the MapLibre logo + (i) so they sit above the bottom
-            // filter-chip row instead of tucked behind its corner (still
-            // visible, as the OSM/MapLibre licence requires).
-            val side = (8 * density).toInt()
-            val lift = (150 * density).toInt()
-            map.uiSettings.setLogoMargins(side, 0, 0, lift)
-            map.uiSettings.setAttributionMargins(side, 0, 0, lift)
-            map.setStyle(Style.Builder().fromUri(viewModel.styleUrl)) { style ->
-                registerPinIcons(style, context, density)
-                // Created before the SymbolManager so the route line + its
-                // destination dot sit under the pins.
-                lineManager = LineManager(mapView, map, style)
-                circleManager = CircleManager(mapView, map, style)
-                val manager = SymbolManager(mapView, map, style).apply {
-                    iconAllowOverlap = true
-                    textAllowOverlap = false
-                    addClickListener { symbol ->
-                        val name = symbol.data?.takeIf { it.isJsonPrimitive }?.asString.orEmpty()
-                        selectedPoi = name to symbol.latLng
-                        true
-                    }
-                }
-                symbolManager = manager
-                maybeEnableLocation(map, style, context, locationPermission.status.isGranted)
-                // Registered here (not before the style loads) so `manager` is real.
-                map.addOnCameraIdleListener {
-                    refreshPois(map, mapView, manager, viewModel.poiFilter.value, viewModel.nameQuery.value)
-                    resolvePlaceLabel(map, viewModel, geoThrottle)
-                }
-            }
-        }
-    }
+    MapSetupEffect(paneState, viewModel, density, locationPermission.status.isGranted)
 
-    LaunchedEffect(locationPermission.status.isGranted, mapLibreMap) {
-        val map = mapLibreMap ?: return@LaunchedEffect
-        if (!locationPermission.status.isGranted) return@LaunchedEffect
-        map.style?.let { maybeEnableLocation(map, it, context, true) }
+    LocationCenteringEffect(mapLibreMap, locationPermission.status.isGranted, paneState)
 
-        // The first GPS fix can take a few seconds after the component
-        // activates; poll for it instead of centering once and giving up
-        // (which left the map on the style's zoomed-out default).
-        // Pane-scoped: once RoadMate has centred on the driver, coming back to
-        // the map tab must not yank the camera away from where they panned.
-        repeat(20) {
-            if (paneState.centeredOnUser) return@LaunchedEffect
-            if (centerOnUser(map)) {
-                paneState.centeredOnUser = true
-                return@LaunchedEffect
-            }
-            delay(500.milliseconds)
-        }
-    }
+    PlaceLabelFallbackEffect(mapLibreMap, viewModel, geoThrottle)
 
-    // Reverse-geocode the driver's position from the downloaded tiles (no
-    // network geocoder) and publish it for the Voz screen's location chip.
-    // The camera-idle listener drives this once the map settles; this loop is
-    // the fallback for a stationary driver whose map loads already centred
-    // (no camera move -> no idle callback).
-    LaunchedEffect(mapLibreMap) {
-        val map = mapLibreMap ?: return@LaunchedEffect
-        repeat(8) {
-            delay(3_000.milliseconds)
-            resolvePlaceLabel(map, viewModel, geoThrottle)
-        }
-    }
-
-    LaunchedEffect(poiFilter, nameQuery, navigateToResult, symbolManager) {
-        val map = mapLibreMap ?: return@LaunchedEffect
-        val manager = symbolManager ?: return@LaunchedEffect
-        val active = poiFilter != null || nameQuery != null
-
-        // The selection changed (a chip tap / toggle-off / voice search) —
-        // always drop the old pins first. refreshPois keeps them on an empty
-        // result only for the camera-idle path (zoom-out past the POI layer).
-        runCatching { manager.deleteAll() }
-        if (!active) {
-            poiLoading = false
-            return@LaunchedEffect
-        }
-
-        poiLoading = true
-        try {
-            // Right after a chip tap / voice search the current tiles' source
-            // features aren't queryable yet, so a single pass finds nothing
-            // until the map next idles (e.g. after "recenter"). Retry briefly.
-            var pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
-            repeat(6) {
-                if (pins.isNotEmpty()) return@repeat
-                delay(350.milliseconds)
-                pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
-            }
-
-            // Still nothing: the current zoom has no usable tiles for this
-            // query. A category (POIs, min zoom ~14) needs zooming *in*; a
-            // place name — likely a town some km away — needs zooming *out*
-            // so its "place" tile loads.
-            if (pins.isEmpty()) {
-                val z = map.cameraPosition.zoom
-                val jump = when {
-                    poiFilter != null && z < 14.0 -> 14.5
-                    poiFilter == null && z > 11.0 -> 10.5
-                    else -> null
-                }
-                if (jump != null) {
-                    runCatching { map.animateCamera(CameraUpdateFactory.zoomTo(jump), 300) }
-                    repeat(8) {
-                        delay(400.milliseconds)
-                        pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
-                        if (pins.isNotEmpty()) return@repeat
-                    }
-                }
-            }
-
-            // Nothing at all — tell the driver instead of leaving them hanging.
-            if (pins.isEmpty()) {
-                if (navigateToResult || nameQuery != null) {
-                    val what = nameQuery ?: filterLabel ?: ""
-                    viewModel.onSearchFoundNothing(what)
-                }
-                return@LaunchedEffect
-            }
-
-            // "llévame a…": for a category ("una gasolinera") route to the
-            // nearest pin; for a name ("Chiclana") refreshPois already put the
-            // best match first, so trust that.
-            if (navigateToResult) {
-                val here = map.currentLatLon()
-                val target = if (poiFilter != null && here != null) {
-                    pins.minByOrNull { metersBetween(here, it.latitude to it.longitude) } ?: pins.first()
-                } else {
-                    pins.first()
-                }
-                viewModel.onNavigationTargetResolved(
-                    from = here,
-                    to = target.latitude to target.longitude,
-                )
-                return@LaunchedEffect
-            }
-
-            // Frame the pins. Clamp the zoom so a city-wide spread doesn't drop
-            // below the POI layer's min zoom — otherwise the *next* category
-            // switch queries tiles that aren't loaded and finds nothing.
-            if (pins.size >= 2) {
-                val b = LatLngBounds.Builder().includes(pins).build()
-                runCatching {
-                    val cam = map.getCameraForLatLngBounds(b, intArrayOf(120, 120, 120, 120))
-                    if (cam != null) {
-                        val z = cam.zoom.coerceIn(13.5, 16.5)
-                        map.animateCamera(
-                            CameraUpdateFactory.newCameraPosition(
-                                org.maplibre.android.camera.CameraPosition.Builder(cam).zoom(z).build(),
-                            ),
-                            400,
-                        )
-                    }
-                }
-            } else if (pins.size == 1) {
-                map.animateCamera(CameraUpdateFactory.newLatLngZoom(pins.first(), 15.0), 400)
-            }
-        } finally {
-            poiLoading = false
-        }
-    }
-
-    // Draw (or clear) the offline route line + its destination dot.
-    LaunchedEffect(route, lineManager) {
-        val manager = lineManager ?: return@LaunchedEffect
-        runCatching { manager.deleteAll() }
-        runCatching { circleManager?.deleteAll() }
-        if (route.size < 2) return@LaunchedEffect
-        val pts = route.map { LatLng(it.first, it.second) }
-        runCatching {
-            manager.create(
-                LineOptions()
-                    .withLatLngs(pts)
-                    .withLineColor("#1565C0")
-                    .withLineWidth(5f),
-            )
-        }
-        runCatching {
-            circleManager?.create(
-                CircleOptions()
-                    .withLatLng(pts.last())
-                    .withCircleRadius(7f)
-                    .withCircleColor("#1565C0")
-                    .withCircleStrokeColor("#FFFFFF")
-                    .withCircleStrokeWidth(2.5f),
-            )
-        }
-        mapLibreMap?.let { m ->
-            runCatching {
-                m.animateCamera(
-                    CameraUpdateFactory.newLatLngBounds(
-                        LatLngBounds.Builder().includes(pts).build(), 140,
-                    ),
-                    500,
-                )
-            }
-        }
-    }
+    PoiSearchEffect(
+        map = mapLibreMap,
+        symbolManager = symbolManager,
+        mapView = mapView,
+        poiFilter = poiFilter,
+        nameQuery = nameQuery,
+        navigateToResult = navigateToResult,
+        filterLabel = filterLabel,
+        viewModel = viewModel,
+        onLoadingChange = { poiLoading = it },
+    )
+    RouteLineEffect(route, lineManager, circleManager, mapLibreMap)
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(
