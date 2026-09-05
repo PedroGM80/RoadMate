@@ -26,4 +26,10 @@ local.properties
 # app/build.gradle.kts).
 /app/google-services.json
 
+# Release signing — never in git. Copy keystore.properties.example and point
+# it at a keystore kept outside the repo (see app/build.gradle.kts).
+/keystore.properties
+*.jks
+*.keystore
+
 .idea/

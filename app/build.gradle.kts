@@ -25,6 +25,26 @@ val localProperties = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+// Release signing. Resolved from keystore.properties at the repo root
+// (gitignored — copy keystore.properties.example) or, for CI, the matching
+// ROADMATE_KEYSTORE_* environment variables. When neither is present the
+// release build is simply left unsigned, so `assembleRelease` still runs for
+// contributors and on CI without the secret. A signed AAB needs the file or
+// the env vars.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+fun signingValue(propKey: String, envKey: String): String? =
+    keystoreProperties.getProperty(propKey) ?: System.getenv(envKey)
+
+val releaseStoreFile = signingValue("storeFile", "ROADMATE_KEYSTORE_FILE")
+val releaseStorePassword = signingValue("storePassword", "ROADMATE_KEYSTORE_PASSWORD")
+val releaseKeyAlias = signingValue("keyAlias", "ROADMATE_KEY_ALIAS")
+val releaseKeyPassword = signingValue("keyPassword", "ROADMATE_KEY_PASSWORD")
+val releaseSigningReady = releaseStoreFile != null && releaseStorePassword != null &&
+    releaseKeyAlias != null && releaseKeyPassword != null
+
 // The Vosk offline Spanish speech model (~39 MB, Apache-2.0). Fetched into
 // assets at build time so voice recognition works fully offline from the
 // first launch — no Google speech pack, no runtime download, no account.
@@ -77,8 +97,21 @@ android {
         buildConfigField("String", "MAP_STYLE_URL", "\"$mapStyleUrl\"")
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
+
             // R8 stays off until a release build has been verified on a real
             // device — MediaPipe / Vosk / MapLibre are JNI-heavy and their
             // reflection surface isn't fully covered by consumer rules yet.
