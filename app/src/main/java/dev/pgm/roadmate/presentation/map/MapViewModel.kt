@@ -60,8 +60,6 @@ class MapViewModel @Inject constructor(
     private val _routeSummary = MutableStateFlow<String?>(null)
     val routeSummary: StateFlow<String?> = _routeSummary.asStateFlow()
 
-    val routingDataStatus: StateFlow<RoutingDataStatus> = routingRepository.dataStatus
-
     /** Fires when a voice search arrives, so the shell can show the map tab. */
     private val _showMap = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val showMap: SharedFlow<Unit> = _showMap.asSharedFlow()
@@ -101,11 +99,6 @@ class MapViewModel @Inject constructor(
         _navigateToResult.value = false
         clearRoute()
         _poiFilter.value = if (_poiFilter.value == kind) null else kind
-    }
-
-    fun clearVoiceSearch() {
-        _nameQuery.value = null
-        _navigateToResult.value = false
     }
 
     /** [MapScreen] retried and the offline tiles have nothing for this search. */

@@ -11,5 +11,4 @@ data class SilenceEvent(
 
 enum class SilenceAction {
     ALERT,
-    NOTIFY
 }

@@ -15,7 +15,6 @@ import dev.pgm.roadmate.domain.model.CalendarEvent
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.CalendarRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
-import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
@@ -114,15 +113,6 @@ class FakeSilenceDetectionRepository(
         lastThresholdDb = thresholdDb
         return events
     }
-}
-
-class FakeLocationRepository(
-    initialLocation: Pair<Double, Double>? = null
-) : LocationRepository {
-    private val _location = MutableStateFlow(initialLocation)
-    override val location: StateFlow<Pair<Double, Double>?> = _location
-
-    override suspend fun getCurrentCoordinates(forceRefresh: Boolean): Pair<Double, Double>? = _location.value
 }
 
 class FakeWeatherRepository(

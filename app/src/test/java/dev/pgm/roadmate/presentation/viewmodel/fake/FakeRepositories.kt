@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Local, minimal fakes for RoadMateViewModel tests — not shared with
@@ -58,7 +59,7 @@ class FakeLocationRepository(
 
     override suspend fun getCurrentCoordinates(forceRefresh: Boolean): Pair<Double, Double>? {
         fetchCount++
-        if (fetchDelayMs > 0) delay(fetchDelayMs)
+        if (fetchDelayMs > 0) delay(fetchDelayMs.milliseconds)
         if (fetchResult != null) _location.value = fetchResult
         return fetchResult
     }
@@ -90,8 +91,6 @@ class FakeSpeechSynthesisRepository : SpeechSynthesisRepository {
     val spoken = mutableListOf<String>()
     private val _isSpeaking = MutableStateFlow(false)
     override val isSpeaking: StateFlow<Boolean> = _isSpeaking
-
-    fun setSpeaking(value: Boolean) { _isSpeaking.value = value }
 
     override fun speak(text: String, onDone: () -> Unit) {
         spoken.add(text)
@@ -225,7 +224,7 @@ class FakeAssistantPreferencesRepository : AssistantPreferencesRepository {
     // scheduler advances. Tests that need the setting live call
     // advanceUntilIdle() before relying on it.
     override val handsFreeEnabled: Flow<Boolean> = flow {
-        delay(1)
+        delay(1.milliseconds)
         emitAll(handsFreeFlow)
     }
     override suspend fun setHandsFreeEnabled(enabled: Boolean) {

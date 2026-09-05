@@ -33,6 +33,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Calendar
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Voice Q&A on the car display: the answer as the message body, one primary
@@ -122,7 +123,7 @@ class HomeCarScreen(
         lifecycleScope.launch {
             var shown = locationLine()
             while (isActive) {
-                delay(LOCATION_REFRESH_MS)
+                delay(LOCATION_REFRESH_MS.milliseconds)
                 val current = locationLine()
                 if (current != shown) {
                     shown = current

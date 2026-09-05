@@ -26,7 +26,7 @@ class UnitConversionParserTest {
     }
 
     @Test
-    fun `temperature`() {
+    fun temperature() {
         assertEquals(
             "30 grados centígrados son 86 grados Fahrenheit.",
             UnitConversionParser.convert("30 grados centígrados a fahrenheit"),

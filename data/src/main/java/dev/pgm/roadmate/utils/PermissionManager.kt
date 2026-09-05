@@ -29,16 +29,6 @@ class PermissionManager @Inject constructor(@ApplicationContext private val cont
     fun hasInternetPermission(): Boolean =
         hasPermission(Manifest.permission.INTERNET)
 
-    fun hasAllRequiredPermissions(): Boolean =
-        hasRecordAudioPermission() && hasLocationPermission() && hasInternetPermission()
-
     private fun hasPermission(permission: String): Boolean =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-
-    companion object {
-        val RUNTIME_PERMISSIONS = arrayOf(
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        )
-    }
 }

@@ -45,12 +45,6 @@ class AudioLevelDetector(
     val isRunning: Boolean
         get() = recordingJob?.isActive == true
 
-    /** Milliseconds of continuous silence so far, or 0 if not currently silent. */
-    fun getSilenceDuration(): Long {
-        val startedAt = silenceStartedAtMs ?: return 0L
-        return System.currentTimeMillis() - startedAt
-    }
-
     /**
      * Starts monitoring. Returns false if the microphone could not be opened —
      * no permission, no mic, or another owner holds it — so the caller can say

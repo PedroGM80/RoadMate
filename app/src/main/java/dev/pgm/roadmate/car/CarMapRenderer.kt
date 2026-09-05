@@ -1,6 +1,9 @@
 package dev.pgm.roadmate.car
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Presentation
+import android.content.pm.PackageManager
 import android.graphics.Rect
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
@@ -8,6 +11,7 @@ import android.util.Log
 import androidx.car.app.CarContext
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
+import androidx.core.content.ContextCompat.checkSelfPermission
 import dev.pgm.roadmate.domain.repository.CurrentPlaceRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.presentation.map.PoiKind
@@ -233,9 +237,6 @@ class CarMapRenderer(
         refreshPins()
     }
 
-    /** How many of the requested category are pinned right now, for the list. */
-    fun poiCount(): Int = lastPinCount
-
     private var lastPinCount = 0
 
     private fun refreshPins() {
@@ -255,7 +256,7 @@ class CarMapRenderer(
         val annotations = symbolManager?.annotations ?: return emptyList()
         return (0 until annotations.size()).mapNotNull { index ->
             val symbol = annotations.valueAt(index) ?: return@mapNotNull null
-            val at = symbol.latLng ?: return@mapNotNull null
+            val at = symbol.latLng
             val name = symbol.data?.takeIf { it.isJsonPrimitive }?.asString.orEmpty()
             CarPlace(name, at.latitude, at.longitude)
         }
@@ -343,9 +344,16 @@ class CarMapRenderer(
         return sqrt(dLat * dLat + dLon * dLon)
     }
 
+    // The guard is hasLocationPermission() one line in; lint's flow analysis
+    // doesn't follow it into a helper, and the whole body is wrapped in
+    // runCatching { }.onFailure anyway.
+    @SuppressLint("MissingPermission")
     private fun enableDriverDot(loaded: MapLibreMap, style: Style) {
-        // The location component throws without the runtime permission rather
+        // Needs a location permission; without one the component throws rather
         // than degrading, and the car screen must not die over a missing dot.
+        // The permission is part of RoadMate's normal cascade — this is just
+        // the belt-and-braces check the location APIs expect at the call site.
+        if (!hasLocationPermission()) return
         runCatching {
             val component = loaded.locationComponent
             if (!component.isLocationComponentActivated) {
@@ -356,6 +364,12 @@ class CarMapRenderer(
             component.isLocationComponentEnabled = true
         }.onFailure { Log.w(TAG, "no location component on the car map", it) }
     }
+
+    private fun hasLocationPermission(): Boolean =
+        checkSelfPermission(carContext, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+            checkSelfPermission(carContext, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
 
     private fun release() {
         mapView?.let { view ->

@@ -66,7 +66,7 @@ class NavigationCarScreen(
     private val mapSearchCoordinator: MapSearchCoordinator,
     private val routingRepository: RoutingRepository,
     private val speechSynthesisRepository: SpeechSynthesisRepository,
-    private val offlineMap: OfflineMapController,
+    offlineMap: OfflineMapController,
 ) : Screen(carContext) {
 
     /** Which category is pinned on the map; null means none is expanded. */
@@ -334,12 +334,6 @@ class NavigationCarScreen(
         return "${minutes / 60} h ${minutes % 60} min"
     }
 
-    private fun PlaceCategory.carLabelRes(): Int = when (this) {
-        PlaceCategory.FUEL -> R.string.map_poi_fuel
-        PlaceCategory.HOTEL -> R.string.map_poi_hotel
-        PlaceCategory.FOOD -> R.string.map_poi_food
-    }
-
     private fun PlaceCategory.carIconRes(): Int = when (this) {
         PlaceCategory.FUEL -> R.drawable.ic_gas_station
         PlaceCategory.HOTEL -> R.drawable.ic_hotel
@@ -352,7 +346,7 @@ class NavigationCarScreen(
     /** Builds "<name> · <distance>" with the distance as a host-formatted span. */
     private class SpannableTitle(private val name: String) {
         fun withDistance(metres: Double): CarText {
-            val text = android.text.SpannableString("$name  ${DISTANCE_PLACEHOLDER}")
+            val text = android.text.SpannableString("$name  $DISTANCE_PLACEHOLDER")
             val start = text.length - DISTANCE_PLACEHOLDER.length
             text.setSpan(
                 DistanceSpan.create(

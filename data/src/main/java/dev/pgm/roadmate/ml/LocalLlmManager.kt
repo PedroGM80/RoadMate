@@ -26,6 +26,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Runs prompts through the downloaded model via the MediaPipe LLM Inference
@@ -188,7 +189,7 @@ class LocalLlmManager @Inject constructor(
         val llm = obtainEngine() ?: return@withContext null
         inFlight.incrementAndGet()
         try {
-            withTimeoutOrNull(Constants.LOCAL_LLM_TIMEOUT_MS) {
+            withTimeoutOrNull(Constants.LOCAL_LLM_TIMEOUT_MS.milliseconds) {
                 runCatching {
                     val session = LlmInferenceSession.createFromOptions(
                         llm,
@@ -303,7 +304,7 @@ class LocalLlmManager @Inject constructor(
         }
 
         val watchdog = launch {
-            delay(Constants.LOCAL_LLM_TIMEOUT_MS)
+            delay(Constants.LOCAL_LLM_TIMEOUT_MS.milliseconds)
             finish("TIMEOUT")
         }
 

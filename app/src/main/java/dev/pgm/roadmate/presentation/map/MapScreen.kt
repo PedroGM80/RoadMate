@@ -88,6 +88,7 @@ import org.maplibre.geojson.MultiLineString
 import org.maplibre.geojson.Point
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val PIN_PREFIX = "roadmate-pin-"
 
@@ -196,7 +197,7 @@ fun MapScreen(
                 paneState.centeredOnUser = true
                 return@LaunchedEffect
             }
-            delay(500)
+            delay(500.milliseconds)
         }
     }
 
@@ -208,7 +209,7 @@ fun MapScreen(
     LaunchedEffect(mapLibreMap) {
         val map = mapLibreMap ?: return@LaunchedEffect
         repeat(8) {
-            delay(3_000)
+            delay(3_000.milliseconds)
             resolvePlaceLabel(map, viewModel, geoThrottle)
         }
     }
@@ -235,7 +236,7 @@ fun MapScreen(
             var pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
             repeat(6) {
                 if (pins.isNotEmpty()) return@repeat
-                delay(350)
+                delay(350.milliseconds)
                 pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
             }
 
@@ -253,7 +254,7 @@ fun MapScreen(
                 if (jump != null) {
                     runCatching { map.animateCamera(CameraUpdateFactory.zoomTo(jump), 300) }
                     repeat(8) {
-                        delay(400)
+                        delay(400.milliseconds)
                         pins = refreshPois(map, mapView, manager, poiFilter, nameQuery)
                         if (pins.isNotEmpty()) return@repeat
                     }
@@ -374,7 +375,7 @@ fun MapScreen(
             LaunchedEffect(offlineStatus) {
                 if (offlineStatus is OfflineMapStatus.Ready) {
                     showReady = true
-                    delay(4000)
+                    delay(4000.milliseconds)
                     showReady = false
                 }
             }

@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import dev.pgm.roadmate.domain.model.ThemePreference
 import kotlinx.coroutines.delay
 import java.time.ZonedDateTime
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Whether RoadMate should render dark right now, for [preference].
@@ -39,7 +40,7 @@ fun rememberIsDarkTheme(
         if (preference != ThemePreference.AUTO) return@LaunchedEffect
         while (true) {
             autoNight = ThemePreference.isNight(ZonedDateTime.now(), location)
-            delay(RECHECK_INTERVAL_MS)
+            delay(RECHECK_INTERVAL_MS.milliseconds)
         }
     }
 

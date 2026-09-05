@@ -8,6 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.domain.model.RoutingDataStatus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +21,6 @@ import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.coroutineContext
 
 /**
  * Gets BRouter `.rd5` segment tiles onto the device on demand: when a route
@@ -48,9 +48,6 @@ class RoutingDataManager @Inject constructor(
 
     private val _status = MutableStateFlow<RoutingDataStatus>(RoutingDataStatus.Idle)
     val status: StateFlow<RoutingDataStatus> = _status.asStateFlow()
-
-    /** True if every `<name>.rd5` is already on disk. */
-    fun hasTiles(names: List<String>): Boolean = names.all { tileFile(it).isReadableTile() }
 
     /**
      * Ensures every named tile is present, downloading the missing ones.
@@ -112,7 +109,7 @@ class RoutingDataManager @Inject constructor(
                     var done = if (partial) resumeFrom else 0L
                     var lastPct = -1
                     while (true) {
-                        coroutineContext.ensureActive()
+                        currentCoroutineContext().ensureActive()
                         val read = input.read(buf)
                         if (read < 0) break
                         output.write(buf, 0, read)

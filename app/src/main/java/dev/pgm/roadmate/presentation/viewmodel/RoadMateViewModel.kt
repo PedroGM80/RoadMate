@@ -38,6 +38,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.Calendar
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The voice loop's state.
@@ -81,7 +82,7 @@ class RoadMateViewModel @Inject constructor(
     private val speechSynthesisRepository: SpeechSynthesisRepository,
     private val greetingRepository: GreetingRepository,
     private val wakeWordRepository: WakeWordRepository,
-    private val assistantPreferencesRepository: AssistantPreferencesRepository,
+    assistantPreferencesRepository: AssistantPreferencesRepository,
     private val currentPlaceRepository: CurrentPlaceRepository
 ) : ViewModel() {
 
@@ -120,7 +121,7 @@ class RoadMateViewModel @Inject constructor(
             locationRepository.location.collect { location ->
                 _uiState.value = _uiState.value.copy(
                     location = location,
-                    locationUnavailable = if (location != null) false else _uiState.value.locationUnavailable,
+                    locationUnavailable = location == null && _uiState.value.locationUnavailable,
                 )
             }
         }
@@ -174,7 +175,7 @@ class RoadMateViewModel @Inject constructor(
     fun refreshLocation() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(locationUnavailable = false)
-            val location = withTimeoutOrNull(Constants.LOCATION_TIMEOUT_MS) {
+            val location = withTimeoutOrNull(Constants.LOCATION_TIMEOUT_MS.milliseconds) {
                 locationRepository.getCurrentCoordinates()
             }
             if (location == null) {
@@ -380,7 +381,7 @@ class RoadMateViewModel @Inject constructor(
         // Silence watchdog: if nothing is said within the window, stop waiting
         // and let the loop fall back to the wake phrase.
         val watchdog = launch {
-            delay(if (followUp) FOLLOW_UP_SILENCE_MS else FIRST_SILENCE_MS)
+            delay((if (followUp) FOLLOW_UP_SILENCE_MS else FIRST_SILENCE_MS).milliseconds)
             if (!heardSpeech) capture.cancel()
         }
         capture.join()

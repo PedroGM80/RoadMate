@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Listens to one utterance and streams recognition events: live
@@ -47,7 +48,7 @@ class RecordAudioUseCase @Inject constructor(
     private suspend fun hushBeforeListening() {
         speechSynthesisRepository.stop()
         speechSynthesisRepository.awaitDoneSpeaking()
-        delay(TTS_SETTLE_MS)
+        delay(TTS_SETTLE_MS.milliseconds)
     }
 
     private companion object {

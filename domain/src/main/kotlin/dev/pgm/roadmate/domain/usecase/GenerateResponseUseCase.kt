@@ -170,7 +170,7 @@ class GenerateResponseUseCase @Inject constructor(
             // "¿dónde estoy?" — answer from the map if it has a street resolved,
             // otherwise fall through to the model (it has the coordinates).
             LocationQuestionParser.matches(userInput) && !context.placeLabel.isNullOrBlank() ->
-                SpokenText.youAreAt(context.placeLabel!!.replace(" · ", ", "))
+                SpokenText.youAreAt(context.placeLabel.replace(" · ", ", "))
             contactName != null -> handleCallRequest(contactName)
             mapQuery != null -> handleMapSearch(
                 mapQuery,

@@ -10,6 +10,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Sends prompts to the on-device Gemini Nano model via Android AICore and returns
@@ -93,7 +94,7 @@ class GeminiNanoManager @Inject constructor(@ApplicationContext context: Context
      */
     private suspend fun attempt(prompt: String): Outcome {
         var threw: Throwable? = null
-        val text = withTimeoutOrNull(Constants.GEMINI_TIMEOUT_MS) {
+        val text = withTimeoutOrNull(Constants.GEMINI_TIMEOUT_MS.milliseconds) {
             runCatching { model.generateContent(prompt).text }
                 .onFailure {
                     threw = it

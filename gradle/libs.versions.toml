@@ -110,9 +110,9 @@ maplibre-android-sdk = { group = "org.maplibre.gl", name = "android-sdk", versio
 maplibre-annotation = { group = "org.maplibre.gl", name = "android-plugin-annotation-v9", version.ref = "maplibreAnnotation" }
 javax-inject = { group = "javax.inject", name = "javax.inject", version.ref = "javaxInject" }
 androidx-car-app = { group = "androidx.car.app", name = "app", version.ref = "carApp" }
-# Implementación de las APIs del host para Android Auto (proyección). Sin esto
-# CarAudioRecord.create() lanza "CarAudioRecord not configured": el artefacto
-# `app` solo trae la API, no el transporte hacia el host proyectado.
+# Host-side implementation of the Android Auto (projected) APIs. Without it
+# CarAudioRecord.create() throws "CarAudioRecord not configured": the `app`
+# artifact ships only the API, not the transport to the projected host.
 androidx-car-app-projected = { group = "androidx.car.app", name = "app-projected", version.ref = "carApp" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }

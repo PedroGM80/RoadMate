@@ -50,7 +50,6 @@ object MediaIntentParser {
     /** True for a music request that named no app at all. */
     fun wantsMusicWithoutApp(userInput: String): Boolean {
         val text = userInput.trim()
-        if (extractMediaApp(text) != null) return false
-        return MUSIC_WITHOUT_APP.containsMatchIn(text)
+        return extractMediaApp(text) == null && MUSIC_WITHOUT_APP.containsMatchIn(text)
     }
 }

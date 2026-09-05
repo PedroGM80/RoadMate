@@ -41,8 +41,7 @@ object WeatherIntentParser {
 
     fun isWeatherQuestion(userInput: String): Boolean {
         val text = userInput.trim()
-        if (NOT_WEATHER_TIEMPO.containsMatchIn(text)) return false
-        return WEATHER_WORDS.containsMatchIn(text) || WEATHER_TIEMPO.containsMatchIn(text)
+        return !NOT_WEATHER_TIEMPO.containsMatchIn(text) && (WEATHER_WORDS.containsMatchIn(text) || WEATHER_TIEMPO.containsMatchIn(text))
     }
 
     /** Trailing "… en/de/para <sitio>" of a weather question, a leading article dropped. */

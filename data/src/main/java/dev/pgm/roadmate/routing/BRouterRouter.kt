@@ -96,7 +96,7 @@ class BRouterRouter @Inject constructor(
                 return@runCatching null
             }
 
-            DebugTrace.log("route: OK ${took} ms, ${nodes.size} pts, ${track.distance} m, ${track.totalSeconds} s")
+            DebugTrace.log("route: OK $took ms, ${nodes.size} pts, ${track.distance} m, ${track.totalSeconds} s")
             RouteResult(
                 points = nodes.map { it.iLat / 1e6 - 90.0 to it.iLon / 1e6 - 180.0 },
                 distanceMeters = track.distance,
