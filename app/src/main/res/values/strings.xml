@@ -121,6 +121,8 @@
     <string name="car_map_place">Sitio</string>
     <string name="car_route_working">Calculando la ruta…</string>
     <string name="car_route_failed">No he podido trazar la ruta.</string>
+    <string name="car_route_stop">Parar</string>
+    <string name="car_route_no_guidance">No puedo guiarte paso a paso ahora mismo.</string>
     <string name="car_route_no_location">Aún no tengo tu posición. Espera unos segundos e inténtalo otra vez.</string>
     <string name="car_no_places">No hay sitios de esta categoría cerca.</string>
     <string name="car_settings_title">Ajustes</string>

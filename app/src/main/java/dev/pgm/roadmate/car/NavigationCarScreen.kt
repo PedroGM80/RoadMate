@@ -19,6 +19,8 @@ import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.navigation.model.TravelEstimate
 import androidx.car.app.model.DateTimeWithZone
 import java.util.TimeZone
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.domain.model.PlaceCategory
@@ -89,7 +91,27 @@ class NavigationCarScreen(
      */
     private var routeStatus: String? = null
 
+    /**
+     * Guidance, once a route is chosen. Owned by this screen rather than the
+     * session because it is this screen's route: leaving it running behind a
+     * screen the driver has backed out of would keep announcing turns for a
+     * journey nobody is on.
+     */
+    private val navigation = CarNavigationController(
+        carContext,
+        locationRepository,
+        speechSynthesisRepository,
+        lifecycleScope,
+        onChanged = ::invalidate,
+    )
+
     init {
+        // The host holds the navigation callback until it is cleared, and a
+        // callback pointing at a destroyed screen is what makes it report the
+        // app as unresponsive on the next connection.
+        lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onDestroy(owner: LifecycleOwner) = navigation.release()
+        })
         lifecycleScope.launch {
             locationRepository.currentLocation()
             renderer.centreOnDriver(animate = false)
@@ -133,19 +155,45 @@ class NavigationCarScreen(
             .addAction(mapAction(R.drawable.lucide_ic_zoom_out) { renderer.zoomOut() })
             .build()
 
-        if (poiKind == null && routeStatus == null) {
+        // While guidance is running the instruction card wins over the place
+        // list: MapWithContentTemplate has nowhere to put a maneuver, so
+        // showing a category would silently drop the driver's turn arrow.
+        if (navigation.isNavigating || (poiKind == null && routeStatus == null)) {
             return NavigationTemplate.Builder()
                 .setMapActionStrip(mapStrip)
-                .setActionStrip(categoryStrip())
-                .apply { travelEstimate?.let { setDestinationTravelEstimate(it) } }
+                .setActionStrip(actionStrip())
+                .apply {
+                    navigation.routingInfo?.let { setNavigationInfo(it) }
+                    (navigation.travelEstimate ?: travelEstimate)
+                        ?.let { setDestinationTravelEstimate(it) }
+                }
                 .build()
         }
 
         return MapWithContentTemplate.Builder()
             .setContentTemplate(contentTemplate())
             .setMapController(MapController.Builder().setMapActionStrip(mapStrip).build())
-            .setActionStrip(categoryStrip())
+            .setActionStrip(actionStrip())
             .build()
+    }
+
+    /**
+     * Categories normally; a stop control while navigating. Ending a route has
+     * to be one press and always in the same corner — a driver who wants out of
+     * a route wants out now, not after finding the right screen.
+     */
+    private fun actionStrip(): ActionStrip = if (navigation.isNavigating) {
+        ActionStrip.Builder()
+            .addAction(
+                Action.Builder()
+                    .setIcon(carIcon(R.drawable.lucide_ic_square, CarColor.RED))
+                    .setTitle(carContext.getString(R.string.car_route_stop))
+                    .setOnClickListener { clearRoute() }
+                    .build()
+            )
+            .build()
+    } else {
+        categoryStrip()
     }
 
     /** The three place categories, as icons, each toggling its own pins. */
@@ -294,11 +342,21 @@ class NavigationCarScreen(
                 routeStatus = null
                 renderer.showRoute(result.points)
                 travelEstimate = estimateFor(result.distanceMeters, result.durationSeconds)
-                // Same as the phone: the driver hears the result, the screen
-                // only has to confirm it.
+                val summary = "${formatDistance(result.distanceMeters)}, " +
+                    formatDuration(result.durationSeconds)
+                // Guidance is what makes this navigation rather than a drawn
+                // line. It can be refused — another app may hold the host's
+                // navigation slot — and the driver is told which of the two
+                // they got, because "ruta trazada" and "te voy guiando" are
+                // very different promises to make to someone driving.
+                val guided = navigation.start(
+                    place.name.ifBlank { carContext.getString(R.string.car_map_place) },
+                    place.latitude,
+                    place.longitude,
+                    result,
+                )
                 speechSynthesisRepository.speak(
-                    "${formatDistance(result.distanceMeters)}, " +
-                        formatDuration(result.durationSeconds)
+                    if (guided) summary else "$summary. ${carContext.getString(R.string.car_route_no_guidance)}"
                 )
             }
             invalidate()
@@ -325,6 +383,7 @@ class NavigationCarScreen(
         routeJob = null
         routeStatus = null
         travelEstimate = null
+        navigation.stop()
         renderer.showRoute(emptyList())
         invalidate()
     }
