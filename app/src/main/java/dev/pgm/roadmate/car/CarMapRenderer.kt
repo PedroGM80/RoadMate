@@ -3,12 +3,14 @@ package dev.pgm.roadmate.car
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Presentation
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.util.DisplayMetrics
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
@@ -120,10 +122,21 @@ class CarMapRenderer(
         val display = createVirtualDisplay(surfaceContainer, surface) ?: return
         virtualDisplay = display
 
-        val view = MapView(carContext, carMapOptions())
-        val screen = Presentation(carContext, display.display).apply {
-            setContentView(wrapWithSpeedHud(view))
-        }
+        // Everything drawn on the car surface is built from the
+        // *presentation's* context, never carContext.
+        //
+        // They have different densities, and that difference is not cosmetic.
+        // carContext carries the phone's (~2.75 on this handset); the virtual
+        // display carries the car's, which is usually 1.0. MapLibre reads the
+        // density off whatever context it is given and uses it as its pixel
+        // ratio, so a map built from carContext renders every road, label and
+        // pin at 2.75x — the map came out looking like it had been zoomed in
+        // on, with fat blue roads and pins the size of buildings. Same story
+        // for the sp and dp of the speed HUD.
+        val screen = Presentation(carContext, display.display)
+        val displayContext: Context = screen.context
+        val view = MapView(displayContext, carMapOptions(displayContext, surfaceContainer))
+        screen.setContentView(wrapWithSpeedHud(displayContext, view))
         try {
             screen.show()
         } catch (t: Throwable) {
@@ -169,8 +182,12 @@ class CarMapRenderer(
         )
     }
 
-    private fun carMapOptions(): MapLibreMapOptions =
-        MapLibreMapOptions.createFromAttributes(carContext)
+    private fun carMapOptions(context: Context, sc: SurfaceContainer): MapLibreMapOptions =
+        MapLibreMapOptions.createFromAttributes(context)
+            // Belt and braces with the context above: state the ratio the car
+            // actually has rather than trusting whatever density the options
+            // picked up. dpi/160 is the definition of density.
+            .pixelRatio(sc.dpi.coerceAtLeast(1).toFloat() / DisplayMetrics.DENSITY_DEFAULT)
             // See the class comment: SurfaceView does not composite here.
             .textureMode(true)
             .attributionEnabled(false)
@@ -183,9 +200,9 @@ class CarMapRenderer(
             .tiltGesturesEnabled(false)
 
     /** Puts [mapView] under a bottom-left speed readout, kept in [speedView]. */
-    private fun wrapWithSpeedHud(mapView: MapView): FrameLayout = FrameLayout(carContext).apply {
+    private fun wrapWithSpeedHud(context: Context, mapView: MapView): FrameLayout = FrameLayout(context).apply {
         addView(mapView)
-        val speed = TextView(carContext).apply {
+        val speed = TextView(context).apply {
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             setPadding(24, 12, 24, 12)

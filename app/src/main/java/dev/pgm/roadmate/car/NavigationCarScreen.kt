@@ -226,7 +226,10 @@ class NavigationCarScreen(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_no_places))
                     .addText(carContext.getString(R.string.car_map_needs_offline))
-                    .setImage(carIcon(R.drawable.lucide_ic_triangle_alert, CarColor.YELLOW))
+                    .setImage(
+                        carIcon(R.drawable.lucide_ic_triangle_alert, CarColor.YELLOW),
+                        Row.IMAGE_TYPE_ICON,
+                    )
                     .build()
             )
         }
@@ -259,11 +262,17 @@ class NavigationCarScreen(
         val kind = place.place.kind
         return Row.Builder()
             .setTitle(title.withDistance(place.metres))
+            // IMAGE_TYPE_ICON, not the default. `setImage(icon)` alone means
+            // IMAGE_TYPE_LARGE, which tells the host this is a photo — it
+            // scales the glyph to fill the row's image slot and a 24dp pin
+            // comes out the size of the text beside it. ICON is the type for
+            // a vector the host should tint and size as an icon.
             .setImage(
                 carIcon(
                     kind?.iconRes ?: R.drawable.lucide_ic_map_pin,
                     if (kind != null) CarColor.createCustom(kind.tint, kind.tint) else CarColor.DEFAULT
-                )
+                ),
+                Row.IMAGE_TYPE_ICON,
             )
             .setOnClickListener { routeTo(place.place) }
             .build()

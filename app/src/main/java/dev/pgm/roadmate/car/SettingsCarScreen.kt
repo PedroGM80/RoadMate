@@ -101,7 +101,7 @@ class SettingsCarScreen(
     private fun offlineMapRow(): Row = Row.Builder()
         .setTitle(carContext.getString(R.string.car_settings_offline_map))
         .addText(offlineMapText(offlineMap.status.value))
-        .setImage(carIcon(R.drawable.lucide_ic_map))
+        .setImage(carIcon(R.drawable.lucide_ic_map), Row.IMAGE_TYPE_ICON)
         .setBrowsable(true)
         .setOnClickListener { screenManager.push(offlineMapScreen()) }
         .build()
@@ -114,7 +114,7 @@ class SettingsCarScreen(
                     Row.Builder()
                         .setTitle(carContext.getString(R.string.car_settings_map_download))
                         .addText(offlineMapText(status))
-                        .setImage(carIcon(R.drawable.lucide_ic_download))
+                        .setImage(carIcon(R.drawable.lucide_ic_download), Row.IMAGE_TYPE_ICON)
                         .setOnClickListener(
                             ParkedOnlyOnClickListener.create { downloadAroundHere() }
                         )
@@ -125,7 +125,7 @@ class SettingsCarScreen(
                     Row.Builder()
                         .setTitle(carContext.getString(R.string.car_settings_map_delete))
                         .addText(carContext.getString(R.string.car_settings_map_delete_note))
-                        .setImage(carIcon(R.drawable.lucide_ic_square))
+                        .setImage(carIcon(R.drawable.lucide_ic_square), Row.IMAGE_TYPE_ICON)
                         .setOnClickListener(
                             ParkedOnlyOnClickListener.create {
                                 offlineMap.deleteAll()
@@ -158,7 +158,7 @@ class SettingsCarScreen(
         val builder = Row.Builder()
             .setTitle(carContext.getString(R.string.car_settings_local_ai))
             .addText(localAiText(status))
-            .setImage(carIcon(R.drawable.lucide_ic_cloud_off))
+            .setImage(carIcon(R.drawable.lucide_ic_cloud_off), Row.IMAGE_TYPE_ICON)
 
         if (status is LocalAiStatus.ModelDownloadable ||
             status is LocalAiStatus.DownloadFailed ||
@@ -196,7 +196,7 @@ class SettingsCarScreen(
     private fun modelPickerRow(): Row = Row.Builder()
         .setTitle(carContext.getString(R.string.car_settings_model))
         .addText(gemini.localAiModels.firstOrNull { it.id == selectedModelId }?.name.orEmpty())
-        .setImage(carIcon(R.drawable.lucide_ic_settings))
+        .setImage(carIcon(R.drawable.lucide_ic_settings), Row.IMAGE_TYPE_ICON)
         .setBrowsable(true)
         .setOnClickListener { screenManager.push(modelPickerScreen()) }
         .build()
@@ -237,7 +237,7 @@ class SettingsCarScreen(
     private fun answerStyleRow(): Row = Row.Builder()
         .setTitle(carContext.getString(R.string.car_settings_answer_style))
         .addText(carContext.getString(answerStyleLabel(answerStyle)))
-        .setImage(carIcon(R.drawable.lucide_ic_moon_star))
+        .setImage(carIcon(R.drawable.lucide_ic_moon_star), Row.IMAGE_TYPE_ICON)
         .setOnClickListener {
             val next = AnswerStyle.entries[(answerStyle.ordinal + 1) % AnswerStyle.entries.size]
             answerStyle = next
@@ -259,7 +259,7 @@ class SettingsCarScreen(
                 if (handsFree) R.string.car_settings_on else R.string.car_settings_off
             )
         )
-        .setImage(carIcon(R.drawable.lucide_ic_mic))
+        .setImage(carIcon(R.drawable.lucide_ic_mic), Row.IMAGE_TYPE_ICON)
         .setOnClickListener {
             handsFree = !handsFree
             invalidate()
