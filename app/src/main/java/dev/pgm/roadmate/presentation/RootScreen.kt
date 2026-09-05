@@ -49,14 +49,9 @@ import dev.pgm.roadmate.presentation.map.rememberMapPaneState
 import dev.pgm.roadmate.presentation.screen.HomeScreen
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 import dev.pgm.roadmate.presentation.viewmodel.SettingsViewModel
+import dev.pgm.roadmate.ui.theme.Spacing
 
-/**
- * Two destinations: the voice assistant ("Voz") and the offline map ("Mapa"),
- * under one [TopAppBar] that carries the settings overflow (theme, clear
- * memory). Phone width = tabs behind a bottom bar; from ~840dp both panes
- * show side by side and the nav chrome drops. One saved [tab] int, no nav
- * library.
- */
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RootScreen(
@@ -199,7 +194,7 @@ private fun SettingsMenu(
             localAiStatusText(localAiStatus),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = Spacing.md),
         )
         localAiModels.forEach { model ->
             DropdownMenuItem(
@@ -310,7 +305,7 @@ private fun MenuHeader(labelRes: Int) {
         stringResource(labelRes),
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
     )
 }
 

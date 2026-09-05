@@ -29,7 +29,7 @@ fun PermissionRequest(
             painter = painterResource(R.drawable.lucide_ic_mic),
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(48.dp),
+            modifier = Modifier.size(Spacing.touchTarget),
         )
         Text(
             text = stringResource(

@@ -40,6 +40,8 @@ import dev.pgm.roadmate.presentation.viewmodel.RoadMateUiState
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 import dev.pgm.roadmate.ui.rememberReduceMotion
 import dev.pgm.roadmate.ui.theme.Spacing
+import dev.pgm.roadmate.ui.theme.Dimens
+import dev.pgm.roadmate.ui.theme.IconSize
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -176,8 +178,8 @@ private fun GrantedContent(
             ) {
                 if (uiState.status == RoadMateStatus.PROCESSING) {
                     CircularProgressIndicator(
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(16.dp).padding(end = Spacing.sm),
+                        strokeWidth = Dimens.progressStroke,
+                        modifier = Modifier.size(IconSize.sm).padding(end = Spacing.sm),
                         color = MaterialTheme.colorScheme.secondary,
                     )
                 }

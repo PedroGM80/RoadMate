@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.ui.theme.Spacing
+import dev.pgm.roadmate.ui.theme.Dimens
 
 /**
  * One small line under the title telling the driver, honestly, where the
@@ -51,7 +52,7 @@ fun LocalAiStatusLabel(
                 )
                 LinearProgressIndicator(
                     progress = { status.progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.padding(top = Spacing.xs).width(220.dp),
+                    modifier = Modifier.padding(top = Spacing.xs).width(Dimens.statusLabelMaxWidth),
                 )
             }
 

@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.dp
  * bare `16.dp` so padding stays consistent and tweakable in one place.
  */
 object Spacing {
+    val none = 0.dp
     val xs = 4.dp
     val sm = 8.dp
     val md = 16.dp

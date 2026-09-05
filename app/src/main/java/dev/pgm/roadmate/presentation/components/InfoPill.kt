@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.pgm.roadmate.ui.theme.IconSize
 import dev.pgm.roadmate.ui.theme.Spacing
 
 /**
@@ -51,12 +52,12 @@ fun InfoPill(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null) {
-                Icon(painter = icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(painter = icon, contentDescription = null, modifier = Modifier.size(IconSize.sm))
             }
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                modifier = Modifier.padding(start = if (icon != null) Spacing.xs else 0.dp),
+                modifier = Modifier.padding(start = if (icon != null) Spacing.xs else Spacing.none),
             )
         }
     }

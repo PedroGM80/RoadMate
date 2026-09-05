@@ -58,6 +58,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import dev.pgm.roadmate.ui.theme.Dimens
+import dev.pgm.roadmate.ui.theme.Elevation
+import dev.pgm.roadmate.ui.theme.IconSize
 import dev.pgm.roadmate.ui.theme.Spacing
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
@@ -386,15 +389,15 @@ fun MapScreen(
                     modifier = Modifier.align(Alignment.TopCenter),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.secondaryContainer,
-                    tonalElevation = 3.dp,
+                    tonalElevation = Elevation.medium,
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(IconSize.sm),
+                            strokeWidth = Dimens.progressStroke,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
                         Spacer(Modifier.width(Spacing.sm))
@@ -411,7 +414,7 @@ fun MapScreen(
                     modifier = Modifier.align(Alignment.TopCenter),
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.secondaryContainer,
-                    tonalElevation = 3.dp,
+                    tonalElevation = Elevation.medium,
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
@@ -423,7 +426,7 @@ fun MapScreen(
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
                         )
                         Spacer(Modifier.width(Spacing.sm))
-                        IconButton(onClick = viewModel::clearRoute, modifier = Modifier.size(20.dp)) {
+                        IconButton(onClick = viewModel::clearRoute, modifier = Modifier.size(IconSize.md)) {
                             Icon(
                                 painterResource(R.drawable.lucide_ic_square),
                                 contentDescription = stringResource(R.string.action_cancel),
@@ -474,7 +477,7 @@ fun MapScreen(
                 Surface(
                     shape = MaterialTheme.shapes.large,
                     color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    shadowElevation = 2.dp,
+                    shadowElevation = Elevation.low,
                 ) {
                     Row(
                         modifier = Modifier
@@ -490,7 +493,7 @@ fun MapScreen(
                                     Icon(
                                         painterResource(kind.iconRes),
                                         contentDescription = stringResource(kind.labelRes),
-                                        modifier = Modifier.size(20.dp),
+                                        modifier = Modifier.size(IconSize.md),
                                     )
                                 },
                             )
@@ -532,7 +535,7 @@ private fun OfflineStatusChip(status: OfflineMapStatus, modifier: Modifier = Mod
         modifier = modifier,
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 2.dp,
+        shadowElevation = Elevation.low,
     ) {
         Column(modifier = Modifier.padding(horizontal = Spacing.md - Spacing.xs, vertical = Spacing.sm)) {
             Text(
@@ -832,14 +835,14 @@ private fun MapControls(
         Surface(
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shadowElevation = 2.dp,
+            shadowElevation = Elevation.low,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 IconButton(
                     onClick = onZoomIn,
                     modifier = Modifier.semantics { contentDescription = zoomInLabel },
                 ) { Text("+", style = MaterialTheme.typography.titleLarge) }
-                HorizontalDivider(modifier = Modifier.width(24.dp))
+                HorizontalDivider(modifier = Modifier.width(Dimens.routeDividerWidth))
                 IconButton(
                     onClick = onZoomOut,
                     modifier = Modifier.semantics { contentDescription = zoomOutLabel },
@@ -849,7 +852,7 @@ private fun MapControls(
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
-            shadowElevation = 2.dp,
+            shadowElevation = Elevation.low,
         ) {
             IconButton(onClick = onRecenter) {
                 Icon(

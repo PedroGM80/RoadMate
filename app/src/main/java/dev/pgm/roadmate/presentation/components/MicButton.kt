@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.audio.Earcon
 import dev.pgm.roadmate.ui.theme.Spacing
+import dev.pgm.roadmate.ui.theme.Dimens
+import dev.pgm.roadmate.ui.theme.IconSize
 import androidx.compose.ui.graphics.graphicsLayer
 
 
@@ -79,7 +81,7 @@ fun MicButton(
             if (isListening && !reduceMotion) {
                 Box(
                     modifier = Modifier
-                        .size(96.dp)
+                        .size(Dimens.micPulseRing)
                         .scale(pulseScale)
                         .background(
                             MaterialTheme.colorScheme.secondary.copy(alpha = 0.22f),
@@ -110,7 +112,7 @@ fun MicButton(
                         MaterialTheme.colorScheme.onSecondary
                     },
                 ),
-                modifier = Modifier.size(80.dp).graphicsLayer {
+                modifier = Modifier.size(Dimens.micButton).graphicsLayer {
                     scaleX = pressScale; scaleY = pressScale
                 },
             ) {
@@ -121,7 +123,7 @@ fun MicButton(
                     contentDescription = stringResource(
                         if (isListening) R.string.mic_stop else R.string.mic_start,
                     ),
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(IconSize.xl),
                 )
             }
         }
@@ -146,7 +148,7 @@ private fun ListeningDot(
     )
     Box(
         modifier = modifier
-            .size(10.dp)
+            .size(Dimens.listeningDot)
             .scale(if (visible) scale else 1f)
             .clip(CircleShape)
             .background(
