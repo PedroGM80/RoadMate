@@ -19,7 +19,6 @@ import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
-import dev.pgm.roadmate.domain.repository.MessagingRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.ReminderRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
@@ -150,21 +149,6 @@ class FakePhoneCallRepository(
 
     override fun placeCall(phoneNumber: String) {
         placedCallTo = phoneNumber
-    }
-}
-
-class FakeMessagingRepository(
-    private val hasPermission: Boolean = true,
-    private val canSend: Boolean = true,
-) : MessagingRepository {
-    var sentTo: String? = null
-    var sentBody: String? = null
-    override fun hasSmsPermission(): Boolean = hasPermission
-    override fun sendSms(phoneNumber: String, body: String): Boolean {
-        if (!hasPermission || !canSend) return false
-        sentTo = phoneNumber
-        sentBody = body
-        return true
     }
 }
 

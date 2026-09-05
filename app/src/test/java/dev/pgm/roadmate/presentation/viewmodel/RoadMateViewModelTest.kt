@@ -56,7 +56,6 @@ class RoadMateViewModelTest {
             FakeAssistantPreferencesRepository(),
             FakeMemoryRepository(),
             FakeWeatherRepository(),
-            dev.pgm.roadmate.presentation.viewmodel.fake.FakeMessagingRepository(),
             dev.pgm.roadmate.presentation.viewmodel.fake.FakeReminderRepository(),
         dev.pgm.roadmate.presentation.viewmodel.fake.FakeCalendarRepository()
         )

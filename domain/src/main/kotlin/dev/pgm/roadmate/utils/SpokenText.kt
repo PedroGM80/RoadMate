@@ -94,12 +94,6 @@ object SpokenText {
     fun calendarToday(list: String) = "Hoy tienes: $list."
     fun calendarNext(event: String) = "Tu próxima cita: $event."
 
-    // Text messages ("dile a Ana que…")
-    const val SMS_NO_PERMISSION =
-        "No puedo enviar mensajes sin permiso. Actívalo en ajustes: SMS."
-    fun messageSent(name: String) = "Mensaje enviado a $name."
-    const val MESSAGE_FAILED = "No he podido enviar el mensaje."
-
     // Parking ("he aparcado aquí" / "¿dónde aparqué?")
     const val PARKING_SAVED = "Vale, guardo dónde has aparcado."
     const val PARKING_NO_FIX_TO_SAVE = "No tengo tu ubicación ahora mismo. Prueba cuando haya señal."

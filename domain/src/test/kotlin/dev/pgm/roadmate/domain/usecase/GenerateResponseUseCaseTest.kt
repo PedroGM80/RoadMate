@@ -6,7 +6,6 @@ import dev.pgm.roadmate.domain.fake.FakeMapSearchCoordinator
 import dev.pgm.roadmate.domain.fake.FakeMediaRepository
 import dev.pgm.roadmate.domain.fake.FakeCalendarRepository
 import dev.pgm.roadmate.domain.fake.FakeMemoryRepository
-import dev.pgm.roadmate.domain.fake.FakeMessagingRepository
 import dev.pgm.roadmate.domain.fake.FakePhoneCallRepository
 import dev.pgm.roadmate.domain.fake.FakeReminderRepository
 import dev.pgm.roadmate.domain.fake.FakeSpeechSynthesisRepository
@@ -43,7 +42,6 @@ class GenerateResponseUseCaseTest {
         assistantPreferencesRepository: FakeAssistantPreferencesRepository = FakeAssistantPreferencesRepository(),
         memoryRepository: FakeMemoryRepository = FakeMemoryRepository(),
         weatherRepository: FakeWeatherRepository = FakeWeatherRepository(),
-        messagingRepository: FakeMessagingRepository = FakeMessagingRepository(),
         reminderRepository: FakeReminderRepository = FakeReminderRepository(),
         calendarRepository: FakeCalendarRepository = FakeCalendarRepository()
     ) = GenerateResponseUseCase(
@@ -55,7 +53,6 @@ class GenerateResponseUseCaseTest {
         assistantPreferencesRepository,
         memoryRepository,
         weatherRepository,
-        messagingRepository,
         reminderRepository,
         calendarRepository
     )
@@ -109,31 +106,6 @@ class GenerateResponseUseCaseTest {
         val emitted = useCase(gemini, weatherRepository = weather)(context, "¿qué tiempo hace en Narnia?").toList()
 
         assertEquals(listOf("No consigo el tiempo de Narnia ahora mismo."), emitted)
-    }
-
-    @Test
-    fun `"dile a X que Y" sends an SMS to the resolved contact`() = runTest {
-        val phone = FakePhoneCallRepository(
-            lookupResult = ContactLookupResult.Found(ContactMatch("Ana García", "600111222")),
-        )
-        val sms = FakeMessagingRepository()
-
-        val emitted = useCase(phoneCallRepository = phone, messagingRepository = sms)(
-            context, "dile a Ana que llego en veinte minutos",
-        ).toList()
-
-        assertEquals(listOf("Mensaje enviado a Ana García."), emitted)
-        assertEquals("600111222", sms.sentTo)
-        assertEquals("llego en veinte minutos", sms.sentBody)
-    }
-
-    @Test
-    fun `a message to an unknown contact is not sent`() = runTest {
-        val sms = FakeMessagingRepository()
-        val emitted = useCase(messagingRepository = sms)(context, "manda un mensaje a Nadie: hola").toList()
-
-        assertEquals(listOf("No encuentro a Nadie en tus contactos."), emitted)
-        assertNull(sms.sentTo)
     }
 
     @Test

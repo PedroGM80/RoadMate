@@ -32,7 +32,6 @@ class DetectSilenceUseCaseTest {
             FakeAssistantPreferencesRepository(),
             FakeMemoryRepository(),
             FakeWeatherRepository(),
-            dev.pgm.roadmate.domain.fake.FakeMessagingRepository(),
             dev.pgm.roadmate.domain.fake.FakeReminderRepository(),
         dev.pgm.roadmate.domain.fake.FakeCalendarRepository()
         )
@@ -56,7 +55,6 @@ class DetectSilenceUseCaseTest {
             FakeAssistantPreferencesRepository(),
             FakeMemoryRepository(),
             FakeWeatherRepository(),
-            dev.pgm.roadmate.domain.fake.FakeMessagingRepository(),
             dev.pgm.roadmate.domain.fake.FakeReminderRepository(),
         dev.pgm.roadmate.domain.fake.FakeCalendarRepository()
         )

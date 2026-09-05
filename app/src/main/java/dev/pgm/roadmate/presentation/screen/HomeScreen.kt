@@ -66,7 +66,6 @@ fun HomeScreen(
         listOf(
             Manifest.permission.CALL_PHONE,
             Manifest.permission.READ_CONTACTS,
-            Manifest.permission.SEND_SMS,
             Manifest.permission.READ_CALENDAR,
         ),
     )

@@ -22,7 +22,6 @@ import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
 import dev.pgm.roadmate.domain.repository.MediaRepository
 import dev.pgm.roadmate.domain.repository.RoutingRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
-import dev.pgm.roadmate.domain.repository.MessagingRepository
 import dev.pgm.roadmate.domain.repository.PhoneCallRepository
 import dev.pgm.roadmate.domain.repository.SilenceDetectionRepository
 import dev.pgm.roadmate.domain.repository.SpeechRecognitionRepository
@@ -143,15 +142,6 @@ class FakePhoneCallRepository(
     override suspend fun findContactByName(name: String): ContactLookupResult = lookupResult
     override fun placeCall(phoneNumber: String) {
         placedCallTo = phoneNumber
-    }
-}
-
-class FakeMessagingRepository : MessagingRepository {
-    var sentTo: String? = null
-    var sentBody: String? = null
-    override fun hasSmsPermission(): Boolean = true
-    override fun sendSms(phoneNumber: String, body: String): Boolean {
-        sentTo = phoneNumber; sentBody = body; return true
     }
 }
 
