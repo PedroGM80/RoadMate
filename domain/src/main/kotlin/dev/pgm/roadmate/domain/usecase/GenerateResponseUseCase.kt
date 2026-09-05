@@ -36,6 +36,7 @@ import dev.pgm.roadmate.utils.ParkingIntentParser
 import dev.pgm.roadmate.utils.PlaybackCommandParser
 import dev.pgm.roadmate.utils.ReminderIntentParser
 import dev.pgm.roadmate.utils.PlaceName
+import dev.pgm.roadmate.utils.PlaybackCommandParser.Command
 import dev.pgm.roadmate.utils.PromptBuilder
 import dev.pgm.roadmate.utils.SentenceChunker
 import dev.pgm.roadmate.utils.spanishRegex
@@ -51,56 +52,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import javax.inject.Inject
 
-/** Speech-rate bounds and per-nudge step for "más despacio" / "más rápido". */
 private const val MIN_RATE = 0.6f
 private const val MAX_RATE = 1.6f
 private const val RATE_STEP = 0.15f
 
-/**
- * Builds a prompt from [TravelContext], asks the on-device model for a
- * response, speaks it aloud, and emits the response text for the UI to
- * display. Real questions are streamed: the answer is spoken sentence by
- * sentence as the model produces it (see [streamGeminiAnswer]) rather than
- * after the whole reply, and each emission carries the cumulative text.
- *
- * Local shortcuts are checked before ever touching Gemini, in this order:
- *  1. "llama a X" — placed directly (ACTION_CALL, no dial-pad confirmation,
- *     by design: hands-free while driving). Ambiguous/missing contacts get a
- *     spoken explanation instead of guessing who to call.
- *  2. "busca/encuentra X" — shown on RoadMate's own downloaded offline map,
- *     never an external Maps app. A category ("gasolineras", "hoteles",
- *     "restaurantes") becomes a POI filter; anything else is matched by name
- *     against the downloaded tiles. With no region downloaded, RoadMate says
- *     so instead of falling back to another app.
- *  3. "abre/pon Spotify|YouTube Music" — launches that music app. Just opens
- *     it (no playback control), and says so. A bare "pon música" that names
- *     no app opens whichever known one is installed.
- *  4. Joke requests — answered from JokeProvider's local bank.
- *  5. "respuestas cortas / normales / con más detalle" — persists an
- *     [AssistantPreferencesRepository] setting and acknowledges it; that
- *     setting then shapes every future Gemini answer's length.
- *  6. Memory management — "recuerda que…" / "prefiero…" / "olvida lo de…" /
- *     "¿qué sabes de mí?" (PREFERENCE facts), "esta es mi casa" / "aquí es
- *     mi trabajo" (HOME/WORK, from the current location), "X es mi hermano"
- *     (RELATIONSHIP, so "llama a mi hermano" then resolves to X). Everything
- *     stored is fed into future Gemini prompts.
- *  7. "¿qué tiempo hace?" / "¿va a llover?" — answered straight from the
- *     weather already in [TravelContext], not by the model (which often
- *     can't, and in "modo básico" there's no model). Plain "no puedo
- *     consultar el tiempo" when there's no fix / network / API key.
- * All of these work identically whether or not this device has on-device AI,
- * unlike every other question, which falls back to GeminiNanoManager's
- * generic FALLBACK_RESPONSE in "modo básico".
- *
- * Real questions (the Gemini path) are also given the last few exchanges
- * from [MemoryRepository] for continuity, and the new question/answer pair
- * is written back to it. The shortcuts aren't remembered — they're actions,
- * not conversation.
- *
- * Holds one bit of state, [pendingCall]: when "llama a X" is ambiguous the
- * candidate list is kept so the next utterance ("la segunda", "García") can
- * finish the call. Per-instance, which is exactly the voice loop's scope.
- */
 class GenerateResponseUseCase @Inject constructor(
     private val geminiRepository: GeminiRepository,
     private val speechSynthesisRepository: SpeechSynthesisRepository,
@@ -221,26 +176,26 @@ class GenerateResponseUseCase @Inject constructor(
      * "voz normal" nudge the speech rate and persist it. All spoken and shown
      * like any other one-line reply.
      */
-    private suspend fun handlePlaybackCommand(command: PlaybackCommandParser.Command): String {
-        if (command == PlaybackCommandParser.Command.REPEAT) {
+    private suspend fun handlePlaybackCommand(command: Command): String {
+        if (command == Command.REPEAT) {
             return lastAnswer ?: SpokenText.NOTHING_TO_REPEAT
         }
         val current = assistantPreferencesRepository.speechRate.first()
         val target = when (command) {
-            PlaybackCommandParser.Command.SLOWER -> current - RATE_STEP
-            PlaybackCommandParser.Command.FASTER -> current + RATE_STEP
-            PlaybackCommandParser.Command.NORMAL_SPEED -> 1.0f
-            PlaybackCommandParser.Command.REPEAT -> current // unreachable
+            Command.SLOWER -> current - RATE_STEP
+            Command.FASTER -> current + RATE_STEP
+            Command.NORMAL_SPEED -> 1.0f
+            Command.REPEAT -> current // unreachable
         }.coerceIn(MIN_RATE, MAX_RATE)
 
-        if (target == current && command != PlaybackCommandParser.Command.NORMAL_SPEED) {
+        if (target == current && command != Command.NORMAL_SPEED) {
             return SpokenText.SPEECH_RATE_LIMIT
         }
         assistantPreferencesRepository.setSpeechRate(target)
         speechSynthesisRepository.setSpeechRate(target)
         return when (command) {
-            PlaybackCommandParser.Command.SLOWER -> SpokenText.SPEECH_SLOWER
-            PlaybackCommandParser.Command.FASTER -> SpokenText.SPEECH_FASTER
+            Command.SLOWER -> SpokenText.SPEECH_SLOWER
+            Command.FASTER -> SpokenText.SPEECH_FASTER
             else -> SpokenText.SPEECH_NORMAL_SPEED
         }
     }

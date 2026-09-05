@@ -31,7 +31,7 @@ object WeatherIntentParser {
             """hace\s+(?:frío|frio|calor|sol|bueno|mal\s+tiempo|buen\s+tiempo))""",
     )
 
-    /** "cuánto tiempo", "a tiempo", "tiempo libre", "el tiempo de viaje"… — not weather. */
+    /** "Cuánto tiempo", "a tiempo", "tiempo libre", "el tiempo de viaje"… — not weather. */
     private val NOT_WEATHER_TIEMPO = spanishRegex(
         """\b(?:cu[aá]nto\s+tiempo|a\s+tiempo|""" +
             """tiempo\s+(?:libre|restante|que\s+queda|para\s+llegar|""" +
