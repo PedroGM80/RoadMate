@@ -141,6 +141,8 @@ class MapViewModel @Inject constructor(
                                 "Descargando mapa de ruta… ${(st.progress * 100).roundToInt()}%"
                         RoutingDataStatus.WaitingForWifi ->
                             _routeSummary.value = "Necesito Wi-Fi para el mapa de ruta de esta zona."
+                        RoutingDataStatus.NoNetwork ->
+                            _routeSummary.value = "Sin conexión para el mapa de ruta de esta zona."
                         else -> Unit
                     }
                 }
@@ -151,6 +153,7 @@ class MapViewModel @Inject constructor(
                 _route.value = emptyList()
                 val line = when (routingRepository.dataStatus.value) {
                     RoutingDataStatus.WaitingForWifi -> SpokenText.ROUTE_NEEDS_WIFI
+                    RoutingDataStatus.NoNetwork -> SpokenText.ROUTE_NO_NETWORK
                     is RoutingDataStatus.Failed -> SpokenText.ROUTE_DOWNLOAD_FAILED
                     else -> SpokenText.ROUTE_NOT_POSSIBLE
                 }

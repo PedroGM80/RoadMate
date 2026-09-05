@@ -209,6 +209,12 @@ class FakeMediaRepository(
 class FakeAssistantPreferencesRepository : AssistantPreferencesRepository {
     private val styleFlow = MutableStateFlow(AnswerStyle.DEFAULT)
     override val answerStyle: StateFlow<AnswerStyle> = styleFlow
+
+    private val routeDataOverMobileFlow = MutableStateFlow(true)
+    override val routeDataOverMobile: StateFlow<Boolean> = routeDataOverMobileFlow
+    override suspend fun setRouteDataOverMobile(enabled: Boolean) {
+        routeDataOverMobileFlow.value = enabled
+    }
     override suspend fun setAnswerStyle(style: AnswerStyle) {
         styleFlow.value = style
     }

@@ -27,4 +27,14 @@ interface AssistantPreferencesRepository {
     /** How fast the assistant speaks; 1.0 is normal. Adjusted by "más despacio" / "más rápido". */
     val speechRate: Flow<Float>
     suspend fun setSpeechRate(rate: Float)
+
+    /**
+     * Whether routing-map tiles may be downloaded over mobile data. Defaults
+     * to on: the tiles are only needed for an area the driver is actually in,
+     * and a car in that area is on mobile data by definition — waiting for
+     * Wi-Fi meant routing never worked on the road at all. Off is for drivers
+     * on a tight data plan, who can pre-download at home instead.
+     */
+    val routeDataOverMobile: Flow<Boolean>
+    suspend fun setRouteDataOverMobile(enabled: Boolean)
 }

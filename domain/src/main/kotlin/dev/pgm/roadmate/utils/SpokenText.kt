@@ -43,6 +43,9 @@ object SpokenText {
         "Conéctate a Wi-Fi para descargar el mapa de ruta de esta zona."
     const val ROUTE_DOWNLOAD_FAILED = "No pude descargar el mapa de ruta."
 
+    const val ROUTE_NO_NETWORK =
+        "No tengo el mapa de esta zona y ahora mismo no hay conexión para descargarlo."
+
     // Weather
     fun weatherNow(description: String) = "Ahora mismo: $description."
     fun weatherAt(place: String, description: String) = "En $place: $description."

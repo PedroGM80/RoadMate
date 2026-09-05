@@ -83,6 +83,8 @@ class FakeCarPreferencesRepository : AssistantPreferencesRepository {
     override suspend fun setLocalAiModelId(id: String) = Unit
     override val speechRate = flowOf(1.0f)
     override suspend fun setSpeechRate(rate: Float) = Unit
+    override val routeDataOverMobile = flowOf(true)
+    override suspend fun setRouteDataOverMobile(enabled: Boolean) = Unit
 }
 
 class FakeCarGeminiRepository : GeminiRepository {

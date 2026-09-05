@@ -219,6 +219,12 @@ class FakeAssistantPreferencesRepository(
         localAiModelFlow.value = id
     }
 
+    val routeDataOverMobileFlow = MutableStateFlow(true)
+    override val routeDataOverMobile: StateFlow<Boolean> = routeDataOverMobileFlow
+    override suspend fun setRouteDataOverMobile(enabled: Boolean) {
+        routeDataOverMobileFlow.value = enabled
+    }
+
     val speechRateFlow = MutableStateFlow(1.0f)
     override val speechRate: StateFlow<Float> = speechRateFlow
     override suspend fun setSpeechRate(rate: Float) {

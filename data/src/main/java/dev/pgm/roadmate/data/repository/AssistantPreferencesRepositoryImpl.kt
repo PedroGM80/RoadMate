@@ -63,7 +63,17 @@ class AssistantPreferencesRepositoryImpl @Inject constructor(
         }
     }
 
+    override val routeDataOverMobile: Flow<Boolean> =
+        context.roadMatePreferencesDataStore.data.map { prefs ->
+            prefs[ROUTE_DATA_OVER_MOBILE_KEY] ?: true
+        }
+
+    override suspend fun setRouteDataOverMobile(enabled: Boolean) {
+        context.roadMatePreferencesDataStore.edit { it[ROUTE_DATA_OVER_MOBILE_KEY] = enabled }
+    }
+
     private companion object {
+        val ROUTE_DATA_OVER_MOBILE_KEY = booleanPreferencesKey("route_data_over_mobile")
         val ANSWER_STYLE_KEY = stringPreferencesKey("answer_style")
         val THEME_KEY = stringPreferencesKey("theme_preference")
         val HANDS_FREE_KEY = booleanPreferencesKey("hands_free_enabled")

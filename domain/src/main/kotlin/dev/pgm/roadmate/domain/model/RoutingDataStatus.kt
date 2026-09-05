@@ -15,8 +15,16 @@ sealed interface RoutingDataStatus {
     /** The tiles a route asked for are on disk. */
     data object Ready : RoutingDataStatus
 
-    /** Download is held until an unmetered (Wi-Fi) network is available. */
+    /**
+     * Download is held until Wi-Fi is available, because the driver turned
+     * off "descargar con datos móviles". Only ever reached by choice — the
+     * default allows mobile data, since a car on the road has no Wi-Fi and
+     * gating on it made routing fail exactly where it is needed.
+     */
     data object WaitingForWifi : RoutingDataStatus
+
+    /** No usable connection at all, so a missing tile can't be fetched. */
+    data object NoNetwork : RoutingDataStatus
 
     /** The tile download failed; [message] is a short human-readable reason. */
     data class Failed(val message: String) : RoutingDataStatus
