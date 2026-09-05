@@ -6,19 +6,13 @@ import androidx.car.app.navigation.model.Step
 import dev.pgm.roadmate.domain.model.RouteManeuver
 import dev.pgm.roadmate.domain.model.RouteStep
 import dev.pgm.roadmate.domain.model.UserLocation
-import kotlin.math.asin
-import kotlin.math.cos
-import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * Translation between RoadMate's [RouteStep] / [RouteManeuver] and the Car App
  * Library's navigation types, plus the Spanish wording and distance formatting
  * for spoken and on-card instructions. Pure — no state.
  */
-private const val EARTH_RADIUS_M = 6_371_000.0
 
 internal fun stepFor(step: RouteStep): Step = Step.Builder()
     .setCue(phrase(step))
@@ -110,11 +104,5 @@ internal fun distanceOf(metres: Double): Distance =
         Distance.create(metres, Distance.UNIT_METERS)
     }
 
-internal fun metresBetween(from: UserLocation, to: RouteStep): Double {
-    val dLat = Math.toRadians(to.latitude - from.latitude)
-    val dLon = Math.toRadians(to.longitude - from.longitude)
-    val a = sin(dLat / 2).let { it * it } +
-        cos(Math.toRadians(from.latitude)) * cos(Math.toRadians(to.latitude)) *
-        sin(dLon / 2).let { it * it }
-    return 2 * EARTH_RADIUS_M * asin(min(1.0, sqrt(a)))
-}
+internal fun metresBetween(from: UserLocation, to: RouteStep): Double =
+    haversineMetres(from.latitude, from.longitude, to.latitude, to.longitude)

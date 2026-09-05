@@ -33,12 +33,6 @@ import dev.pgm.roadmate.presentation.map.OfflineMapController
 import dev.pgm.roadmate.presentation.map.PoiKind
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import kotlin.math.asin
-import kotlin.math.cos
-import kotlin.math.min
-import kotlin.math.roundToInt
-import kotlin.math.sin
-import kotlin.math.sqrt
 
 /**
  * RoadMate's own map on the car screen, with its own controls.
@@ -308,7 +302,7 @@ class NavigationCarScreen(
     private fun nearbyPlaces(): List<PlacedAt> {
         val loc = locationRepository.location.value ?: return emptyList()
         return renderer.pinnedPlaces()
-            .map { PlacedAt(it, metresBetween(loc.latitude, loc.longitude, it.latitude, it.longitude)) }
+            .map { PlacedAt(it, haversineMetres(loc.latitude, loc.longitude, it.latitude, it.longitude)) }
             .sortedBy { it.metres }
             .take(MAX_PLACES)
     }
@@ -388,15 +382,6 @@ class NavigationCarScreen(
         invalidate()
     }
 
-    private fun formatDistance(metres: Int): String =
-        if (metres < 1000) "$metres m" else "%,.1f km".format(metres / 1000.0)
-
-    private fun formatDuration(seconds: Int): String {
-        val minutes = (seconds / 60.0).roundToInt().coerceAtLeast(1)
-        if (minutes < 60) return "$minutes min"
-        return "${minutes / 60} h ${minutes % 60} min"
-    }
-
     private fun PlaceCategory.carIconRes(): Int = when (this) {
         PlaceCategory.FUEL -> R.drawable.ic_gas_station
         PlaceCategory.HOTEL -> R.drawable.ic_hotel
@@ -432,20 +417,5 @@ class NavigationCarScreen(
         /** Enough to choose from without turning the list into reading. */
         const val MAX_PLACES = 6
 
-        const val EARTH_RADIUS_M = 6_371_000.0
-    }
-
-    private fun metresBetween(
-        fromLat: Double,
-        fromLon: Double,
-        toLat: Double,
-        toLon: Double,
-    ): Double {
-        val dLat = Math.toRadians(toLat - fromLat)
-        val dLon = Math.toRadians(toLon - fromLon)
-        val a = sin(dLat / 2).let { it * it } +
-            cos(Math.toRadians(fromLat)) * cos(Math.toRadians(toLat)) *
-            sin(dLon / 2).let { it * it }
-        return 2 * EARTH_RADIUS_M * asin(min(1.0, sqrt(a)))
     }
 }
