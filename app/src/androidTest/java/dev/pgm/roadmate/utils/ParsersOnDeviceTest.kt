@@ -2,6 +2,7 @@ package dev.pgm.roadmate.utils
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dev.pgm.roadmate.domain.model.TravelContext
+import dev.pgm.roadmate.domain.model.UserLocation
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -25,7 +26,7 @@ import java.util.Date
 class ParsersOnDeviceTest {
 
     private val ctx = TravelContext(
-        currentLocation = 36.46 to -6.19, hour = 12, minute = 0, date = Date(), userInput = "",
+        currentLocation = UserLocation(36.46, -6.19), hour = 12, minute = 0, date = Date(), userInput = "",
     )
 
     @Test

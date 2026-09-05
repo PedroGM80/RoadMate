@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.pgm.roadmate.domain.model.ThemePreference
+import dev.pgm.roadmate.domain.model.UserLocation
 import kotlinx.coroutines.delay
 import java.time.ZonedDateTime
 import kotlin.time.Duration.Companion.milliseconds
@@ -31,7 +32,7 @@ import kotlin.time.Duration.Companion.milliseconds
 @Composable
 fun rememberIsDarkTheme(
     preference: ThemePreference,
-    location: Pair<Double, Double>?,
+    location: UserLocation?,
 ): Boolean {
     val systemDark = isSystemInDarkTheme()
     var autoNight by remember { mutableStateOf(ThemePreference.isNight(ZonedDateTime.now(), location)) }

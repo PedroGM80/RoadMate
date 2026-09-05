@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
+import dev.pgm.roadmate.domain.model.UserLocation
 import dev.pgm.roadmate.domain.repository.OnboardingRepository
 import dev.pgm.roadmate.presentation.map.MapViewModel
 import dev.pgm.roadmate.presentation.screen.OnboardingScreen

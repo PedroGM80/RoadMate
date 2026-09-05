@@ -8,7 +8,7 @@
         errorLine2="              ~~~~~~~~~">
         <location
             file="src/main/java/dev/pgm/roadmate/presentation/viewmodel/RoadMateViewModel.kt"
-            line="494"
+            line="496"
             column="15"/>
     </issue>
 
@@ -30,7 +30,7 @@
         errorLine2="               ~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/dev/pgm/roadmate/data/datasource/local/LocationDataSource.kt"
-            line="29"
+            line="31"
             column="16"/>
     </issue>
 
@@ -41,7 +41,7 @@
         errorLine2="                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/dev/pgm/roadmate/presentation/map/MapScreen.kt"
-            line="267"
+            line="269"
             column="45"/>
     </issue>
 
@@ -52,7 +52,7 @@
         errorLine2="                    ~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/dev/pgm/roadmate/presentation/map/MapScreen.kt"
-            line="152"
+            line="154"
             column="21"/>
     </issue>
 
@@ -63,7 +63,7 @@
         errorLine2="                                             ~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/dev/pgm/roadmate/presentation/map/MapScreen.kt"
-            line="462"
+            line="464"
             column="46"/>
     </issue>
 
@@ -74,7 +74,7 @@
         errorLine2="    ~~~~~~~~">
         <location
             file="src/main/java/dev/pgm/roadmate/presentation/map/MapScreen.kt"
-            line="117"
+            line="119"
             column="5"/>
     </issue>
 
@@ -204,23 +204,12 @@
 
     <issue
         id="UnusedResources"
-        message="The resource `R.string.car_listen` appears to be unused"
-        errorLine1="    &lt;string name=&quot;car_listen&quot;>Escuchar&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="108"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
         message="The resource `R.string.car_stop` appears to be unused"
         errorLine1="    &lt;string name=&quot;car_stop&quot;>Parar&lt;/string>"
         errorLine2="            ~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
-            line="109"
+            line="117"
             column="13"/>
     </issue>
 
@@ -231,7 +220,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
-            line="110"
+            line="118"
             column="13"/>
     </issue>
 
@@ -242,7 +231,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
-            line="112"
+            line="120"
             column="13"/>
     </issue>
 
@@ -253,18 +242,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
-            line="113"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="UnusedResources"
-        message="The resource `R.string.car_map_needs_offline` appears to be unused"
-        errorLine1="    &lt;string name=&quot;car_map_needs_offline&quot;>Descarga la zona en el móvil para buscar sitios sin conexión.&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="116"
+            line="121"
             column="13"/>
     </issue>
 
@@ -275,7 +253,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
-            line="122"
+            line="130"
             column="13"/>
     </issue>
 
@@ -286,7 +264,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/res/values/strings.xml"
-            line="123"
+            line="131"
             column="13"/>
     </issue>
 
@@ -304,7 +282,7 @@
         errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/java/dev/pgm/roadmate/presentation/map/MapScreen.kt"
-            line="983"
+            line="991"
             column="22"/>
     </issue>
 

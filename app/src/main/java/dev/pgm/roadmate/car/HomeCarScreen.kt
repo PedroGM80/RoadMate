@@ -16,7 +16,6 @@ import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
 import androidx.car.app.navigation.model.MapController
 import androidx.car.app.navigation.model.MapWithContentTemplate
-import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.lifecycleScope
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.domain.model.TravelContext
@@ -93,6 +92,17 @@ class HomeCarScreen(
      */
     private var busyLabelRes: Int? = null
 
+    private val SUGGESTIONS by lazy {
+        listOf(
+            carContext.getString(R.string.car_suggestion_1),
+            carContext.getString(R.string.car_suggestion_2),
+            carContext.getString(R.string.car_suggestion_3),
+            carContext.getString(R.string.car_suggestion_4),
+            carContext.getString(R.string.car_suggestion_5),
+            carContext.getString(R.string.car_suggestion_6),
+        )
+    }
+
     private val micIcon = carIcon(R.drawable.lucide_ic_mic, CarColor.DEFAULT)
 
     // The lucide vectors are stroked in black, so they only look right once the
@@ -142,7 +152,7 @@ class HomeCarScreen(
                 }
             }
         }
-        lifecycleScope.launch { runCatching { locationRepository.getCurrentCoordinates() } }
+        lifecycleScope.launch { runCatching { locationRepository.currentLocation() } }
     }
 
     /**
@@ -273,12 +283,32 @@ class HomeCarScreen(
      * self-evident.
      */
     private fun messageBody(): CarText {
-        val transcript = lastRecognizedInput ?: return CarText.create(statusText)
+        val transcript = lastRecognizedInput ?: return idleMessage()
         val text = SpannableString("“$transcript”\n\n$statusText")
         text.setSpan(
             ForegroundCarColorSpan.create(CarColor.PRIMARY),
             0,
             transcript.length + 2, // including the quotes
+            Spanned.SPAN_INCLUSIVE_EXCLUSIVE
+        )
+        return CarText.create(text)
+    }
+
+    /**
+     * When waiting for a question, show the idle prompt plus a random
+     * suggestion to help the driver discover what they can ask the local IA.
+     */
+    private fun idleMessage(): CarText {
+        val suggestion = SUGGESTIONS.random()
+        val prefix = carContext.getString(R.string.car_suggestion_prefix)
+        val body = carContext.getString(R.string.car_idle)
+
+        val text = SpannableString("$body\n\n$prefix “$suggestion”")
+        val start = body.length + 2
+        text.setSpan(
+            ForegroundCarColorSpan.create(CarColor.SECONDARY),
+            start,
+            text.length,
             Spanned.SPAN_INCLUSIVE_EXCLUSIVE
         )
         return CarText.create(text)
@@ -291,10 +321,10 @@ class HomeCarScreen(
      * there is no fix at all.
      */
     private fun locationLine(): String {
-        currentPlaceRepository.label.value?.let { return it }
+        currentPlaceRepository.label.value?.let { return "$it · IA Local" }
         val here = locationRepository.location.value
             ?: return carContext.getString(R.string.app_name)
-        return carContext.getString(R.string.car_map_coordinates, here.first, here.second)
+        return carContext.getString(R.string.car_map_coordinates, here.latitude, here.longitude)
     }
 
     private fun isSpeaking(): Boolean = speechSynthesisRepository.isSpeaking.value
@@ -311,11 +341,6 @@ class HomeCarScreen(
         .setIcon(mapIcon)
         .setOnClickListener { screenManager.push(mapScreen()) }
         .build()
-
-    private fun carIcon(resId: Int, tint: CarColor): CarIcon =
-        CarIcon.Builder(IconCompat.createWithResource(carContext, resId))
-            .setTint(tint)
-            .build()
 
     private fun startListening() {
         if (busyLabelRes != null) return
@@ -347,12 +372,14 @@ class HomeCarScreen(
                 busyLabelRes = R.string.car_processing
                 invalidate()
 
-                val location = locationRepository.getCurrentCoordinates()
+                val location = locationRepository.currentLocation()
                 // Same weather the phone would have: without it "¿qué tiempo
                 // hace?" answered "no puedo consultarlo" in the car even where
                 // the handset could.
-                val weather = location?.let { (lat, lon) ->
-                    runCatching { weatherRepository.getCurrentWeatherDescription(lat, lon) }.getOrNull()
+                val weather = location?.let {
+                    runCatching {
+                        weatherRepository.getCurrentWeatherDescription(it.latitude, it.longitude)
+                    }.getOrNull()
                 }
                 val calendar = Calendar.getInstance()
                 val travelContext = TravelContext(

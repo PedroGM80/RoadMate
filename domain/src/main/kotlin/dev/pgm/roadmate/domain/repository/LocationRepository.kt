@@ -1,5 +1,6 @@
 package dev.pgm.roadmate.domain.repository
 
+import dev.pgm.roadmate.domain.model.UserLocation
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -9,12 +10,12 @@ import kotlinx.coroutines.flow.StateFlow
  */
 interface LocationRepository {
 
-    /** Last known coordinates, updated on every successful fetch. */
-    val location: StateFlow<Pair<Double, Double>?>
+    /** Last known fix, updated on every successful [currentLocation] call. */
+    val location: StateFlow<UserLocation?>
 
     /**
-     * Returns the current (latitude, longitude), or null if unavailable
-     * (permission missing, GPS disabled, no fix — e.g. tunnels, parking garages).
+     * The current fix, or null when it can't be obtained (permission missing,
+     * GPS disabled, no signal — tunnels, underground parking).
      */
-    suspend fun getCurrentCoordinates(forceRefresh: Boolean = false): Pair<Double, Double>?
+    suspend fun currentLocation(forceRefresh: Boolean = false): UserLocation?
 }

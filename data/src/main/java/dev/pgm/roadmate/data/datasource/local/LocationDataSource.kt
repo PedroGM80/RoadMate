@@ -9,10 +9,12 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.pgm.roadmate.utils.PermissionManager
+import dev.pgm.roadmate.domain.model.UserLocation
 import kotlinx.coroutines.suspendCancellableCoroutine
 import javax.inject.Inject
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.math.roundToInt
 
 /**
  * Low-level GPS access via the fused location provider. Returns null instead of
@@ -24,7 +26,7 @@ class LocationDataSource @Inject constructor(@ApplicationContext context: Contex
     private val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
     private val permissionManager = PermissionManager(context)
 
-    suspend fun getCurrentLocation(): Pair<Double, Double>? {
+    suspend fun getCurrentLocation(): UserLocation? {
         if (!permissionManager.hasLocationPermission()) return null
         return fetchLocation()
     }
@@ -32,7 +34,7 @@ class LocationDataSource @Inject constructor(@ApplicationContext context: Contex
     @RequiresPermission(
         anyOf = [Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION]
     )
-    private suspend fun fetchLocation(): Pair<Double, Double>? =
+    private suspend fun fetchLocation(): UserLocation? =
         suspendCancellableCoroutine { continuation ->
             val cancellationTokenSource = CancellationTokenSource()
             continuation.invokeOnCancellation { cancellationTokenSource.cancel() }
@@ -44,7 +46,13 @@ class LocationDataSource @Inject constructor(@ApplicationContext context: Contex
             fusedLocationClient.getCurrentLocation(request, cancellationTokenSource.token)
                 .addOnSuccessListener { location ->
                     if (!continuation.isActive) return@addOnSuccessListener
-                    continuation.resume(location?.let { it.latitude to it.longitude })
+                    continuation.resume(location?.let { 
+                        UserLocation(
+                            latitude = it.latitude,
+                            longitude = it.longitude,
+                            speedKmh = if (it.hasSpeed()) (it.speed * 3.6f).roundToInt() else null
+                        )
+                    })
                 }
                 .addOnFailureListener { exception ->
                     if (continuation.isActive) continuation.resumeWithException(exception)

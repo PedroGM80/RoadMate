@@ -20,6 +20,7 @@ import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.PlaceCategory
 import dev.pgm.roadmate.domain.model.PhoneLabel
 import dev.pgm.roadmate.domain.model.TravelContext
+import dev.pgm.roadmate.domain.model.UserLocation
 import dev.pgm.roadmate.utils.JokeProvider
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
@@ -30,7 +31,7 @@ import java.util.Date
 
 class GenerateResponseUseCaseTest {
 
-    private val context = TravelContext(currentLocation = 36.46 to -6.19, hour = 12, date = Date(), userInput = "")
+    private val context = TravelContext(currentLocation = UserLocation(36.46, -6.19), hour = 12, date = Date(), userInput = "")
 
     private fun useCase(
         geminiRepository: FakeGeminiRepository = FakeGeminiRepository(),
@@ -152,7 +153,7 @@ class GenerateResponseUseCaseTest {
         val mem = FakeMemoryRepository()
         val uc = useCase(memoryRepository = mem)
 
-        val parked = context.copy(currentLocation = 36.4609 to -6.19) // ~100 m north of "here"
+        val parked = context.copy(currentLocation = UserLocation(36.4609, -6.19)) // ~100 m north of "here"
         assertEquals(listOf("Vale, guardo dónde has aparcado."), uc(parked, "he aparcado aquí").toList())
 
         val found = uc(context, "¿dónde aparqué?").toList()

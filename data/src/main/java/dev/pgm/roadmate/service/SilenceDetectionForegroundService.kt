@@ -122,7 +122,7 @@ class SilenceDetectionForegroundService : Service() {
     }
 
     private suspend fun buildTravelContext(): TravelContext {
-        val location = locationRepository.getCurrentCoordinates()
+        val location = locationRepository.currentLocation()
         val calendar = Calendar.getInstance()
         return TravelContext(
             currentLocation = location,

@@ -5,7 +5,6 @@ import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.ActionStrip
 import androidx.car.app.model.CarColor
-import androidx.car.app.model.CarIcon
 import androidx.car.app.model.CarText
 import androidx.car.app.model.Distance
 import androidx.car.app.model.DistanceSpan
@@ -20,7 +19,6 @@ import androidx.car.app.navigation.model.NavigationTemplate
 import androidx.car.app.navigation.model.TravelEstimate
 import androidx.car.app.model.DateTimeWithZone
 import java.util.TimeZone
-import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.lifecycleScope
 import dev.pgm.roadmate.R
 import dev.pgm.roadmate.domain.model.PlaceCategory
@@ -93,7 +91,7 @@ class NavigationCarScreen(
 
     init {
         lifecycleScope.launch {
-            locationRepository.getCurrentCoordinates()
+            locationRepository.currentLocation()
             renderer.centreOnDriver(animate = false)
             invalidate()
         }
@@ -154,13 +152,14 @@ class NavigationCarScreen(
     private fun categoryStrip(): ActionStrip {
         val strip = ActionStrip.Builder()
         PlaceCategory.entries.forEach { category ->
-            val selected = poiKind == PoiKind.from(category)
+            val kind = PoiKind.from(category)
+            val selected = poiKind == kind
             strip.addAction(
                 Action.Builder()
                     .setIcon(
-                        icon(
+                        carIcon(
                             category.carIconRes(),
-                            if (selected) CarColor.PRIMARY else CarColor.DEFAULT,
+                            if (selected) CarColor.PRIMARY else CarColor.createCustom(kind.tint, kind.tint),
                         )
                     )
                     .setOnClickListener { toggle(category) }
@@ -184,6 +183,8 @@ class NavigationCarScreen(
             list.addItem(
                 Row.Builder()
                     .setTitle(carContext.getString(R.string.car_no_places))
+                    .addText(carContext.getString(R.string.car_map_needs_offline))
+                    .setImage(carIcon(R.drawable.lucide_ic_triangle_alert, CarColor.YELLOW))
                     .build()
             )
         }
@@ -201,9 +202,9 @@ class NavigationCarScreen(
     /** Street name once the offline tiles resolve one, the raw fix otherwise. */
     private fun title(): String {
         currentPlaceRepository.label.value?.let { return it }
-        val here = locationRepository.location.value
+        val loc = locationRepository.location.value
             ?: return carContext.getString(R.string.car_map_locating)
-        return carContext.getString(R.string.car_map_coordinates, here.first, here.second)
+        return carContext.getString(R.string.car_map_coordinates, loc.latitude, loc.longitude)
     }
 
     /**
@@ -213,21 +214,23 @@ class NavigationCarScreen(
      */
     private fun placeRow(place: PlacedAt): Row {
         val title = SpannableTitle(place.place.name.ifBlank { carContext.getString(R.string.car_map_place) })
+        val kind = place.place.kind
         return Row.Builder()
             .setTitle(title.withDistance(place.metres))
+            .setImage(
+                carIcon(
+                    kind?.iconRes ?: R.drawable.lucide_ic_map_pin,
+                    if (kind != null) CarColor.createCustom(kind.tint, kind.tint) else CarColor.DEFAULT
+                )
+            )
             .setOnClickListener { routeTo(place.place) }
             .build()
     }
 
     private fun mapAction(iconRes: Int, onClick: () -> Unit): Action = Action.Builder()
-        .setIcon(icon(iconRes))
+        .setIcon(carIcon(iconRes))
         .setOnClickListener(onClick)
         .build()
-
-    private fun icon(iconRes: Int, tint: CarColor = CarColor.DEFAULT): CarIcon =
-        CarIcon.Builder(IconCompat.createWithResource(carContext, iconRes))
-            .setTint(tint)
-            .build()
 
     private fun recentre() {
         clearRoute()
@@ -255,17 +258,17 @@ class NavigationCarScreen(
 
     /** Pinned places, nearest first — the order a driver wants to read them in. */
     private fun nearbyPlaces(): List<PlacedAt> {
-        val here = locationRepository.location.value ?: return emptyList()
+        val loc = locationRepository.location.value ?: return emptyList()
         return renderer.pinnedPlaces()
-            .map { PlacedAt(it, metresBetween(here.first, here.second, it.latitude, it.longitude)) }
+            .map { PlacedAt(it, metresBetween(loc.latitude, loc.longitude, it.latitude, it.longitude)) }
             .sortedBy { it.metres }
             .take(MAX_PLACES)
     }
 
     private fun routeTo(place: CarPlace) {
         routeJob?.cancel()
-        val from = locationRepository.location.value
-        if (from == null) {
+        val fromLoc = locationRepository.location.value
+        if (fromLoc == null) {
             // No fix yet — say so and keep the panel up, rather than swallow
             // the tap and leave the driver looking at an unchanged screen.
             routeStatus = carContext.getString(R.string.car_route_no_location)
@@ -273,6 +276,7 @@ class NavigationCarScreen(
             invalidate()
             return
         }
+        val from = fromLoc.latitude to fromLoc.longitude
         // Collapsing the list here, not when the route lands: the driver has
         // made their choice, and what they want to see next is the road.
         poiKind = null

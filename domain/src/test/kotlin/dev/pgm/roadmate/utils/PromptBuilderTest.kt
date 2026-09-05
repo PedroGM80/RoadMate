@@ -3,6 +3,7 @@ package dev.pgm.roadmate.utils
 import dev.pgm.roadmate.domain.model.AnswerStyle
 import dev.pgm.roadmate.domain.model.Exchange
 import dev.pgm.roadmate.domain.model.TravelContext
+import dev.pgm.roadmate.domain.model.UserLocation
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -11,7 +12,7 @@ import java.util.Date
 class PromptBuilderTest {
 
     private fun context(
-        location: Pair<Double, Double>? = null,
+        location: UserLocation? = null,
         destination: String? = null,
         hour: Int = 9,
         minute: Int = 0,
@@ -53,7 +54,7 @@ class PromptBuilderTest {
     @Test
     fun `includes coordinates when location is known`() {
         val prompt = PromptBuilder.buildPrompt(
-            context(location = 36.4614 to -6.1998, input = "¿cuánto queda?"),
+            context(location = UserLocation(36.4614, -6.1998), input = "¿cuánto queda?"),
             "¿cuánto queda?",
         )
 
@@ -74,7 +75,7 @@ class PromptBuilderTest {
     @Test
     fun `omits coordinates entirely when the question is not spatial`() {
         val prompt = PromptBuilder.buildPrompt(
-            context(location = 36.4614 to -6.1998, input = "¿quién pintó el Guernica?"),
+            context(location = UserLocation(36.4614, -6.1998), input = "¿quién pintó el Guernica?"),
             "¿quién pintó el Guernica?",
         )
 
@@ -85,7 +86,7 @@ class PromptBuilderTest {
     @Test
     fun `includes coordinates when the question is spatial`() {
         val prompt = PromptBuilder.buildPrompt(
-            context(location = 36.4614 to -6.1998, input = "¿estamos cerca?"),
+            context(location = UserLocation(36.4614, -6.1998), input = "¿estamos cerca?"),
             "¿estamos cerca?",
         )
 

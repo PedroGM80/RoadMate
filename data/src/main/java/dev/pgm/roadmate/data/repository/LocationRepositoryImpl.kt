@@ -1,6 +1,7 @@
 package dev.pgm.roadmate.data.repository
 
 import dev.pgm.roadmate.data.datasource.local.LocationDataSource
+import dev.pgm.roadmate.domain.model.UserLocation
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,8 +20,8 @@ class LocationRepositoryImpl @Inject constructor(
     private val locationDataSource: LocationDataSource
 ) : LocationRepository {
 
-    private val _location = MutableStateFlow<Pair<Double, Double>?>(null)
-    override val location: StateFlow<Pair<Double, Double>?> = _location.asStateFlow()
+    private val _location = MutableStateFlow<UserLocation?>(null)
+    override val location: StateFlow<UserLocation?> = _location.asStateFlow()
 
     @Volatile
     private var cachedAtMs: Long = 0L
@@ -34,7 +35,7 @@ class LocationRepositoryImpl @Inject constructor(
      */
     private val mutex = Mutex()
 
-    override suspend fun getCurrentCoordinates(forceRefresh: Boolean): Pair<Double, Double>? =
+    override suspend fun currentLocation(forceRefresh: Boolean): UserLocation? =
         mutex.withLock {
             val cacheIsFresh = !forceRefresh && System.currentTimeMillis() - cachedAtMs < CACHE_TTL_MS
             if (cacheIsFresh && _location.value != null) return@withLock _location.value

@@ -140,9 +140,9 @@ class WakeWordForegroundService : Service() {
     }
 
     private suspend fun buildTravelContext(userInput: String): TravelContext {
-        val location = locationRepository.getCurrentCoordinates()
-        val weather = location?.let { (lat, lon) ->
-            weatherRepository.getCurrentWeatherDescription(lat, lon)
+        val location = locationRepository.currentLocation()
+        val weather = location?.let {
+            weatherRepository.getCurrentWeatherDescription(it.latitude, it.longitude)
         }
         val calendar = Calendar.getInstance()
         return TravelContext(

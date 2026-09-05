@@ -992,16 +992,18 @@ internal fun registerPinIcons(style: Style, context: Context, sizeDp: Float = 32
         val canvas = Canvas(bitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        paint.color = 0x33000000 // soft drop shadow
-        canvas.drawCircle(cx, cx + 1f * density, cx - ring, paint)
-        paint.color = 0xFFFFFFFF.toInt() // white ring
+        // A stronger drop shadow than the phone's — the car display is further
+        // from the eye and often glare-lit.
+        paint.color = 0x55000000
+        canvas.drawCircle(cx, cx + 1.5f * density, cx - ring, paint)
+        paint.color = 0xFFFFFFFF.toInt() // crisp white ring
         canvas.drawCircle(cx, cx, cx - ring, paint)
         paint.color = fill // category disc
-        canvas.drawCircle(cx, cx, cx - ring * 2.2f, paint)
+        canvas.drawCircle(cx, cx, cx - ring * 2.0f, paint)
 
         ContextCompat.getDrawable(context, iconRes)?.mutate()?.let { d ->
             d.setTint(0xFFFFFFFF.toInt())
-            val pad = (size * 0.27f).toInt()
+            val pad = (size * 0.25f).toInt()
             d.setBounds(pad, pad, size - pad, size - pad)
             d.draw(canvas)
         }

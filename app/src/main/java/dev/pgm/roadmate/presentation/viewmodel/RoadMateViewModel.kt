@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.pgm.roadmate.audio.Earcon
 import dev.pgm.roadmate.domain.model.LocalAiStatus
+import dev.pgm.roadmate.domain.model.UserLocation
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
@@ -61,7 +62,7 @@ data class RoadMateUiState(
     val currentResponse: String = "",
     /** True when [currentResponse] is an error/nudge, not a real answer. */
     val isError: Boolean = false,
-    val location: Pair<Double, Double>? = null,
+    val location: UserLocation? = null,
     /** "Calle X, Localidad · Provincia" when reverse geocoding resolved it. */
     val locationLabel: String? = null,
     val locationUnavailable: Boolean = false,
@@ -176,7 +177,7 @@ class RoadMateViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(locationUnavailable = false)
             val location = withTimeoutOrNull(Constants.LOCATION_TIMEOUT_MS.milliseconds) {
-                locationRepository.getCurrentCoordinates()
+                locationRepository.currentLocation()
             }
             if (location == null) {
                 _uiState.value = _uiState.value.copy(locationUnavailable = true)
@@ -474,9 +475,9 @@ class RoadMateViewModel @Inject constructor(
     }
 
     private suspend fun buildTravelContext(userInput: String): TravelContext {
-        val location = locationRepository.getCurrentCoordinates()
-        val weatherDescription = location?.let { (lat, lon) ->
-            weatherRepository.getCurrentWeatherDescription(lat, lon)
+        val location = locationRepository.currentLocation()
+        val weatherDescription = location?.let {
+            weatherRepository.getCurrentWeatherDescription(it.latitude, it.longitude)
         }
         val calendar = Calendar.getInstance()
         return TravelContext(

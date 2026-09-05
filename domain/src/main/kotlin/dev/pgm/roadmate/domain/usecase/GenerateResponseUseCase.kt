@@ -8,6 +8,7 @@ import dev.pgm.roadmate.domain.model.MapSearchRequest
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.TravelContext
 import dev.pgm.roadmate.domain.model.UserFact
+import dev.pgm.roadmate.domain.model.latLon
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
@@ -174,7 +175,7 @@ class GenerateResponseUseCase @Inject constructor(
             contactName != null -> handleCallRequest(contactName)
             mapQuery != null -> handleMapSearch(
                 mapQuery,
-                context.currentLocation,
+                context.currentLocation?.latLon(),
                 navigate = MapSearchIntentParser.isNavigationRequest(userInput),
             )
             mediaApp != null -> handleMediaRequest(mediaApp)
@@ -317,7 +318,7 @@ class GenerateResponseUseCase @Inject constructor(
     private suspend fun saveNamedLocation(type: FactType, label: String, context: TravelContext): String {
         val here = context.currentLocation ?: return SpokenText.NO_LOCATION_YET
         memoryRepository.forget(type)
-        memoryRepository.remember(UserFact(type, value = "${here.first},${here.second}"))
+        memoryRepository.remember(UserFact(type, value = "${here.latitude},${here.longitude}"))
         return SpokenText.locationSaved(label)
     }
 
@@ -542,7 +543,7 @@ class GenerateResponseUseCase @Inject constructor(
         if (intent == ParkingIntentParser.Intent.SAVE) {
             if (here == null) return SpokenText.PARKING_NO_FIX_TO_SAVE
             memoryRepository.forget(FactType.PARKING)
-            memoryRepository.remember(UserFact(FactType.PARKING, value = "${here.first},${here.second}"))
+            memoryRepository.remember(UserFact(FactType.PARKING, value = "${here.latitude},${here.longitude}"))
             return SpokenText.PARKING_SAVED
         }
 
@@ -550,15 +551,15 @@ class GenerateResponseUseCase @Inject constructor(
             ?: return SpokenText.PARKING_NONE
         if (here == null) return SpokenText.PARKING_NO_FIX_NOW
 
-        val distance = distanceWords(here, spot)
-        val direction = COMPASS_ES[bearingIndex(here, spot)]
+        val distance = distanceWords(here.latLon(), spot)
+        val direction = COMPASS_ES[bearingIndex(here.latLon(), spot)]
 
         return if (intent == ParkingIntentParser.Intent.TAKE_ME && mapSearchCoordinator.hasOfflineMap()) {
             mapSearchCoordinator.submit(
                 MapSearchRequest(
                     rawQuery = "el coche",
                     category = null,
-                    origin = here,
+                    origin = here.latLon(),
                     navigate = true,
                     destination = spot,
                 ),

@@ -16,6 +16,7 @@ import dev.pgm.roadmate.domain.model.UserFact
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.GreetingRepository
+import dev.pgm.roadmate.domain.model.UserLocation
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.CurrentPlaceRepository
 import dev.pgm.roadmate.domain.repository.MapSearchCoordinator
@@ -47,17 +48,17 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 
 class FakeLocationRepository(
-    initial: Pair<Double, Double>? = null,
+    initial: UserLocation? = null,
     private val fetchDelayMs: Long = 0L,
-    private val fetchResult: Pair<Double, Double>? = initial
+    private val fetchResult: UserLocation? = initial
 ) : LocationRepository {
     private val _location = MutableStateFlow(initial)
-    override val location: StateFlow<Pair<Double, Double>?> = _location
+    override val location: StateFlow<UserLocation?> = _location
 
     var fetchCount = 0
         private set
 
-    override suspend fun getCurrentCoordinates(forceRefresh: Boolean): Pair<Double, Double>? {
+    override suspend fun currentLocation(forceRefresh: Boolean): UserLocation? {
         fetchCount++
         if (fetchDelayMs > 0) delay(fetchDelayMs.milliseconds)
         if (fetchResult != null) _location.value = fetchResult

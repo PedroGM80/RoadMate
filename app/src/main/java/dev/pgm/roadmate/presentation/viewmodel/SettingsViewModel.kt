@@ -13,6 +13,7 @@ import dev.pgm.roadmate.domain.repository.GeminiRepository
 import dev.pgm.roadmate.domain.repository.LocationRepository
 import dev.pgm.roadmate.domain.repository.MemoryRepository
 import dev.pgm.roadmate.presentation.map.OfflineMapController
+import dev.pgm.roadmate.domain.model.UserLocation
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -50,7 +51,7 @@ class SettingsViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.Eagerly, ThemePreference.DEFAULT)
 
     /** Last known position, for the AUTO theme's sunrise/sunset check. Null until a fix lands. */
-    val lastLocation: StateFlow<Pair<Double, Double>?> = location.location
+    val lastLocation: StateFlow<UserLocation?> = location.location
 
     val answerStyle: StateFlow<AnswerStyle> = preferences.answerStyle
         .stateIn(viewModelScope, SharingStarted.Eagerly, AnswerStyle.DEFAULT)

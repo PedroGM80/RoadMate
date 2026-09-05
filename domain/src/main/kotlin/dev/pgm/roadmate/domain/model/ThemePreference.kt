@@ -25,8 +25,8 @@ enum class ThemePreference {
          * Whether [AUTO] should be dark right now: real sunrise/sunset at
          * [location] when it's known, otherwise the fixed [isNightHour] window.
          */
-        fun isNight(now: ZonedDateTime, location: Pair<Double, Double>?): Boolean =
+        fun isNight(now: ZonedDateTime, location: UserLocation?): Boolean =
             if (location == null) isNightHour(now.hour)
-            else SolarClock.isNight(now, location.first, location.second)
+            else SolarClock.isNight(now, location.latitude, location.longitude)
     }
 }

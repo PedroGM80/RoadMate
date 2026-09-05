@@ -5,6 +5,7 @@ import android.content.res.Configuration
 import androidx.car.app.AppManager
 import androidx.car.app.Screen
 import androidx.car.app.Session
+import androidx.lifecycle.lifecycleScope
 import dev.pgm.roadmate.BuildConfig
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
 import dev.pgm.roadmate.domain.repository.CurrentPlaceRepository
@@ -50,6 +51,7 @@ class RoadMateSession(
             BuildConfig.MAP_STYLE_URL,
             locationRepository,
             currentPlaceRepository,
+            lifecycleScope,
         )
     }
 

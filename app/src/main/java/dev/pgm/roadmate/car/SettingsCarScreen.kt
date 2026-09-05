@@ -101,6 +101,7 @@ class SettingsCarScreen(
     private fun offlineMapRow(): Row = Row.Builder()
         .setTitle(carContext.getString(R.string.car_settings_offline_map))
         .addText(offlineMapText(offlineMap.status.value))
+        .setImage(carIcon(R.drawable.lucide_ic_map))
         .setBrowsable(true)
         .setOnClickListener { screenManager.push(offlineMapScreen()) }
         .build()
@@ -113,6 +114,7 @@ class SettingsCarScreen(
                     Row.Builder()
                         .setTitle(carContext.getString(R.string.car_settings_map_download))
                         .addText(offlineMapText(status))
+                        .setImage(carIcon(R.drawable.lucide_ic_download))
                         .setOnClickListener(
                             ParkedOnlyOnClickListener.create { downloadAroundHere() }
                         )
@@ -123,6 +125,7 @@ class SettingsCarScreen(
                     Row.Builder()
                         .setTitle(carContext.getString(R.string.car_settings_map_delete))
                         .addText(carContext.getString(R.string.car_settings_map_delete_note))
+                        .setImage(carIcon(R.drawable.lucide_ic_square))
                         .setOnClickListener(
                             ParkedOnlyOnClickListener.create {
                                 offlineMap.deleteAll()
@@ -155,6 +158,7 @@ class SettingsCarScreen(
         val builder = Row.Builder()
             .setTitle(carContext.getString(R.string.car_settings_local_ai))
             .addText(localAiText(status))
+            .setImage(carIcon(R.drawable.lucide_ic_cloud_off))
 
         if (status is LocalAiStatus.ModelDownloadable ||
             status is LocalAiStatus.DownloadFailed ||
@@ -192,6 +196,7 @@ class SettingsCarScreen(
     private fun modelPickerRow(): Row = Row.Builder()
         .setTitle(carContext.getString(R.string.car_settings_model))
         .addText(gemini.localAiModels.firstOrNull { it.id == selectedModelId }?.name.orEmpty())
+        .setImage(carIcon(R.drawable.lucide_ic_settings))
         .setBrowsable(true)
         .setOnClickListener { screenManager.push(modelPickerScreen()) }
         .build()
@@ -232,6 +237,7 @@ class SettingsCarScreen(
     private fun answerStyleRow(): Row = Row.Builder()
         .setTitle(carContext.getString(R.string.car_settings_answer_style))
         .addText(carContext.getString(answerStyleLabel(answerStyle)))
+        .setImage(carIcon(R.drawable.lucide_ic_moon_star))
         .setOnClickListener {
             val next = AnswerStyle.entries[(answerStyle.ordinal + 1) % AnswerStyle.entries.size]
             answerStyle = next
@@ -253,6 +259,7 @@ class SettingsCarScreen(
                 if (handsFree) R.string.car_settings_on else R.string.car_settings_off
             )
         )
+        .setImage(carIcon(R.drawable.lucide_ic_mic))
         .setOnClickListener {
             handsFree = !handsFree
             invalidate()
@@ -272,8 +279,9 @@ class SettingsCarScreen(
      * useful approximation of "where I am now".
      */
     private fun downloadAroundHere() {
-        val here = locationRepository.location.value ?: return
-        val (lat, lon) = here
+        val loc = locationRepository.location.value ?: return
+        val lat = loc.latitude
+        val lon = loc.longitude
         val bounds = LatLngBounds.Builder()
             .include(LatLng(lat + BOX_DEGREES, lon + BOX_DEGREES))
             .include(LatLng(lat - BOX_DEGREES, lon - BOX_DEGREES))

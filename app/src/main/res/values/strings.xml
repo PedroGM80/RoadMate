@@ -104,6 +104,13 @@
     <string name="car_no_answer">No he podido responder. Pulsa Escuchar y prueba otra vez.</string>
     <string name="car_error">Algo ha fallado. Pulsa Escuchar y prueba otra vez.</string>
     <string name="car_idle">Pulsa Escuchar y pregunta lo que quieras.</string>
+    <string name="car_suggestion_prefix">Prueba a decir:</string>
+    <string name="car_suggestion_1">Busca una gasolinera</string>
+    <string name="car_suggestion_2">¿Qué tiempo hace en Cádiz?</string>
+    <string name="car_suggestion_3">Llévame a Chiclana</string>
+    <string name="car_suggestion_4">¿Dónde puedo comer algo?</string>
+    <string name="car_suggestion_5">Cuéntame un chiste</string>
+    <string name="car_suggestion_6">Recuerda que hoy tengo una cena</string>
     <string name="car_listening">Escuchando…</string>
     <string name="car_processing">Procesando…</string>
     <string name="car_listen">Escuchar</string>

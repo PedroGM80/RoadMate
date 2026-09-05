@@ -14,7 +14,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,11 +23,13 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import com.google.accompanist.permissions.rememberPermissionState
 import dev.pgm.roadmate.R
+import dev.pgm.roadmate.domain.model.UserLocation
 import dev.pgm.roadmate.presentation.components.AnswerCard
 import dev.pgm.roadmate.presentation.components.InfoPill
 import dev.pgm.roadmate.presentation.components.LocalAiStatusLabel
@@ -39,7 +40,6 @@ import dev.pgm.roadmate.presentation.viewmodel.RoadMateUiState
 import dev.pgm.roadmate.presentation.viewmodel.RoadMateViewModel
 import dev.pgm.roadmate.ui.rememberReduceMotion
 import dev.pgm.roadmate.ui.theme.Spacing
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -140,7 +140,7 @@ fun HomeScreen(
 
 @Composable
 private fun LocationRow(
-    location: Pair<Double, Double>?,
+    location: UserLocation?,
     placeLabel: String?,
     unavailable: Boolean,
     onRetry: () -> Unit,
@@ -148,7 +148,7 @@ private fun LocationRow(
 ) {
     val label = when {
         !placeLabel.isNullOrBlank() -> placeLabel
-        location != null -> stringResource(R.string.location_coords, location.first, location.second)
+        location != null -> stringResource(R.string.location_coords, location.latitude, location.longitude)
         unavailable -> stringResource(R.string.location_unavailable)
         else -> stringResource(R.string.location_searching)
     }

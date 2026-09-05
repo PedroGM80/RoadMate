@@ -10,6 +10,7 @@ import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.MapSearchRequest
 import dev.pgm.roadmate.domain.model.MediaApp
 import dev.pgm.roadmate.domain.model.RoutingDataStatus
+import dev.pgm.roadmate.domain.model.UserLocation
 import dev.pgm.roadmate.domain.model.ThemePreference
 import dev.pgm.roadmate.domain.model.UserFact
 import dev.pgm.roadmate.domain.repository.AssistantPreferencesRepository
@@ -42,10 +43,10 @@ import kotlinx.coroutines.flow.flowOf
  */
 
 class FakeCarLocationRepository(
-    fix: Pair<Double, Double>? = 36.46 to -6.19,
+    fix: UserLocation? = UserLocation(36.46, -6.19),
 ) : LocationRepository {
     override val location = MutableStateFlow(fix)
-    override suspend fun getCurrentCoordinates(forceRefresh: Boolean) = location.value
+    override suspend fun currentLocation(forceRefresh: Boolean) = location.value
 }
 
 class FakeCarWeatherRepository : WeatherRepository {

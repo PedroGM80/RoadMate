@@ -4,10 +4,17 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Presentation
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.graphics.Rect
+import android.graphics.drawable.GradientDrawable
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.util.Log
+import android.util.TypedValue
+import android.view.Gravity
+import android.view.View
+import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.car.app.CarContext
 import androidx.car.app.SurfaceCallback
 import androidx.car.app.SurfaceContainer
@@ -23,6 +30,8 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.LocationComponentActivationOptions
 import org.maplibre.android.location.LocationComponentOptions
+import org.maplibre.android.location.modes.CameraMode
+import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
@@ -32,6 +41,13 @@ import org.maplibre.android.plugins.annotation.CircleOptions
 import org.maplibre.android.plugins.annotation.LineManager
 import org.maplibre.android.plugins.annotation.LineOptions
 import org.maplibre.android.plugins.annotation.SymbolManager
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
+import android.graphics.Typeface
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.ln
 import kotlin.math.sqrt
@@ -60,6 +76,7 @@ class CarMapRenderer(
     private val styleUrl: String,
     private val locationRepository: LocationRepository,
     private val currentPlaceRepository: CurrentPlaceRepository,
+    private val scope: CoroutineScope,
 ) : SurfaceCallback {
 
     private var virtualDisplay: VirtualDisplay? = null
@@ -90,6 +107,8 @@ class CarMapRenderer(
      * pane.
      */
     private var visibleArea: Rect? = null
+
+    private var speedView: TextView? = null
 
     private var lastGeocodedAt: Pair<Double, Double>? = null
     private var lastGeocodedMs = 0L
@@ -123,8 +142,31 @@ class CarMapRenderer(
             .tiltGesturesEnabled(false)
 
         val view = MapView(carContext, options)
+        val root = FrameLayout(carContext).apply {
+            addView(view)
+            val speed = TextView(carContext).apply {
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+                setPadding(24, 12, 24, 12)
+                background = GradientDrawable().apply {
+                    setColor(0xAA000000.toInt())
+                    cornerRadius = 16f
+                }
+                visibility = View.GONE
+                gravity = Gravity.CENTER
+            }
+            addView(speed, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.START
+            ).apply {
+                setMargins(32, 0, 0, 32)
+            })
+            speedView = speed
+        }
+
         val screen = Presentation(carContext, display.display).apply {
-            setContentView(view)
+            setContentView(root)
         }
 
         try {
@@ -137,6 +179,26 @@ class CarMapRenderer(
 
         presentation = screen
         mapView = view
+
+        scope.launch {
+            locationRepository.location.collect { loc ->
+                val speedKmh = loc?.speedKmh
+                speedView?.apply {
+                    if (speedKmh != null && speedKmh > 3) {
+                        val text = SpannableString("$speedKmh\nkm/h")
+                        val numLen = speedKmh.toString().length
+                        text.setSpan(RelativeSizeSpan(1.5f), 0, numLen, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+                        text.setSpan(StyleSpan(Typeface.BOLD), 0, numLen, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+                        text.setSpan(RelativeSizeSpan(0.6f), numLen, text.length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+                        
+                        this.text = text
+                        visibility = View.VISIBLE
+                    } else {
+                        visibility = View.GONE
+                    }
+                }
+            }
+        }
 
         view.onCreate(null)
         view.onStart()
@@ -159,7 +221,7 @@ class CarMapRenderer(
     /**
      * Loads the day or night style and rebuilds everything anchored to it:
      * the pin images, the three annotation managers (route line, destination
-     * dot, POI pins), and the driver dot. Also re-applied when the car flips
+     * dot, POI pins), and the driver dot. Also, re-applied when the car flips
      * between day and night — see [refreshDayNight].
      */
     private fun installStyle(loaded: MapLibreMap, recentre: Boolean) {
@@ -353,9 +415,9 @@ class CarMapRenderer(
 
     /** Re-centres on the last known fix. Called by the map strip's recentre action. */
     fun centreOnDriver(animate: Boolean = true) {
-        val here = locationRepository.location.value ?: return
+        val loc = locationRepository.location.value ?: return
         val target = CameraUpdateFactory.newLatLngZoom(
-            LatLng(here.first, here.second),
+            LatLng(loc.latitude, loc.longitude),
             DRIVING_ZOOM,
         )
         val loaded = map ?: return
@@ -363,19 +425,10 @@ class CarMapRenderer(
         centredOnDriver = true
     }
 
-    /**
-     * Turns the car's coordinates into "Calle Servando Camuñez · San Fernando"
-     * off the loaded tiles — the same on-device reverse geocode the phone
-     * does, no network geocoder. Until the car map existed this could only run
-     * on the phone, which is why the car screens had nothing but a latitude
-     * and a longitude to show.
-     *
-     * Throttled by distance and time: the query walks every road feature in
-     * the loaded tiles, and the answer does not change between two fixes a few
-     * metres apart.
-     */
+
     private fun resolveWhereWeAre(loaded: MapLibreMap) {
-        val here = locationRepository.location.value ?: return
+        val loc = locationRepository.location.value ?: return
+        val here = loc.latitude to loc.longitude
         val now = System.currentTimeMillis()
         val movedEnough = lastGeocodedAt?.let { metresBetween(it, here) > GEOCODE_MOVE_M } ?: true
         if (!movedEnough || now - lastGeocodedMs < GEOCODE_INTERVAL_MS) return
@@ -424,6 +477,11 @@ class CarMapRenderer(
                 )
             }
             component.isLocationComponentEnabled = true
+            // A directional puck that points where the car is heading. The
+            // camera stays under this renderer's control (centreOnDriver, route
+            // framing, manual pan), so the component itself must not drive it.
+            component.cameraMode = CameraMode.NONE
+            component.renderMode = RenderMode.GPS
         }.onFailure { Log.w(TAG, "no location component on the car map", it) }
     }
 

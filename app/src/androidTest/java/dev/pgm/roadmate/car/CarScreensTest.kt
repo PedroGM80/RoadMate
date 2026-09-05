@@ -14,6 +14,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.MainScope
 import dev.pgm.roadmate.BuildConfig
 import dev.pgm.roadmate.utils.PermissionManager
 import org.junit.Assert.assertTrue
@@ -70,7 +71,7 @@ class CarScreensTest {
         PermissionManager(ApplicationProvider.getApplicationContext())
 
     private fun renderer(ctx: TestCarContext) =
-        CarMapRenderer(ctx, BuildConfig.MAP_STYLE_URL, location, currentPlace)
+        CarMapRenderer(ctx, BuildConfig.MAP_STYLE_URL, location, currentPlace, MainScope())
 
     private fun homeScreen(ctx: TestCarContext) = HomeCarScreen(
         ctx, renderer(ctx), fakeGenerateResponseUseCase(), location, FakeCarWeatherRepository(),

@@ -1,5 +1,6 @@
 package dev.pgm.roadmate.presentation.viewmodel
 
+import dev.pgm.roadmate.domain.model.UserLocation
 import dev.pgm.roadmate.domain.model.LocalAiStatus
 import dev.pgm.roadmate.domain.model.SpeechRecognitionEvent
 import dev.pgm.roadmate.domain.usecase.DetectSilenceUseCase
@@ -37,7 +38,7 @@ class RoadMateViewModelTest {
     private fun buildViewModel(
         recognizedSpeech: String = "hola roadmate",
         geminiResponse: String = "respuesta de prueba",
-        location: Pair<Double, Double>? = 36.46 to -6.19,
+        location: UserLocation? = UserLocation(36.46, -6.19),
         locationFetchDelayMs: Long = 0L,
         greetingRepository: FakeGreetingRepository = FakeGreetingRepository(),
         greetingSpeechSynthesisRepository: FakeSpeechSynthesisRepository = FakeSpeechSynthesisRepository(),
@@ -162,13 +163,13 @@ class RoadMateViewModelTest {
 
     @Test
     fun `refreshLocation surfaces a resolved fix`() = runTest(mainDispatcherRule.testDispatcher) {
-        val viewModel = buildViewModel(location = 40.4168 to -3.7038)
+        val viewModel = buildViewModel(location = UserLocation(40.4168, -3.7038))
 
         viewModel.refreshLocation()
         advanceUntilIdle()
 
         val state = viewModel.uiState.value
-        assertEquals(40.4168 to -3.7038, state.location)
+        assertEquals(UserLocation(40.4168, -3.7038), state.location)
         assertFalse(state.locationUnavailable)
     }
 
@@ -177,7 +178,7 @@ class RoadMateViewModelTest {
         runTest(mainDispatcherRule.testDispatcher) {
             // Longer than Constants.LOCATION_TIMEOUT_MS (10s) — advanced via virtual
             // time by runTest, not a real 15-second wait.
-            val viewModel = buildViewModel(location = 40.4168 to -3.7038, locationFetchDelayMs = 15_000L)
+            val viewModel = buildViewModel(location = UserLocation(40.4168, -3.7038), locationFetchDelayMs = 15_000L)
 
             viewModel.refreshLocation()
             advanceUntilIdle()
