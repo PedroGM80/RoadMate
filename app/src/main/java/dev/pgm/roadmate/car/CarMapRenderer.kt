@@ -22,6 +22,7 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.location.LocationComponentActivationOptions
+import org.maplibre.android.location.LocationComponentOptions
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.MapLibreMapOptions
 import org.maplibre.android.maps.MapView
@@ -71,6 +72,12 @@ class CarMapRenderer(
 
     /** The category currently pinned, re-queried on every camera idle. */
     private var poiKind: PoiKind? = null
+
+    /** The route currently drawn, kept so a day/night restyle can redraw it. */
+    private var activeRoute: List<Pair<Double, Double>> = emptyList()
+
+    /** Which mode the loaded style is for, so [refreshDayNight] can skip a no-op. */
+    private var appliedNight = false
 
     /** Set once the first camera move has happened, so it only auto-centres once. */
     private var centredOnDriver = false
@@ -141,43 +148,65 @@ class CarMapRenderer(
                 isLogoEnabled = false
                 isCompassEnabled = false
             }
-            loaded.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
-                registerPinIcons(style, carContext, CAR_PIN_DP)
-                Log.i(
-                    TAG,
-                    "pin images registered: " +
-                        PoiKind.entries.joinToString { k ->
-                            "${k.name}=${style.getImage("roadmate-pin-" + k.name) != null}"
-                        },
-                )
-                // Created before the SymbolManager so the route line and its
-                // destination dot sit underneath the POI pins, same order as
-                // the phone's map.
-                lineManager = LineManager(view, loaded, style)
-                circleManager = CircleManager(view, loaded, style)
-                val manager = SymbolManager(view, loaded, style).apply {
-                    // Both, not just allow-overlap: the base style is dense
-                    // with its own POI symbols, and without ignore-placement
-                    // ours lose every collision against them and are dropped
-                    // silently — created, counted, never drawn.
-                    iconAllowOverlap = true
-                    iconIgnorePlacement = true
-                    textAllowOverlap = true
-                    textIgnorePlacement = true
-                }
-                symbolManager = manager
-                enableDriverDot(loaded, style)
-                applyVisibleArea()
-                centreOnDriver(animate = false)
-                // POI features come from the loaded tiles, so the pins have to
-                // be recomputed whenever the camera settles somewhere new —
-                // exactly what the phone's map does.
-                loaded.addOnCameraIdleListener {
-                    refreshPins()
-                    resolveWhereWeAre(loaded)
-                }
+            loaded.addOnCameraIdleListener {
+                refreshPins()
+                resolveWhereWeAre(loaded)
             }
+            installStyle(loaded, recentre = true)
         }
+    }
+
+    /**
+     * Loads the day or night style and rebuilds everything anchored to it:
+     * the pin images, the three annotation managers (route line, destination
+     * dot, POI pins), and the driver dot. Also re-applied when the car flips
+     * between day and night — see [refreshDayNight].
+     */
+    private fun installStyle(loaded: MapLibreMap, recentre: Boolean) {
+        val view = mapView ?: return
+        appliedNight = carContext.isDarkMode
+        // A light street style is a headlight in the face at night; the car
+        // tells us which mode it is in, so load the matching one.
+        loaded.setStyle(Style.Builder().fromUri(activeStyleUrl())) { style ->
+            symbolManager?.let { runCatching { it.onDestroy() } }
+            lineManager?.let { runCatching { it.onDestroy() } }
+            circleManager?.let { runCatching { it.onDestroy() } }
+
+            registerPinIcons(style, carContext, CAR_PIN_DP)
+            // Created before the SymbolManager so the route line and its
+            // destination dot sit underneath the POI pins, same order as the
+            // phone's map.
+            lineManager = LineManager(view, loaded, style)
+            circleManager = CircleManager(view, loaded, style)
+            symbolManager = SymbolManager(view, loaded, style).apply {
+                // Both, not just allow-overlap: the base style is dense with
+                // its own POI symbols, and without ignore-placement ours lose
+                // every collision against them and are dropped silently —
+                // created, counted, never drawn.
+                iconAllowOverlap = true
+                iconIgnorePlacement = true
+                textAllowOverlap = true
+                textIgnorePlacement = true
+            }
+            enableDriverDot(loaded, style)
+            applyVisibleArea()
+            if (recentre) centreOnDriver(animate = false)
+            // Put back what was on the old style.
+            if (activeRoute.size >= 2) drawRoute(activeRoute)
+            refreshPins()
+        }
+    }
+
+    /**
+     * Re-themes the map when the car switches between day and night. Hosts
+     * that recreate the surface on that change hit [onSurfaceAvailable]
+     * instead; this covers the ones that don't. No-op if the style already
+     * matches the current mode.
+     */
+    fun refreshDayNight() {
+        val loaded = map ?: return
+        if (carContext.isDarkMode == appliedNight) return
+        installStyle(loaded, recentre = false)
     }
 
     override fun onSurfaceDestroyed(surfaceContainer: SurfaceContainer) = release()
@@ -261,7 +290,7 @@ class CarMapRenderer(
             val symbol = annotations.valueAt(index) ?: return@mapNotNull null
             val at = symbol.latLng
             val name = symbol.data?.takeIf { it.isJsonPrimitive }?.asString.orEmpty()
-            CarPlace(name, at.latitude, at.longitude)
+            CarPlace(name, at.latitude, at.longitude, poiKind)
         }
     }
 
@@ -269,14 +298,29 @@ class CarMapRenderer(
     fun showRoute(points: List<Pair<Double, Double>>) {
         runCatching { lineManager?.deleteAll() }
         runCatching { circleManager?.deleteAll() }
+        activeRoute = if (points.size >= 2) points else emptyList()
         if (points.size < 2) return
+        drawRoute(points)
+    }
 
+    /** The draw half of [showRoute], re-callable after a day/night restyle. */
+    private fun drawRoute(points: List<Pair<Double, Double>>) {
         val line = points.map { LatLng(it.first, it.second) }
+        val routeColor = routeColor()
+        val casingColor = if (carContext.isDarkMode) "#0B1220" else "#FFFFFF"
         runCatching {
+            // A casing line underneath so the route reads against water, parks
+            // and, at night, the near-black background.
             lineManager?.create(
                 LineOptions()
                     .withLatLngs(line)
-                    .withLineColor(ROUTE_COLOR)
+                    .withLineColor(casingColor)
+                    .withLineWidth(ROUTE_WIDTH + 3f)
+            )
+            lineManager?.create(
+                LineOptions()
+                    .withLatLngs(line)
+                    .withLineColor(routeColor)
                     .withLineWidth(ROUTE_WIDTH)
             )
         }
@@ -284,10 +328,10 @@ class CarMapRenderer(
             circleManager?.create(
                 CircleOptions()
                     .withLatLng(line.last())
-                    .withCircleRadius(7f)
-                    .withCircleColor(ROUTE_COLOR)
-                    .withCircleStrokeColor("#FFFFFF")
-                    .withCircleStrokeWidth(2.5f)
+                    .withCircleRadius(8f)
+                    .withCircleColor(routeColor)
+                    .withCircleStrokeColor(casingColor)
+                    .withCircleStrokeWidth(3f)
             )
         }
         runCatching {
@@ -361,12 +405,40 @@ class CarMapRenderer(
             val component = loaded.locationComponent
             if (!component.isLocationComponentActivated) {
                 component.activateLocationComponent(
-                    LocationComponentActivationOptions.builder(carContext, style).build()
+                    LocationComponentActivationOptions.builder(carContext, style)
+                        .locationComponentOptions(
+                            // RoadMate blue, with a slow pulse so the driver's
+                            // own position stays findable at a glance among the
+                            // route line and the POI pins.
+                            LocationComponentOptions.builder(carContext)
+                                .foregroundTintColor(DRIVER_DOT_COLOR)
+                                .bearingTintColor(DRIVER_DOT_COLOR)
+                                .accuracyColor(DRIVER_DOT_COLOR)
+                                .accuracyAlpha(0.12f)
+                                .pulseEnabled(true)
+                                .pulseColor(DRIVER_DOT_COLOR)
+                                .pulseSingleDuration(2_400f)
+                                .build()
+                        )
+                        .build()
                 )
             }
             component.isLocationComponentEnabled = true
         }.onFailure { Log.w(TAG, "no location component on the car map", it) }
     }
+
+    /** The dark style at night, the configured one otherwise. */
+    private fun activeStyleUrl(): String {
+        if (!carContext.isDarkMode) return styleUrl
+        // OpenFreeMap ships a matching dark style at .../styles/dark; for a
+        // self-hosted / MapTiler URL we can't guess one, so keep it.
+        return OPENFREEMAP_STYLE.find(styleUrl)
+            ?.let { "${it.groupValues[1]}/dark" }
+            ?: styleUrl
+    }
+
+    private fun routeColor(): String =
+        if (carContext.isDarkMode) ROUTE_COLOR_NIGHT else ROUTE_COLOR
 
     private fun hasLocationPermission(): Boolean =
         checkSelfPermission(carContext, Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -395,6 +467,7 @@ class CarMapRenderer(
         runCatching { virtualDisplay?.release() }
         virtualDisplay = null
         centredOnDriver = false
+        appliedNight = false
         visibleArea = null
     }
 
@@ -402,9 +475,18 @@ class CarMapRenderer(
         const val TAG = "CarMapRenderer"
         const val VIRTUAL_DISPLAY_NAME = "RoadMateCarMap"
         const val DRIVING_ZOOM = 15.5
+
+        /** RoadMate blue for the route, and a lighter blue that survives the dark style. */
         const val ROUTE_COLOR = "#1565C0"
+        const val ROUTE_COLOR_NIGHT = "#5B9CFF"
         const val ROUTE_WIDTH = 5f
         const val ROUTE_PADDING_PX = 140
+
+        /** The driver's own position marker — RoadMate blue in both modes. */
+        const val DRIVER_DOT_COLOR = 0xFF1A73E8.toInt()
+
+        /** `https://tiles.openfreemap.org/styles/liberty` → group 1 is everything up to the style name. */
+        val OPENFREEMAP_STYLE = Regex("^(https?://tiles\\.openfreemap\\.org/styles)/[a-z0-9-]+/?$")
 
         /** Don't re-geocode until the car has actually gone somewhere. */
         const val GEOCODE_MOVE_M = 40.0

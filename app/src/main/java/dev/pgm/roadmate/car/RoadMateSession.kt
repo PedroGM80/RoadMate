@@ -1,6 +1,7 @@
 package dev.pgm.roadmate.car
 
 import android.content.Intent
+import android.content.res.Configuration
 import androidx.car.app.AppManager
 import androidx.car.app.Screen
 import androidx.car.app.Session
@@ -50,6 +51,15 @@ class RoadMateSession(
             locationRepository,
             currentPlaceRepository,
         )
+    }
+
+    /**
+     * The car switched between day and night. Hosts that recreate the drawing
+     * surface on this change re-run the renderer's setup anyway; this covers
+     * the ones that only send a config change, so the map still re-themes.
+     */
+    override fun onCarConfigurationChanged(newConfiguration: Configuration) {
+        mapRenderer.refreshDayNight()
     }
 
     override fun onCreateScreen(intent: Intent): Screen {
