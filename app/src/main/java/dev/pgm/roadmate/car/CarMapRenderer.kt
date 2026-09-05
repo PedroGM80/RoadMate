@@ -117,58 +117,13 @@ class CarMapRenderer(
         val surface = surfaceContainer.surface ?: return
         release()
 
-        val displayManager = carContext.getSystemService(DisplayManager::class.java) ?: return
-        val display = displayManager.createVirtualDisplay(
-            VIRTUAL_DISPLAY_NAME,
-            surfaceContainer.width.coerceAtLeast(1),
-            surfaceContainer.height.coerceAtLeast(1),
-            surfaceContainer.dpi.coerceAtLeast(1),
-            surface,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY or
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION,
-        ) ?: return
+        val display = createVirtualDisplay(surfaceContainer, surface) ?: return
         virtualDisplay = display
 
-        val options = MapLibreMapOptions.createFromAttributes(carContext)
-            // See the class comment: SurfaceView does not composite here.
-            .textureMode(true)
-            .attributionEnabled(false)
-            .logoEnabled(false)
-            .compassEnabled(false)
-            // Every gesture arrives through SurfaceCallback instead.
-            .scrollGesturesEnabled(false)
-            .zoomGesturesEnabled(false)
-            .rotateGesturesEnabled(false)
-            .tiltGesturesEnabled(false)
-
-        val view = MapView(carContext, options)
-        val root = FrameLayout(carContext).apply {
-            addView(view)
-            val speed = TextView(carContext).apply {
-                setTextColor(Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-                setPadding(24, 12, 24, 12)
-                background = GradientDrawable().apply {
-                    setColor(0xAA000000.toInt())
-                    cornerRadius = 16f
-                }
-                visibility = View.GONE
-                gravity = Gravity.CENTER
-            }
-            addView(speed, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM or Gravity.START
-            ).apply {
-                setMargins(32, 0, 0, 32)
-            })
-            speedView = speed
-        }
-
+        val view = MapView(carContext, carMapOptions())
         val screen = Presentation(carContext, display.display).apply {
-            setContentView(root)
+            setContentView(wrapWithSpeedHud(view))
         }
-
         try {
             screen.show()
         } catch (t: Throwable) {
@@ -176,28 +131,11 @@ class CarMapRenderer(
             release()
             return
         }
-
         presentation = screen
         mapView = view
 
         scope.launch {
-            locationRepository.location.collect { loc ->
-                val speedKmh = loc?.speedKmh
-                speedView?.apply {
-                    if (speedKmh != null && speedKmh > 3) {
-                        val text = SpannableString("$speedKmh\nkm/h")
-                        val numLen = speedKmh.toString().length
-                        text.setSpan(RelativeSizeSpan(1.5f), 0, numLen, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
-                        text.setSpan(StyleSpan(Typeface.BOLD), 0, numLen, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
-                        text.setSpan(RelativeSizeSpan(0.6f), numLen, text.length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
-                        
-                        this.text = text
-                        visibility = View.VISIBLE
-                    } else {
-                        visibility = View.GONE
-                    }
-                }
-            }
+            locationRepository.location.collect { showSpeed(it?.speedKmh) }
         }
 
         view.onCreate(null)
@@ -216,6 +154,73 @@ class CarMapRenderer(
             }
             installStyle(loaded, recentre = true)
         }
+    }
+
+    private fun createVirtualDisplay(sc: SurfaceContainer, surface: android.view.Surface): VirtualDisplay? {
+        val displayManager = carContext.getSystemService(DisplayManager::class.java) ?: return null
+        return displayManager.createVirtualDisplay(
+            VIRTUAL_DISPLAY_NAME,
+            sc.width.coerceAtLeast(1),
+            sc.height.coerceAtLeast(1),
+            sc.dpi.coerceAtLeast(1),
+            surface,
+            DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY or
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESENTATION,
+        )
+    }
+
+    private fun carMapOptions(): MapLibreMapOptions =
+        MapLibreMapOptions.createFromAttributes(carContext)
+            // See the class comment: SurfaceView does not composite here.
+            .textureMode(true)
+            .attributionEnabled(false)
+            .logoEnabled(false)
+            .compassEnabled(false)
+            // Every gesture arrives through SurfaceCallback instead.
+            .scrollGesturesEnabled(false)
+            .zoomGesturesEnabled(false)
+            .rotateGesturesEnabled(false)
+            .tiltGesturesEnabled(false)
+
+    /** Puts [mapView] under a bottom-left speed readout, kept in [speedView]. */
+    private fun wrapWithSpeedHud(mapView: MapView): FrameLayout = FrameLayout(carContext).apply {
+        addView(mapView)
+        val speed = TextView(carContext).apply {
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setPadding(24, 12, 24, 12)
+            background = GradientDrawable().apply {
+                setColor(0xAA000000.toInt())
+                cornerRadius = 16f
+            }
+            visibility = View.GONE
+            gravity = Gravity.CENTER
+        }
+        addView(
+            speed,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.BOTTOM or Gravity.START,
+            ).apply { setMargins(32, 0, 0, 32) },
+        )
+        speedView = speed
+    }
+
+    /** Shows the speed above a walking pace, big number over a small "km/h". */
+    private fun showSpeed(speedKmh: Int?) {
+        val view = speedView ?: return
+        if (speedKmh == null || speedKmh <= 3) {
+            view.visibility = View.GONE
+            return
+        }
+        val numLen = speedKmh.toString().length
+        view.text = SpannableString("$speedKmh\nkm/h").apply {
+            setSpan(RelativeSizeSpan(1.5f), 0, numLen, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+            setSpan(StyleSpan(Typeface.BOLD), 0, numLen, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+            setSpan(RelativeSizeSpan(0.6f), numLen, length, Spanned.SPAN_INCLUSIVE_EXCLUSIVE)
+        }
+        view.visibility = View.VISIBLE
     }
 
     /**
