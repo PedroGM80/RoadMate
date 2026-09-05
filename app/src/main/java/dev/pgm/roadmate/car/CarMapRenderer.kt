@@ -138,7 +138,7 @@ class CarMapRenderer(
                 isCompassEnabled = false
             }
             loaded.setStyle(Style.Builder().fromUri(styleUrl)) { style ->
-                registerPinIcons(style, carContext)
+                registerPinIcons(style, carContext, CAR_PIN_DP)
                 Log.i(
                     TAG,
                     "pin images registered: " +
@@ -152,8 +152,14 @@ class CarMapRenderer(
                 lineManager = LineManager(view, loaded, style)
                 circleManager = CircleManager(view, loaded, style)
                 val manager = SymbolManager(view, loaded, style).apply {
+                    // Both, not just allow-overlap: the base style is dense
+                    // with its own POI symbols, and without ignore-placement
+                    // ours lose every collision against them and are dropped
+                    // silently — created, counted, never drawn.
                     iconAllowOverlap = true
-                    textAllowOverlap = false
+                    iconIgnorePlacement = true
+                    textAllowOverlap = true
+                    textIgnorePlacement = true
                 }
                 symbolManager = manager
                 enableDriverDot(loaded, style)
@@ -386,6 +392,14 @@ class CarMapRenderer(
         /** Don't re-geocode until the car has actually gone somewhere. */
         const val GEOCODE_MOVE_M = 40.0
         const val GEOCODE_INTERVAL_MS = 8_000L
+
+        /**
+         * Pin size for the car screen. The phone's 32dp is a speck here: the
+         * display is further from the driver and lower-resolution, and the
+         * base style's own POI icons are already competing for the same
+         * pixels.
+         */
+        const val CAR_PIN_DP = 72f
         val LN_2 = ln(2.0)
     }
 }

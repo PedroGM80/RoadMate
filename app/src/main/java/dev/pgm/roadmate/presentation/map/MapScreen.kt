@@ -968,9 +968,14 @@ private fun fallbackLabelFor(context: Context, kind: PoiKind): String = when (ki
     PoiKind.FOOD -> context.getString(R.string.map_poi_food_one)
 }
 
-internal fun registerPinIcons(style: Style, context: Context) {
+/**
+ * @param sizeDp how big the pin bitmap is. The phone's default reads well at
+ *   arm's length; the car screen is further away and lower-resolution, and a
+ *   32dp pin there comes out as a speck among the base style's own icons.
+ */
+internal fun registerPinIcons(style: Style, context: Context, sizeDp: Float = 32f) {
     val density = context.resources.displayMetrics.density
-    val size = (32f * density).toInt()
+    val size = (sizeDp * density).toInt()
     val cx = size / 2f
     val ring = 2.5f * density
 
