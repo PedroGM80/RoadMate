@@ -2,6 +2,8 @@ package dev.pgm.roadmate.ml
 
 import android.content.Context
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -25,6 +27,39 @@ import javax.inject.Singleton
  */
 @Singleton
 class TextToSpeechManager @Inject constructor(@ApplicationContext context: Context) {
+
+    // Android Auto only routes the phone's audio to the car speakers, and only
+    // ducks the car's music, while the app holds audio focus. Without a focus
+    // request the answer plays silently on the projected head unit even though
+    // the same utterance is audible on the handset. USAGE_ASSISTANCE_NAVIGATION_
+    // GUIDANCE is the channel a navigation-category car app is expected to speak
+    // on; TRANSIENT_MAY_DUCK lowers music instead of pausing it for the few
+    // seconds an answer takes.
+    private val audioManager = context.getSystemService(AudioManager::class.java)
+
+    private val speechAudioAttributes: AudioAttributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_ASSISTANCE_NAVIGATION_GUIDANCE)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+        .build()
+
+    private val focusRequest: AudioFocusRequest =
+        AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+            .setAudioAttributes(speechAudioAttributes)
+            .setWillPauseWhenDucked(false)
+            .setOnAudioFocusChangeListener { change ->
+                // A call or the car's own assistant taking the channel: drop
+                // the rest of the answer rather than talk under it.
+                if (change == AudioManager.AUDIOFOCUS_LOSS ||
+                    change == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT
+                ) {
+                    stop()
+                }
+            }
+            .build()
+
+    /** Whether a focus request is currently outstanding, so it is abandoned once. */
+    @Volatile
+    private var holdingFocus = false
 
     // Touched from three threads: the caller (main), the TTS init callback and
     // the UtteranceProgressListener (both binder threads). The plain
@@ -60,12 +95,7 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
         if (spanish == TextToSpeech.LANG_MISSING_DATA || spanish == TextToSpeech.LANG_NOT_SUPPORTED) {
             engine.language = Locale.getDefault()
         }
-        engine.setAudioAttributes(
-            AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANT)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build()
-        )
+        engine.setAudioAttributes(speechAudioAttributes)
         engine.setSpeechRate(speechRate)
         engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
             override fun onStart(utteranceId: String?) = Unit
@@ -106,6 +136,7 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
         }
         if (!isReady) {
             pendingUtterances.add(text to onDone)
+            acquireFocus()
             _isSpeaking.value = true
             return
         }
@@ -116,6 +147,7 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
         engine.stop()
         pendingUtterances.clear()
         doneCallbacks.clear()
+        releaseFocus()
         _isSpeaking.value = false
     }
 
@@ -128,13 +160,30 @@ class TextToSpeechManager @Inject constructor(@ApplicationContext context: Conte
     private fun enqueue(text: String, onDone: () -> Unit) {
         val utteranceId = UUID.randomUUID().toString()
         doneCallbacks[utteranceId] = onDone
+        acquireFocus()
         _isSpeaking.value = true
         engine.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
     }
 
     @Synchronized
     private fun refreshSpeakingState() {
-        _isSpeaking.value = doneCallbacks.isNotEmpty() || pendingUtterances.isNotEmpty()
+        val speaking = doneCallbacks.isNotEmpty() || pendingUtterances.isNotEmpty()
+        if (!speaking) releaseFocus()
+        _isSpeaking.value = speaking
+    }
+
+    @Synchronized
+    private fun acquireFocus() {
+        if (holdingFocus) return
+        holdingFocus = audioManager?.requestAudioFocus(focusRequest) ==
+            AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    }
+
+    @Synchronized
+    private fun releaseFocus() {
+        if (!holdingFocus) return
+        holdingFocus = false
+        audioManager?.abandonAudioFocusRequest(focusRequest)
     }
 
     private companion object {
